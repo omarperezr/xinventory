@@ -82,7 +82,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
       return [...prev, { ...item, cartQuantity: quantity }];
     });
-    toast.success(`Added ${quantity} ${item.name}(s) to Total`);
+    toast.success(`Se agrego ${quantity} ${item.name}(s) al total`);
   };
 
   const removeFromCart = (itemId: string) => {
@@ -105,22 +105,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const saveCart = () => {
     if (cartItems.length === 0) {
-        toast.error("Total list is empty");
+        toast.error("Lista Total vacía, no se puede guardar");
         return;
     }
-    
     const newSavedCart: SavedCart = {
       id: Date.now().toString(),
-      name: `Total List - ${new Date().toLocaleString()}`,
+      name: `Carrito - ${savedCarts.length + 1}`,
       items: [...cartItems],
-      dateSaved: new Date().toISOString(),
+      dateSaved: new Date().toLocaleString(),
       payments: [...currentPayments],
       notes: transactionNotes
     };
     
     setSavedCarts(prev => [newSavedCart, ...prev]);
     clearCart();
-    toast.success("Total list saved");
+    toast.success("Carrito Guardado");
   };
 
   const loadCart = (cart: SavedCart) => {
@@ -128,12 +127,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Backward compatibility: check if payments/notes exist, otherwise default to empty
     setCurrentPayments(cart.payments || []);
     setTransactionNotes(cart.notes || '');
-    toast.success("Loaded saved list");
+    toast.success("Carrito Cargado");
   };
 
   const deleteSavedCart = (cartId: string) => {
     setSavedCarts(prev => prev.filter(c => c.id !== cartId));
-    toast.success("Saved list deleted");
+    toast.success("Carrito eliminado");
   };
 
   // Payment Actions

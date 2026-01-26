@@ -28,7 +28,7 @@ function AppContent() {
       try {
         setItems(JSON.parse(savedItems));
       } catch (error) {
-        console.error('Failed to load inventory items:', error);
+        console.error('Error al cargar los elementos del inventario:', error);
       }
     }
     
@@ -54,7 +54,7 @@ function AppContent() {
         prev.map(i => i.id === editingItem.id ? { ...item, id: editingItem.id } : i)
       );
       setEditingItem(undefined);
-      toast.success('Product updated successfully');
+      toast.success('Producto actualizado exitosamente');
     } else {
       // Add new item
       const newItem: InventoryItem = {
@@ -62,7 +62,7 @@ function AppContent() {
         id: Date.now().toString(),
       };
       setItems(prev => [...prev, newItem]);
-      toast.success('Product added successfully');
+      toast.success('Producto agregado exitosamente');
     }
   };
 
@@ -80,7 +80,7 @@ function AppContent() {
     if (editingItem?.id === id) {
       setEditingItem(undefined);
     }
-    toast.success('Product deleted successfully');
+    toast.success('Producto eliminado exitosamente');
   };
 
   const handleCancelEdit = () => {
@@ -112,7 +112,7 @@ function AppContent() {
       
       addTransaction(cartItems, subtotal, tax, total, currentPayments, transactionNotes);
 
-      toast.success('Payment successful. Inventory updated.');
+      toast.success('Pago exitoso. Inventario actualizado.');
   };
 
   const handleReturnInventory = (itemId: string, quantity: number) => {

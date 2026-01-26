@@ -54,7 +54,7 @@ function InventoryTableRow({ item, onEdit, onDelete, onAddToCart }: {
                     ? 'bg-yellow-50 text-yellow-700'
                     : 'bg-green-50 text-green-700'
                 }`}>
-                  {item.quantity} units
+                  {item.quantity} unidades
                 </span>
               </div>
             </td>
@@ -111,8 +111,8 @@ export function InventoryTable({ items, onEdit, onDelete, onAddToCart }: Invento
             <Package className="w-8 h-8 text-gray-400" strokeWidth={1.5} />
           </div>
           <div>
-            <h3 className="text-gray-900 mb-1">No products found</h3>
-            <p className="text-sm text-gray-500 font-light">Add products or adjust your search to see results</p>
+            <h3 className="text-gray-900 mb-1">No se encontro el producto</h3>
+            <p className="text-sm text-gray-500 font-light">Agrega productos o ajusta tu busqueda para ver resultados</p>
           </div>
         </div>
       </div>
@@ -125,12 +125,12 @@ export function InventoryTable({ items, onEdit, onDelete, onAddToCart }: Invento
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Product Name</th>
-              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Barcode</th>
-              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Price</th>
-              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Date Added</th>
+              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Nombre del Producto</th>
+              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Codigo de Barra</th>
+              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Precio</th>
+              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Fecha de Adicion</th>
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Stock</th>
-              <th className="text-right px-6 py-4 text-sm text-gray-600 font-normal">Actions</th>
+              <th className="text-right px-6 py-4 text-sm text-gray-600 font-normal">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -151,10 +151,10 @@ export function InventoryTable({ items, onEdit, onDelete, onAddToCart }: Invento
       <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
         <div className="flex items-center justify-between text-sm">
           <div className="text-gray-600">
-            Total Products: <span className="text-[#1A1A1A] font-medium">{items.length}</span>
+            Productos Totales: <span className="text-[#1A1A1A] font-medium">{items.length}</span>
           </div>
           <div className="text-gray-600">
-            Total Units: <span className="text-[#1A1A1A] font-medium">
+            Unidades Totales: <span className="text-[#1A1A1A] font-medium">
               {items.reduce((sum, item) => sum + item.quantity, 0)}
             </span>
           </div>

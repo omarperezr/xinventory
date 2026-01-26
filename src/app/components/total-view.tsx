@@ -30,16 +30,14 @@ const currencySymbols: Record<string, string> = {
 };
 
 const PAYMENT_METHODS = [
-    "Cash",
-    "Credit Card",
-    "Debit Card",
-    "Bank Transfer",
-    "PayPal",
-    "Apple Pay",
-    "Google Pay",
-    "Cryptocurrency",
-    "Check",
-    "Other"
+    "Pago Movil",
+    "Efectivo",
+    "Tarjeta de Credito",
+    "Tarjeta de Debito",
+    "Transferencia Bancaria",
+    "Crypto",
+    "Zelle",
+    "Otro"
 ];
 
 interface TotalViewProps {
@@ -86,7 +84,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
   const handleAddPayment = () => {
       const amount = parseFloat(paymentAmount);
       if (isNaN(amount) || amount <= 0) {
-          toast.error("Please enter a valid amount");
+          toast.error("Por favor ingrese una cantidad valida");
           return;
       }
 
@@ -108,7 +106,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
               handleCompleteTransaction();
           }
       } else {
-          toast.success(`Payment of $${amount.toFixed(2)} added. Remaining: $${remaining.toFixed(2)}`);
+          toast.success(`Pago de $${amount.toFixed(2)} agregado. Falta: $${remaining.toFixed(2)}`);
       }
   };
 
@@ -134,7 +132,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-[#2196F3]" />
-                Current Total List
+                Carrito de Compras
               </h2>
               <div className="flex gap-2 w-full sm:w-auto">
                  <Button 
@@ -144,7 +142,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                    className="flex-1 sm:flex-none text-red-600 hover:text-red-700 hover:bg-red-50"
                  >
                    <Trash2 className="w-4 h-4 mr-2" />
-                   Clear
+                   Borrar
                  </Button>
                  <Button 
                    onClick={saveCart}
@@ -152,7 +150,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                    className="flex-1 sm:flex-none bg-[#2196F3] hover:bg-[#1976D2] text-white"
                  >
                    <Save className="w-4 h-4 mr-2" />
-                   Save
+                   Guardar
                  </Button>
               </div>
             </div>
@@ -160,7 +158,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <Input 
-                 placeholder="Search in total list..." 
+                 placeholder="Buscar en el carrito..." 
                  value={searchTerm}
                  onChange={(e) => setSearchTerm(e.target.value)}
                  className="pl-9"
@@ -172,16 +170,16 @@ export function TotalView({ onCheckout }: TotalViewProps) {
              {cartItems.length === 0 ? (
                 <div className="p-12 text-center">
                   <ShoppingCart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">Your total list is empty</p>
+                  <p className="text-gray-500">Tu carrito esta vacio</p>
                 </div>
              ) : (
                <div className="overflow-x-auto">
                  <table className="w-full">
                    <thead className="bg-gray-50 border-b border-gray-200">
                      <tr>
-                       <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Product</th>
-                       <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Price</th>
-                       <th className="text-center px-6 py-4 text-sm text-gray-600 font-normal">Quantity</th>
+                       <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Producto</th>
+                       <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Precio</th>
+                       <th className="text-center px-6 py-4 text-sm text-gray-600 font-normal">Cantidad</th>
                        <th className="text-right px-6 py-4 text-sm text-gray-600 font-normal">Subtotal</th>
                        <th className="px-6 py-4"></th>
                      </tr>
@@ -242,7 +240,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                        <td></td>
                      </tr>
                      <tr>
-                       <td colSpan={3} className="px-6 py-2 text-right text-sm text-gray-500">Tax (10%):</td>
+                       <td colSpan={3} className="px-6 py-2 text-right text-sm text-gray-500">Impuestos (10%):</td>
                        <td className="px-6 py-2 text-right text-sm text-gray-900 font-medium">
                          ${taxAmount.toFixed(2)}
                        </td>
@@ -252,7 +250,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         <>
                             {currentPayments.map((p, idx) => (
                                 <tr key={idx} className="text-green-600">
-                                    <td colSpan={3} className="px-6 py-2 text-right text-sm">Paid ({p.method}):</td>
+                                    <td colSpan={3} className="px-6 py-2 text-right text-sm">Pagado ({p.method}):</td>
                                     <td className="px-6 py-2 text-right text-sm font-medium">
                                         -${p.amount.toFixed(2)}
                                     </td>
@@ -263,7 +261,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                      )}
                      <tr className={isOverpaid ? "bg-red-50" : "bg-gray-100"}>
                        <td colSpan={3} className="px-6 py-4 text-right font-bold text-gray-700">
-                           {isOverpaid ? "Change Due:" : "Total Due:"}
+                           {isOverpaid ? "Vuelto a Dar:" : "Total a Pagar:"}
                        </td>
                        <td className={`px-6 py-4 text-right text-xl font-bold ${isOverpaid ? "text-red-600" : "text-[#2196F3]"}`}>
                          ${Math.abs(remainingDue).toFixed(2)}
@@ -283,7 +281,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         onClick={() => setIsPaymentModalOpen(true)}
                     >
                         <CreditCard className="w-5 h-5 mr-2" />
-                        {remainingDue <= 0 ? "Finish Transaction" : `Pay Balance: $${remainingDue.toFixed(2)}`}
+                        {remainingDue <= 0 ? "Finalizar Transacción" : `Pagar: $${remainingDue.toFixed(2)}`}
                     </Button>
                 </div>
              )}
@@ -294,15 +292,15 @@ export function TotalView({ onCheckout }: TotalViewProps) {
         <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
             <DialogContent className="sm:max-w-md bg-white">
                 <DialogHeader>
-                    <DialogTitle>Process Payment</DialogTitle>
+                    <DialogTitle>Procesar Pago</DialogTitle>
                     <DialogDescription>
-                        Total Remaining: <span className="font-bold text-[#2196F3]">${remainingDue.toFixed(2)}</span>
+                        Total Restante: <span className="font-bold text-[#2196F3]">${remainingDue.toFixed(2)}</span>
                     </DialogDescription>
                 </DialogHeader>
                 
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label>Payment Method</Label>
+                        <Label>Metodo de Pago</Label>
                         <Select value={selectedMethod} onValueChange={setSelectedMethod}>
                             <SelectTrigger>
                                 <SelectValue />
@@ -316,7 +314,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Amount</Label>
+                        <Label>Cantidad</Label>
                         <div className="relative">
                             <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                             <Input 
@@ -336,9 +334,9 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Notes (Optional)</Label>
+                        <Label>Notas (Opcional)</Label>
                         <Textarea 
-                            placeholder="Add transaction notes..." 
+                            placeholder="Agregar notas de transacción..." 
                             value={transactionNotes}
                             onChange={(e) => setTransactionNotes(e.target.value)}
                         />
@@ -350,13 +348,13 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         variant="secondary" 
                         onClick={() => setIsPaymentModalOpen(false)}
                      >
-                         Cancel
+                         Cancelar
                      </Button>
                      <Button 
                         onClick={handleAddPayment}
                         className="bg-[#2196F3] hover:bg-[#1976D2]"
                      >
-                         Confirm Payment
+                         Confirmar Pago
                      </Button>
                 </DialogFooter>
             </DialogContent>
@@ -370,7 +368,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                 <DialogHeader>
                     <DialogTitle className="text-red-600 flex items-center gap-2">
                         <Banknote className="w-6 h-6" />
-                        Change Required
+                        Vuelto a Dar
                     </DialogTitle>
                 </DialogHeader>
                 
@@ -384,7 +382,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         onClick={handleCompleteTransaction}
                         className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-6"
                      >
-                         Done
+                         Listo
                      </Button>
                 </DialogFooter>
             </DialogContent>
@@ -395,11 +393,11 @@ export function TotalView({ onCheckout }: TotalViewProps) {
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
             <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
               <RotateCcw className="w-4 h-4 text-gray-500" />
-              Saved Lists
+              Carritos Guardados
             </h3>
             
             {savedCarts.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">No saved lists</p>
+              <p className="text-sm text-gray-500 text-center py-4">No hay carritos guardados</p>
             ) : (
               <div className="space-y-3">
                 {savedCarts.map(cart => (

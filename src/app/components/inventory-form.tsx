@@ -89,10 +89,10 @@ export function InventoryForm({ onSubmit, defaultCurrency, editItem, onCancelEdi
           {editItem ? (
             <>
               <Edit className="w-5 h-5 text-[#2196F3]" strokeWidth={1.5} />
-              Edit Product
+              Editar Producto
             </>
           ) : (
-            'Add New Product'
+            'Agrega un Nuevo Producto'
           )}
         </h2>
         {editItem && onCancelEdit && (
@@ -112,12 +112,12 @@ export function InventoryForm({ onSubmit, defaultCurrency, editItem, onCancelEdi
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Product Name */}
           <div className="space-y-2">
-            <Label htmlFor="name" className="text-sm text-gray-700 font-normal">Product Name</Label>
+            <Label htmlFor="name" className="text-sm text-gray-700 font-normal">Nombre del Producto</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter product name"
+              placeholder="Ingresa el nombre del producto"
               className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
               required
             />
@@ -128,14 +128,14 @@ export function InventoryForm({ onSubmit, defaultCurrency, editItem, onCancelEdi
             <Label htmlFor="barcode" className="text-sm text-gray-700 font-normal">
               <span className="flex items-center gap-2">
                 <Barcode className="w-4 h-4 text-[#2196F3]" strokeWidth={1.5} />
-                Barcode
+                Codigo de Barra
               </span>
             </Label>
             <Input
               id="barcode"
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
-              placeholder="Enter or scan barcode"
+              placeholder="Ingresa o escanea el codigo de barra"
               className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
               required
             />
@@ -143,7 +143,7 @@ export function InventoryForm({ onSubmit, defaultCurrency, editItem, onCancelEdi
 
           {/* Price */}
           <div className="space-y-2">
-            <Label htmlFor="price" className="text-sm text-gray-700 font-normal">Price</Label>
+            <Label htmlFor="price" className="text-sm text-gray-700 font-normal">Precio</Label>
             <div className="flex gap-2">
               <Select value={currency} onValueChange={setCurrency}>
                 <SelectTrigger className="w-[110px] border-gray-300 rounded-lg">
@@ -171,14 +171,14 @@ export function InventoryForm({ onSubmit, defaultCurrency, editItem, onCancelEdi
 
           {/* Date Added */}
           <div className="space-y-2">
-            <Label className="text-sm text-gray-700 font-normal">Date Added</Label>
+            <Label className="text-sm text-gray-700 font-normal">Fecha de Adicion</Label>
             <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   className="w-full flex items-center justify-start text-left font-normal border border-gray-300 rounded-lg hover:bg-gray-50 px-3 py-2 bg-white"
                 >
-                  {dateAdded ? format(dateAdded, 'PPP') : <span>Pick a date</span>}
+                  {dateAdded ? format(dateAdded, 'PPP') : <span>Selecciona una fecha</span>}
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0 bg-white rounded-lg border border-gray-200" align="start">
@@ -199,7 +199,7 @@ export function InventoryForm({ onSubmit, defaultCurrency, editItem, onCancelEdi
 
           {/* Stock Quantity */}
           <div className="space-y-2">
-            <Label className="text-sm text-gray-700 font-normal">Stock Quantity</Label>
+            <Label className="text-sm text-gray-700 font-normal">Cantidad en Stock</Label>
             <div className="flex items-center gap-3">
               <Button
                 type="button"
@@ -235,7 +235,7 @@ export function InventoryForm({ onSubmit, defaultCurrency, editItem, onCancelEdi
             type="submit"
             className="bg-[#2196F3] hover:bg-[#1976D2] text-white rounded-lg px-8 shadow-sm"
           >
-            {editItem ? 'Update Product' : 'Add Product'}
+            {editItem ? 'Actualizar Producto' : 'Agregar Producto'}
           </Button>
         </div>
       </form>

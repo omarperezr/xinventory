@@ -50,12 +50,12 @@ export function SearchView({
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
-        <h2 className="text-lg font-medium text-gray-900">Search Inventory</h2>
+        <h2 className="text-lg font-medium text-gray-900">Buscar en el Inventario</h2>
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
              <Input 
-               placeholder="Search products..." 
+               placeholder="Buscar productos..."
                value={searchTerm}
                onChange={(e) => setSearchTerm(e.target.value)}
                className="pl-9"
@@ -66,9 +66,9 @@ export function SearchView({
               <SelectValue placeholder="Filter by" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Fields</SelectItem>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="barcode">Barcode</SelectItem>
+              <SelectItem value="all">Todos los Campos</SelectItem>
+              <SelectItem value="name">Nombre</SelectItem>
+              <SelectItem value="barcode">Codigo de Barra</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -83,7 +83,7 @@ export function SearchView({
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg md:relative md:bg-[#2196F3] md:text-white md:rounded-lg md:shadow-md md:border-0 md:mt-8">
         <div className="max-w-7xl mx-auto flex justify-between items-center px-4 md:px-0">
-            <div className="text-sm md:text-lg font-medium text-gray-900 md:text-white">Current Total Value</div>
+            <div className="text-sm md:text-lg font-medium text-gray-900 md:text-white">Total actual</div>
             <div className="text-xl md:text-3xl font-bold text-[#2196F3] md:text-white">${totalAmount.toFixed(2)}</div>
         </div>
       </div>

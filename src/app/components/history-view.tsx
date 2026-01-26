@@ -73,7 +73,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
         <div className="relative">
            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
            <Input 
-             placeholder="Search transactions by ID or product name..." 
+             placeholder="Busca transacciones por ID o nombre del producto" 
              value={searchTerm}
              onChange={(e) => setSearchTerm(e.target.value)}
              className="pl-9"
@@ -92,8 +92,8 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Transaction ID</th>
-                  <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Date</th>
+                  <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">ID de la Transaccion</th>
+                  <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Fecha</th>
                   <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">Items</th>
                   <th className="text-right px-6 py-4 text-sm text-gray-600 font-normal">Total</th>
                   <th className="px-6 py-4"></th>
@@ -119,7 +119,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                       <div className="text-sm text-gray-600">
                         {transaction.items.length} items
                         <span className="text-xs text-gray-400 ml-2">
-                          ({transaction.items.reduce((acc, i) => acc + i.cartQuantity, 0)} units)
+                          ({transaction.items.reduce((acc, i) => acc + i.cartQuantity, 0)} unidades)
                         </span>
                       </div>
                     </td>
@@ -143,9 +143,9 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
       <Dialog open={!!selectedTransaction} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
         <DialogContent className="sm:max-w-4xl max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
-            <DialogTitle>Transaction Details</DialogTitle>
+            <DialogTitle>Detalles de la Transaccion</DialogTitle>
             <DialogDescription>
-              Transaction ID: #{selectedTransaction?.id} • {selectedTransaction && format(new Date(selectedTransaction.date), 'PPP p')}
+              ID de la Transaccion: #{selectedTransaction?.id} • {selectedTransaction && format(new Date(selectedTransaction.date), 'PPP p')}
             </DialogDescription>
           </DialogHeader>
 
@@ -156,10 +156,10 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                 <table className="w-full">
                    <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-medium">
                      <tr>
-                       <th className="px-4 py-3 text-left">Product</th>
-                       <th className="px-4 py-3 text-right">Price</th>
-                       <th className="px-4 py-3 text-center">Qty Bought</th>
-                       <th className="px-4 py-3 text-center">Returned</th>
+                       <th className="px-4 py-3 text-left">Producto</th>
+                       <th className="px-4 py-3 text-right">Precio</th>
+                       <th className="px-4 py-3 text-center">Cantidad Comprada</th>
+                       <th className="px-4 py-3 text-center">Vuelto</th>
                        <th className="px-4 py-3 text-right">Subtotal</th>
                        <th className="px-4 py-3"></th>
                      </tr>
@@ -184,12 +184,12 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                         <td></td>
                       </tr>
                       <tr>
-                        <td colSpan={4} className="px-4 py-2 text-right text-gray-500">Tax (10%):</td>
+                        <td colSpan={4} className="px-4 py-2 text-right text-gray-500">Impuestos (10%):</td>
                         <td className="px-4 py-2 text-right font-medium">${selectedTransaction.tax.toFixed(2)}</td>
                         <td></td>
                       </tr>
                       <tr className="border-t border-gray-200">
-                        <td colSpan={4} className="px-4 py-3 text-right font-bold text-gray-900">Total Paid:</td>
+                        <td colSpan={4} className="px-4 py-3 text-right font-bold text-gray-900">Total Pagado:</td>
                         <td className="px-4 py-3 text-right font-bold text-[#2196F3]">${selectedTransaction.total.toFixed(2)}</td>
                         <td></td>
                       </tr>
@@ -201,7 +201,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-3">
                   <h3 className="font-medium text-gray-900 flex items-center gap-2">
                       <CreditCard className="w-4 h-4 text-[#2196F3]" />
-                      Payment Details
+                      Detalles del Pago
                   </h3>
                   <div className="grid gap-2">
                       {selectedTransaction.payments.map((p, i) => (
@@ -212,7 +212,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                       ))}
                       {selectedTransaction.total < selectedTransaction.payments.reduce((sum, p) => sum + p.amount, 0) && (
                           <div className="flex justify-between text-sm border-t border-gray-200 pt-2 mt-2">
-                              <span className="text-gray-600">Change Given</span>
+                              <span className="text-gray-600">Vuelto Dado</span>
                               <span className="font-medium text-red-600">
                                   -${(selectedTransaction.payments.reduce((sum, p) => sum + p.amount, 0) - selectedTransaction.total).toFixed(2)}
                               </span>
@@ -223,7 +223,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                       <div className="pt-2 border-t border-gray-200 mt-2">
                           <div className="text-xs text-gray-500 flex items-center gap-1 mb-1">
                               <StickyNote className="w-3 h-3" />
-                              Notes
+                              Notas
                           </div>
                           <p className="text-sm text-gray-700 italic bg-white p-2 rounded border border-gray-100">
                               {selectedTransaction.notes}
@@ -236,7 +236,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
               <div className="space-y-4">
                  <h3 className="font-medium text-gray-900 flex items-center gap-2">
                    <ImageIcon className="w-4 h-4 text-[#2196F3]" />
-                   Attachments (Bills/Receipts)
+                   Archivos (Recibos/Facturas)
                  </h3>
                  
                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -322,7 +322,7 @@ function TransactionItemRow({
               onClick={() => setReturnMode(true)}
             >
               <CornerUpLeft className="w-3 h-3 mr-1" />
-              Return
+              Retornar Producto
             </Button>
           ) : (
             <div className="flex items-center justify-end gap-2 bg-gray-50 p-1 rounded border border-gray-200">
@@ -339,7 +339,7 @@ function TransactionItemRow({
                 className="h-7 px-2 text-xs bg-red-600 hover:bg-red-700 text-white"
                 onClick={handleReturnClick}
               >
-                Confirm
+                Confirmar
               </Button>
               <button 
                 onClick={() => setReturnMode(false)}
