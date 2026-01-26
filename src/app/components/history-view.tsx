@@ -68,7 +68,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
         <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
           <History className="w-5 h-5 text-[#2196F3]" />
-          Transaction History
+          Historial de Transacciones
         </h2>
         <div className="relative">
            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -85,7 +85,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
         {transactions.length === 0 ? (
            <div className="p-16 text-center">
              <Receipt className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-             <p className="text-gray-500">No transactions yet</p>
+             <p className="text-gray-500">No Hay Transacciones Realizadas</p>
            </div>
         ) : (
           <div className="overflow-x-auto">
