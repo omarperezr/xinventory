@@ -150,8 +150,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   // Calculations
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.cartQuantity), 0);
-  const taxAmount = subtotal * 0.10;
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.sellingPrice * item.cartQuantity), 0);
+  // Calculate tax at 10% IF item.includesTax is true
+  const taxAmount = cartItems.reduce((sum, item) => 
+    sum + (item.includesTax ? item.sellingPrice * item.cartQuantity * 0.1 : 0), 0);
   const totalAmount = subtotal + taxAmount;
   
   const amountPaid = currentPayments.reduce((sum, p) => sum + p.amount, 0);

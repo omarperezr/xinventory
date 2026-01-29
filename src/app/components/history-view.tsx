@@ -295,7 +295,7 @@ function TransactionItemRow({
         <div className="text-xs text-gray-500 font-mono">{item.barcode}</div>
       </td>
       <td className="px-4 py-3 text-right text-gray-600">
-        {currencySymbols[item.currency] || '$'}{item.price.toFixed(2)}
+        {currencySymbols[item.currency] || '$'}{item.sellingPrice.toFixed(2)}
       </td>
       <td className="px-4 py-3 text-center text-gray-900">
         {item.cartQuantity}
@@ -310,7 +310,7 @@ function TransactionItemRow({
         )}
       </td>
       <td className="px-4 py-3 text-right font-medium text-gray-900">
-        {currencySymbols[item.currency] || '$'}{(item.price * item.cartQuantity).toFixed(2)}
+        {currencySymbols[item.currency] || '$'}{(item.sellingPrice * item.cartQuantity).toFixed(2)}
       </td>
       <td className="px-4 py-3 text-right">
         {availableToReturn > 0 && (

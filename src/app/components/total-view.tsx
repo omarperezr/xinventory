@@ -192,7 +192,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                            <div className="text-xs text-gray-500 font-mono">{item.barcode}</div>
                          </td>
                          <td className="px-6 py-4 text-sm text-gray-600">
-                            {currencySymbols[item.currency] || '$'}{item.price.toFixed(2)}
+                            {currencySymbols[item.currency] || '$'}{item.sellingPrice.toFixed(2)}
                          </td>
                          <td className="px-6 py-4">
                            <div className="flex items-center justify-center gap-2">
@@ -218,7 +218,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                            </div>
                          </td>
                          <td className="px-6 py-4 text-right font-medium text-[#1A1A1A]">
-                           {currencySymbols[item.currency] || '$'}{(item.price * item.cartQuantity).toFixed(2)}
+                           {currencySymbols[item.currency] || '$'}{(item.sellingPrice * item.cartQuantity).toFixed(2)}
                          </td>
                          <td className="px-6 py-4 text-right">
                            <button 

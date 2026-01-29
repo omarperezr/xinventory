@@ -43,7 +43,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
       try {
         setTransactions(JSON.parse(saved));
       } catch (e) {
-        console.error("Failed to load history", e);
+        console.error("Error al cargar historial", e);
       }
     }
   }, []);
@@ -92,7 +92,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
       if (t.id !== transactionId) return t;
       return { ...t, images: [...t.images, imageBase64] };
     }));
-    toast.success("Image attached to transaction");
+    toast.success("Imagen agregada a la transacción");
   };
 
   return (
