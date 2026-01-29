@@ -16,12 +16,18 @@ interface SearchViewProps {
   items: InventoryItem[];
   onEditItem: (item: InventoryItem) => void;
   onDeleteItem: (id: string) => void;
+  usdValue: number;
+  eurValue: number;
+  defaultCurrency: string;
 }
 
 export function SearchView({
   items,
   onEditItem,
   onDeleteItem,
+  usdValue,
+  eurValue,
+  defaultCurrency,
 }: SearchViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBy, setFilterBy] = useState("all");
@@ -81,6 +87,9 @@ export function SearchView({
         onEdit={onEditItem}
         onDelete={onDeleteItem}
         onAddToCart={addToCart}
+        usdValue={usdValue}
+        eurValue={eurValue}
+        defaultCurrency={defaultCurrency}
       />
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg md:relative md:bg-[#2196F3] md:text-white md:rounded-lg md:shadow-md md:border-0 md:mt-8">

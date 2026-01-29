@@ -11,19 +11,26 @@ import { HistoryProvider, useHistory } from "./context/history-context";
 import { Toaster } from "sonner";
 import { toast } from "sonner";
 
-function AppContent() {
+function AppContent({
+  defaultCurrency,
+  setDefaultCurrency,
+  usdValue,
+  setUsdValue,
+  eurValue,
+  setEurValue,
+}: {
+  defaultCurrency: string;
+  setDefaultCurrency: (currency: string) => void;
+  usdValue: number;
+  setUsdValue: (value: number) => void;
+  eurValue: number;
+  setEurValue: (value: number) => void;
+}) {
   const navigate = useNavigate();
   const { addTransaction } = useHistory();
   const { currentPayments, transactionNotes } = useCart(); // Access payment state from Cart
-  const [defaultCurrency, setDefaultCurrency] = useState("BS");
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [editingItem, setEditingItem] = useState<InventoryItem | undefined>();
-  const [usdValue, setUsdValue] = useState(
-    Math.max(1, parseFloat(localStorage.getItem("usdValue") || "1")),
-  );
-  const [eurValue, setEurValue] = useState(
-    Math.max(1, parseFloat(localStorage.getItem("eurValue") || "1")),
-  );
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -187,6 +194,9 @@ function AppContent() {
                 items={items}
                 onEditItem={handleEditItem}
                 onDeleteItem={handleDeleteItem}
+                usdValue={usdValue}
+                eurValue={eurValue}
+                defaultCurrency={defaultCurrency}
               />
             }
           />
@@ -205,11 +215,29 @@ function AppContent() {
 }
 
 function App() {
+  const [defaultCurrency, setDefaultCurrency] = useState("BS");
+  const [usdValue, setUsdValue] = useState(
+    Math.max(1, parseFloat(localStorage.getItem("usdValue") || "1")),
+  );
+  const [eurValue, setEurValue] = useState(
+    Math.max(1, parseFloat(localStorage.getItem("eurValue") || "1")),
+  );
   return (
     <BrowserRouter>
-      <CartProvider>
+      <CartProvider
+        defaultCurrency={defaultCurrency}
+        usdValue={usdValue}
+        eurValue={eurValue}
+      >
         <HistoryProvider>
-          <AppContent />
+          <AppContent
+            defaultCurrency={defaultCurrency}
+            setDefaultCurrency={setDefaultCurrency}
+            usdValue={usdValue}
+            setUsdValue={setUsdValue}
+            eurValue={eurValue}
+            setEurValue={setEurValue}
+          />
         </HistoryProvider>
       </CartProvider>
     </BrowserRouter>

@@ -10,6 +10,9 @@ interface InventoryTableProps {
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
   onAddToCart?: (item: InventoryItem, quantity: number) => void;
+  usdValue: number;
+  eurValue: number;
+  defaultCurrency: string;
 }
 
 const currencySymbols: Record<string, string> = {
@@ -18,16 +21,61 @@ const currencySymbols: Record<string, string> = {
   EUR: "€",
 };
 
+const getRightPriceBasedOnCurrency = (
+  item: InventoryItem,
+  price: number,
+  defaultCurrency: string,
+  usdValue: number,
+  eurValue: number,
+) => {
+  if (item.currency === defaultCurrency) {
+    return price;
+  }
+
+  // Convert to default currency
+  switch (defaultCurrency) {
+    case "BS":
+      if (item.currency === "USD") {
+        return price * usdValue;
+      } else if (item.currency === "EUR") {
+        return price * eurValue;
+      }
+      break;
+    case "USD":
+      if (item.currency === "BS") {
+        return price / usdValue;
+      } else if (item.currency === "EUR") {
+        return (price * eurValue) / usdValue;
+      }
+      break;
+    case "EUR":
+      if (item.currency === "BS") {
+        return price / eurValue;
+      } else if (item.currency === "USD") {
+        return (price * usdValue) / eurValue;
+      }
+      break;
+  }
+
+  return item.sellingPrice; // Fallback
+};
+
 function InventoryTableRow({
   item,
   onEdit,
   onDelete,
   onAddToCart,
+  usdValue,
+  eurValue,
+  defaultCurrency,
 }: {
   item: InventoryItem;
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
   onAddToCart?: (item: InventoryItem, quantity: number) => void;
+  usdValue: number;
+  eurValue: number;
+  defaultCurrency: string;
 }) {
   const [quantityToAdd, setQuantityToAdd] = useState(1);
 
@@ -41,16 +89,26 @@ function InventoryTableRow({
       </td>
       <td className="px-6 py-4">
         <div className="text-[#1A1A1A]">
-          {currencySymbols[item.currency]}
-          {item.buyingPrice.toFixed(2)}
-          <span className="text-xs text-gray-500 ml-1">{item.currency}</span>
+          {getRightPriceBasedOnCurrency(
+            item,
+            item.buyingPrice,
+            defaultCurrency,
+            usdValue,
+            eurValue,
+          ).toFixed(2)}
+          <span className="text-xs text-gray-500 ml-1">{defaultCurrency}</span>
         </div>
       </td>
       <td className="px-6 py-4">
         <div className="text-[#1A1A1A]">
-          {currencySymbols[item.currency]}
-          {item.sellingPrice.toFixed(2)}
-          <span className="text-xs text-gray-500 ml-1">{item.currency}</span>
+          {getRightPriceBasedOnCurrency(
+            item,
+            item.sellingPrice,
+            defaultCurrency,
+            usdValue,
+            eurValue,
+          ).toFixed(2)}
+          <span className="text-xs text-gray-500 ml-1">{defaultCurrency}</span>
         </div>
       </td>
       <td className="px-6 py-4">
@@ -124,6 +182,9 @@ export function InventoryTable({
   onEdit,
   onDelete,
   onAddToCart,
+  usdValue,
+  eurValue,
+  defaultCurrency,
 }: InventoryTableProps) {
   if (items.length === 0) {
     return (
@@ -180,6 +241,9 @@ export function InventoryTable({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onAddToCart={onAddToCart}
+                usdValue={usdValue}
+                eurValue={eurValue}
+                defaultCurrency={defaultCurrency}
               />
             ))}
           </tbody>

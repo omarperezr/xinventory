@@ -48,6 +48,9 @@ export function DashboardView({
         items={items}
         onEdit={onEditItem}
         onDelete={onDeleteItem}
+        usdValue={usdValue}
+        eurValue={eurValue}
+        defaultCurrency={defaultCurrency}
       />
     </div>
   );
