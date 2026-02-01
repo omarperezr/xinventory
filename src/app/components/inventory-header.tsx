@@ -4,6 +4,9 @@ import {
   Search,
   ShoppingCart,
   History,
+  BarChart2,
+  User,
+  LogOut,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -13,21 +16,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { useApp } from "../context/app-context";
+import { useAuth } from "../context/auth-context";
+import { Button } from "./ui/button";
 
-interface InventoryHeaderProps {
-  defaultCurrency: string;
-  onCurrencyChange: (currency: string) => void;
-}
-
-export function InventoryHeader({
-  defaultCurrency,
-  onCurrencyChange,
-}: InventoryHeaderProps) {
+export function InventoryHeader() {
   const location = useLocation();
+  const { currency, setCurrency } = useApp();
+  const { currentUser, users, login, logout } = useAuth();
+
+  const isAdmin = currentUser?.role === "admin";
   const isDashboard = location.pathname === "/";
   const isSearch = location.pathname === "/search";
   const isTotal = location.pathname === "/total";
   const isHistory = location.pathname === "/history";
+  const isReports = location.pathname === "/reports";
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -39,25 +42,27 @@ export function InventoryHeader({
                 <Package className="w-5 h-5 text-white" strokeWidth={1.5} />
               </div>
               <div>
-                <h1 className="text-[#1A1A1A] tracking-tight">XInventory</h1>
+                <h1 className="text-[#1A1A1A] tracking-tight">Inventario</h1>
                 <p className="text-sm text-gray-500 font-light">
-                  Producto de XSingularity
+                  Gestión de productos
                 </p>
               </div>
             </div>
 
             <nav className="hidden md:flex items-center bg-gray-100/80 p-1 rounded-lg">
-              <Link
-                to="/"
-                className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  isDashboard
-                    ? "bg-white text-[#2196F3] shadow-sm"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4 mr-2" />
-                Admin
-              </Link>
+              {isAdmin && (
+                <Link
+                  to="/"
+                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    isDashboard
+                      ? "bg-white text-[#2196F3] shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4 mr-2" />
+                  Admin
+                </Link>
+              )}
               <Link
                 to="/search"
                 className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
@@ -91,65 +96,58 @@ export function InventoryHeader({
                 <History className="w-4 h-4 mr-2" />
                 Historial
               </Link>
+              {isAdmin && (
+                <Link
+                  to="/reports"
+                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    isReports
+                      ? "bg-white text-[#2196F3] shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  <BarChart2 className="w-4 h-4 mr-2" />
+                  Reportes
+                </Link>
+              )}
             </nav>
           </div>
 
           <div className="flex items-center justify-between md:justify-end gap-3">
-            <nav className="flex md:hidden items-center bg-gray-100/80 p-1 rounded-lg mr-4">
-              <Link
-                to="/"
-                className={`p-2 rounded-md transition-all ${
-                  isDashboard
-                    ? "bg-white text-[#2196F3] shadow-sm"
-                    : "text-gray-500"
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </Link>
-              <Link
-                to="/search"
-                className={`p-2 rounded-md transition-all ${
-                  isSearch
-                    ? "bg-white text-[#2196F3] shadow-sm"
-                    : "text-gray-500"
-                }`}
-              >
-                <Search className="w-4 h-4" />
-              </Link>
-              <Link
-                to="/total"
-                className={`p-2 rounded-md transition-all ${
-                  isTotal
-                    ? "bg-white text-[#2196F3] shadow-sm"
-                    : "text-gray-500"
-                }`}
-              >
-                <ShoppingCart className="w-4 h-4" />
-              </Link>
-              <Link
-                to="/history"
-                className={`p-2 rounded-md transition-all ${
-                  isHistory
-                    ? "bg-white text-[#2196F3] shadow-sm"
-                    : "text-gray-500"
-                }`}
-              >
-                <History className="w-4 h-4" />
-              </Link>
-            </nav>
+            {/* Mobile Nav - simplified */}
 
             <div className="flex items-center gap-3">
-              <label className="text-sm text-gray-600 font-normal hidden sm:block">
-                Moneda Default:
-              </label>
-              <Select value={defaultCurrency} onValueChange={onCurrencyChange}>
-                <SelectTrigger className="w-[120px] border-gray-300 rounded-lg">
+              {/* Currency Selector */}
+              <Select
+                value={currency}
+                onValueChange={(val: any) => setCurrency(val)}
+              >
+                <SelectTrigger className="w-[100px] border-gray-300 rounded-lg h-9 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="BS">BS (Bs)</SelectItem>
+                  <SelectItem value="BS">Bs (VES)</SelectItem>
                   <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="EUR">EUR (€)</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* User Selector (Mock Auth) */}
+              <Select
+                value={currentUser?.id}
+                onValueChange={(val) => login(val)}
+              >
+                <SelectTrigger className="w-[140px] border-gray-300 rounded-lg h-9 text-sm">
+                  <User className="w-4 h-4 mr-2 text-gray-500" />
+                  <span className="truncate">
+                    {currentUser?.name.split(" ")[0] || "Login"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name} ({u.role})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -1,6 +1,12 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { CartItem, PaymentRecord } from './cart-context';
-import { toast } from 'sonner';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { CartItem, PaymentRecord } from "./app-context";
+import { toast } from "sonner";
 
 export interface TransactionItem extends CartItem {
   quantityReturned: number;
@@ -13,20 +19,22 @@ export interface Transaction {
   subtotal: number;
   tax: number;
   total: number;
-  images: string[]; // Base64 strings
+  images: string[];
   payments: PaymentRecord[];
   notes?: string;
+  userId: string; // User who performed the transaction
 }
 
 interface HistoryContextType {
   transactions: Transaction[];
   addTransaction: (
-      items: CartItem[], 
-      subtotal: number, 
-      tax: number, 
-      total: number, 
-      payments: PaymentRecord[],
-      notes?: string
+    items: CartItem[],
+    subtotal: number,
+    tax: number,
+    total: number,
+    payments: PaymentRecord[],
+    userId: string,
+    notes?: string,
   ) => void;
   returnItem: (transactionId: string, itemId: string, quantity: number) => void;
   addImageToTransaction: (transactionId: string, imageBase64: string) => void;
@@ -38,70 +46,88 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('transactionHistory');
+    const saved = localStorage.getItem("transactionHistory");
     if (saved) {
       try {
         setTransactions(JSON.parse(saved));
       } catch (e) {
-        console.error("Error al cargar historial", e);
+        console.error("Failed to load history", e);
       }
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('transactionHistory', JSON.stringify(transactions));
+    localStorage.setItem("transactionHistory", JSON.stringify(transactions));
   }, [transactions]);
 
   const addTransaction = (
-      items: CartItem[], 
-      subtotal: number, 
-      tax: number, 
-      total: number,
-      payments: PaymentRecord[],
-      notes?: string
+    items: CartItem[],
+    subtotal: number,
+    tax: number,
+    total: number,
+    payments: PaymentRecord[],
+    userId: string,
+    notes?: string,
   ) => {
     const newTransaction: Transaction = {
       id: Date.now().toString(),
       date: new Date().toISOString(),
-      items: items.map(item => ({ ...item, quantityReturned: 0 })),
+      items: items.map((item) => ({ ...item, quantityReturned: 0 })),
       subtotal,
       tax,
       total,
       images: [],
       payments,
-      notes
+      notes,
+      userId,
     };
-    setTransactions(prev => [newTransaction, ...prev]);
+    setTransactions((prev) => [newTransaction, ...prev]);
   };
 
-  const returnItem = (transactionId: string, itemId: string, quantity: number) => {
-    setTransactions(prev => prev.map(t => {
-      if (t.id !== transactionId) return t;
+  const returnItem = (
+    transactionId: string,
+    itemId: string,
+    quantity: number,
+  ) => {
+    setTransactions((prev) =>
+      prev.map((t) => {
+        if (t.id !== transactionId) return t;
 
-      const updatedItems = t.items.map(item => {
-        if (item.id !== itemId) return item;
-        return { ...item, quantityReturned: item.quantityReturned + quantity };
-      });
-      
-      return { ...t, items: updatedItems };
-    }));
+        const updatedItems = t.items.map((item) => {
+          if (item.id !== itemId) return item;
+          return {
+            ...item,
+            quantityReturned: item.quantityReturned + quantity,
+          };
+        });
+
+        return { ...t, items: updatedItems };
+      }),
+    );
   };
 
-  const addImageToTransaction = (transactionId: string, imageBase64: string) => {
-    setTransactions(prev => prev.map(t => {
-      if (t.id !== transactionId) return t;
-      return { ...t, images: [...t.images, imageBase64] };
-    }));
-    toast.success("Imagen agregada a la transacción");
+  const addImageToTransaction = (
+    transactionId: string,
+    imageBase64: string,
+  ) => {
+    setTransactions((prev) =>
+      prev.map((t) => {
+        if (t.id !== transactionId) return t;
+        return { ...t, images: [...t.images, imageBase64] };
+      }),
+    );
+    toast.success("Imagen adjuntada a la transacción");
   };
 
   return (
-    <HistoryContext.Provider value={{
-      transactions,
-      addTransaction,
-      returnItem,
-      addImageToTransaction
-    }}>
+    <HistoryContext.Provider
+      value={{
+        transactions,
+        addTransaction,
+        returnItem,
+        addImageToTransaction,
+      }}
+    >
       {children}
     </HistoryContext.Provider>
   );
@@ -110,7 +136,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
 export function useHistory() {
   const context = useContext(HistoryContext);
   if (context === undefined) {
-    throw new Error('useHistory must be used within a HistoryProvider');
+    throw new Error("useHistory must be used within a HistoryProvider");
   }
   return context;
 }

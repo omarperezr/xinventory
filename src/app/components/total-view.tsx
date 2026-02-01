@@ -12,7 +12,6 @@ import {
   Banknote,
   DollarSign,
 } from "lucide-react";
-import { useCart, type CartItem } from "../context/cart-context";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
@@ -34,21 +33,17 @@ import {
 } from "./ui/select";
 import { Label } from "./ui/label";
 import { toast } from "sonner";
-
-const currencySymbols: Record<string, string> = {
-  BS: "BS",
-  USD: "$",
-  EUR: "€",
-};
+import { useApp, CartItem } from "../context/app-context";
 
 const PAYMENT_METHODS = [
-  "Pago Movil",
   "Efectivo",
-  "Tarjeta de Credito",
-  "Tarjeta de Debito",
-  "Transferencia Bancaria",
-  "Crypto",
+  "Tarjeta de Crédito",
+  "Tarjeta de Débito",
+  "Transferencia",
+  "Pago Móvil",
+  "PayPal",
   "Zelle",
+  "Divisas",
   "Otro",
 ];
 
@@ -69,6 +64,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
     subtotal,
     taxAmount,
     totalAmount,
+    formatPrice,
     // Payment State
     currentPayments,
     transactionNotes,
@@ -77,13 +73,13 @@ export function TotalView({ onCheckout }: TotalViewProps) {
     clearPayments,
     amountPaid,
     remainingDue,
-  } = useCart();
+  } = useApp();
 
   const [searchTerm, setSearchTerm] = useState("");
 
   // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedMethod, setSelectedMethod] = useState("Cash");
+  const [selectedMethod, setSelectedMethod] = useState("Efectivo");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
@@ -97,7 +93,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
   const handleAddPayment = () => {
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
-      toast.error("Por favor ingrese una cantidad valida");
+      toast.error("Por favor ingrese un monto válido");
       return;
     }
 
@@ -108,10 +104,11 @@ export function TotalView({ onCheckout }: TotalViewProps) {
     const newPaidTotal = amountPaid + amount;
     const remaining = totalAmount - newPaidTotal;
 
-    if (remaining <= 0) {
+    if (remaining <= 0.01) {
+      // Tolerance for float errors
       // Transaction Complete
       setIsPaymentModalOpen(false);
-      if (remaining < 0) {
+      if (remaining < -0.01) {
         setChangeAmount(Math.abs(remaining));
         setIsChangeModalOpen(true);
       } else {
@@ -120,7 +117,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
       }
     } else {
       toast.success(
-        `Pago de $${amount.toFixed(2)} agregado. Falta: $${remaining.toFixed(2)}`,
+        `Pago de ${formatPrice(amount)} agregado. Restante: ${formatPrice(remaining)}`,
       );
     }
   };
@@ -135,7 +132,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
     setIsPaymentModalOpen(false);
   };
 
-  const isOverpaid = remainingDue < 0;
+  const isOverpaid = remainingDue < -0.01;
 
   return (
     <div className="space-y-8">
@@ -146,7 +143,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-[#2196F3]" />
-                Carrito de Compras
+                Lista Total Actual
               </h2>
               <div className="flex gap-2 w-full sm:w-auto">
                 <Button
@@ -156,7 +153,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                   className="flex-1 sm:flex-none text-red-600 hover:text-red-700 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Borrar
+                  Limpiar
                 </Button>
                 <Button
                   onClick={saveCart}
@@ -172,7 +169,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <Input
-                placeholder="Buscar en el carrito..."
+                placeholder="Buscar en la lista..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -184,7 +181,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
             {cartItems.length === 0 ? (
               <div className="p-12 text-center">
                 <ShoppingCart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">Tu carrito esta vacio</p>
+                <p className="text-gray-500">Tu lista está vacía</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -195,7 +192,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         Producto
                       </th>
                       <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                        Precio
+                        Precio Unit.
                       </th>
                       <th className="text-center px-6 py-4 text-sm text-gray-600 font-normal">
                         Cantidad
@@ -216,10 +213,14 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                           <div className="text-xs text-gray-500 font-mono">
                             {item.barcode}
                           </div>
+                          {item.includesTaxes && (
+                            <div className="text-[10px] text-blue-600 bg-blue-50 inline-block px-1 rounded mt-1">
+                              Con Impuestos
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {currencySymbols[item.currency] || "$"}
-                          {item.sellingPrice.toFixed(2)}
+                          {formatPrice(item.sellingPrice)}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
@@ -260,8 +261,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right font-medium text-[#1A1A1A]">
-                          {currencySymbols[item.currency] || "$"}
-                          {(item.sellingPrice * item.cartQuantity).toFixed(2)}
+                          {formatPrice(item.sellingPrice * item.cartQuantity)}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button
@@ -283,7 +283,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         Subtotal:
                       </td>
                       <td className="px-6 py-2 text-right text-sm text-gray-900 font-medium">
-                        ${subtotal.toFixed(2)}
+                        {formatPrice(subtotal)}
                       </td>
                       <td></td>
                     </tr>
@@ -292,10 +292,10 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         colSpan={3}
                         className="px-6 py-2 text-right text-sm text-gray-500"
                       >
-                        Impuestos (10%):
+                        Impuestos (10% sobre aplicables):
                       </td>
                       <td className="px-6 py-2 text-right text-sm text-gray-900 font-medium">
-                        ${taxAmount.toFixed(2)}
+                        {formatPrice(taxAmount)}
                       </td>
                       <td></td>
                     </tr>
@@ -310,7 +310,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                               Pagado ({p.method}):
                             </td>
                             <td className="px-6 py-2 text-right text-sm font-medium">
-                              -${p.amount.toFixed(2)}
+                              -{formatPrice(p.amount)}
                             </td>
                             <td></td>
                           </tr>
@@ -322,12 +322,12 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         colSpan={3}
                         className="px-6 py-4 text-right font-bold text-gray-700"
                       >
-                        {isOverpaid ? "Vuelto a Dar:" : "Total a Pagar:"}
+                        {isOverpaid ? "Cambio Pendiente:" : "Total a Pagar:"}
                       </td>
                       <td
                         className={`px-6 py-4 text-right text-xl font-bold ${isOverpaid ? "text-red-600" : "text-[#2196F3]"}`}
                       >
-                        ${Math.abs(remainingDue).toFixed(2)}
+                        {formatPrice(Math.abs(remainingDue))}
                       </td>
                       <td></td>
                     </tr>
@@ -344,9 +344,9 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                   onClick={() => setIsPaymentModalOpen(true)}
                 >
                   <CreditCard className="w-5 h-5 mr-2" />
-                  {remainingDue <= 0
+                  {remainingDue <= 0.01
                     ? "Finalizar Transacción"
-                    : `Pagar: $${remainingDue.toFixed(2)}`}
+                    : `Pagar: ${formatPrice(remainingDue)}`}
                 </Button>
               </div>
             )}
@@ -359,16 +359,16 @@ export function TotalView({ onCheckout }: TotalViewProps) {
             <DialogHeader>
               <DialogTitle>Procesar Pago</DialogTitle>
               <DialogDescription>
-                Total Restante:{" "}
+                Restante por pagar:{" "}
                 <span className="font-bold text-[#2196F3]">
-                  ${remainingDue.toFixed(2)}
+                  {formatPrice(remainingDue)}
                 </span>
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Metodo de Pago</Label>
+                <Label>Método de Pago</Label>
                 <Select
                   value={selectedMethod}
                   onValueChange={setSelectedMethod}
@@ -387,9 +387,11 @@ export function TotalView({ onCheckout }: TotalViewProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Cantidad</Label>
+                <Label>Monto (Bs)</Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                    Bs
+                  </span>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -409,7 +411,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
               <div className="space-y-2">
                 <Label>Notas (Opcional)</Label>
                 <Textarea
-                  placeholder="Agregar notas de transacción..."
+                  placeholder="Notas de la transacción..."
                   value={transactionNotes}
                   onChange={(e) => setTransactionNotes(e.target.value)}
                 />
@@ -444,14 +446,14 @@ export function TotalView({ onCheckout }: TotalViewProps) {
             <DialogHeader>
               <DialogTitle className="text-red-600 flex items-center gap-2">
                 <Banknote className="w-6 h-6" />
-                Vuelto a Dar
+                Cambio Requerido
               </DialogTitle>
             </DialogHeader>
 
             <div className="py-8 text-center">
               <p className="text-gray-600 text-lg">Dale cambio de</p>
               <p className="text-4xl font-bold text-red-600 mt-2">
-                ${changeAmount.toFixed(2)}
+                {formatPrice(changeAmount)}
               </p>
             </div>
 
@@ -460,7 +462,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                 onClick={handleCompleteTransaction}
                 className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-6"
               >
-                Listo
+                Listo (Entregado)
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -471,12 +473,12 @@ export function TotalView({ onCheckout }: TotalViewProps) {
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
             <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
               <RotateCcw className="w-4 h-4 text-gray-500" />
-              Carritos Guardados
+              Listas Guardadas
             </h3>
 
             {savedCarts.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">
-                No hay carritos guardados
+                No hay listas guardadas
               </p>
             ) : (
               <div className="space-y-3">
@@ -495,6 +497,14 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                       </span>
                       <span>{cart.items.length} items</span>
                     </div>
+                    {cart.payments && cart.payments.length > 0 && (
+                      <div className="mt-1 text-xs text-green-600 font-medium">
+                        Abonado:{" "}
+                        {formatPrice(
+                          cart.payments.reduce((s, p) => s + p.amount, 0),
+                        )}
+                      </div>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

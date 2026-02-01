@@ -1,119 +1,72 @@
-import { Edit2, Trash2, Package, Plus } from "lucide-react";
+import { Edit2, Trash2, Package, Plus, Clock } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { format } from "date-fns";
 import { useState } from "react";
-import type { InventoryItem } from "./inventory-form";
+import { useApp, InventoryItem } from "../context/app-context";
 
 interface InventoryTableProps {
   items: InventoryItem[];
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
   onAddToCart?: (item: InventoryItem, quantity: number) => void;
-  usdValue: number;
-  eurValue: number;
-  defaultCurrency: string;
+  onViewHistory?: (item: InventoryItem) => void;
+  showBuyingPrice?: boolean;
 }
-
-const currencySymbols: Record<string, string> = {
-  BS: "BS",
-  USD: "$",
-  EUR: "€",
-};
-
-const getRightPriceBasedOnCurrency = (
-  item: InventoryItem,
-  price: number,
-  defaultCurrency: string,
-  usdValue: number,
-  eurValue: number,
-) => {
-  if (item.currency === defaultCurrency) {
-    return price;
-  }
-
-  // Convert to default currency
-  switch (defaultCurrency) {
-    case "BS":
-      if (item.currency === "USD") {
-        return price * usdValue;
-      } else if (item.currency === "EUR") {
-        return price * eurValue;
-      }
-      break;
-    case "USD":
-      if (item.currency === "BS") {
-        return price / usdValue;
-      } else if (item.currency === "EUR") {
-        return (price * eurValue) / usdValue;
-      }
-      break;
-    case "EUR":
-      if (item.currency === "BS") {
-        return price / eurValue;
-      } else if (item.currency === "USD") {
-        return (price * usdValue) / eurValue;
-      }
-      break;
-  }
-
-  return item.sellingPrice; // Fallback
-};
 
 function InventoryTableRow({
   item,
   onEdit,
   onDelete,
   onAddToCart,
-  usdValue,
-  eurValue,
-  defaultCurrency,
+  onViewHistory,
+  showBuyingPrice,
 }: {
   item: InventoryItem;
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
   onAddToCart?: (item: InventoryItem, quantity: number) => void;
-  usdValue: number;
-  eurValue: number;
-  defaultCurrency: string;
+  onViewHistory?: (item: InventoryItem) => void;
+  showBuyingPrice?: boolean;
 }) {
+  const { formatPrice } = useApp();
   const [quantityToAdd, setQuantityToAdd] = useState(1);
+
+  const unitLabel = {
+    units: "unidades",
+    kg: "kg",
+    liters: "L",
+  }[item.unit || "units"];
 
   return (
     <tr className="hover:bg-gray-50 transition-colors">
       <td className="px-6 py-4">
-        <div className="text-[#1A1A1A]">{item.name}</div>
+        <div className="text-[#1A1A1A] font-medium">{item.name}</div>
+        {item.includesTaxes && (
+          <span className="text-[10px] uppercase bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-2">
+            Con Impuestos
+          </span>
+        )}
       </td>
       <td className="px-6 py-4">
         <div className="text-gray-600 font-mono text-sm">{item.barcode}</div>
       </td>
       <td className="px-6 py-4">
-        <div className="text-[#1A1A1A]">
-          {getRightPriceBasedOnCurrency(
-            item,
-            item.buyingPrice,
-            defaultCurrency,
-            usdValue,
-            eurValue,
-          ).toFixed(2)}
-          <span className="text-xs text-gray-500 ml-1">{defaultCurrency}</span>
+        <div className="text-[#1A1A1A] font-medium">
+          {formatPrice(item.sellingPrice)}
         </div>
       </td>
-      <td className="px-6 py-4">
-        <div className="text-[#1A1A1A]">
-          {getRightPriceBasedOnCurrency(
-            item,
-            item.sellingPrice,
-            defaultCurrency,
-            usdValue,
-            eurValue,
-          ).toFixed(2)}
-          <span className="text-xs text-gray-500 ml-1">{defaultCurrency}</span>
-        </div>
-      </td>
+      {showBuyingPrice && (
+        <td className="px-6 py-4">
+          <div className="text-gray-500">{formatPrice(item.buyingPrice)}</div>
+        </td>
+      )}
       <td className="px-6 py-4">
         <div className="text-gray-600 text-sm">
-          {format(new Date(item.dateAdded), "MMM dd, yyyy")}
+          {/* dateAdded is stored as string in JSON but Date in logic, handle safely */}
+          {item.history?.[0]?.date
+            ? format(new Date(item.history[0].date), "dd MMM yyyy")
+            : "N/A"}
         </div>
       </td>
       <td className="px-6 py-4">
@@ -127,7 +80,7 @@ function InventoryTableRow({
                   : "bg-green-50 text-green-700"
             }`}
           >
-            {item.quantity} unidades
+            {item.quantity} {unitLabel}
           </span>
         </div>
       </td>
@@ -138,6 +91,7 @@ function InventoryTableRow({
               <Input
                 type="number"
                 min="1"
+                // Max is item.quantity, but user might want to try adding more to see error
                 value={quantityToAdd}
                 onChange={(e) =>
                   setQuantityToAdd(Math.max(1, parseInt(e.target.value) || 1))
@@ -148,11 +102,24 @@ function InventoryTableRow({
                 size="sm"
                 onClick={() => onAddToCart(item, quantityToAdd)}
                 className="bg-[#2196F3] hover:bg-[#1976D2] text-white h-7 w-7 p-0 rounded-md"
-                title="Add to Total"
+                title="Agregar al Total"
+                disabled={item.quantity === 0}
               >
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
+          )}
+
+          {onViewHistory && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onViewHistory(item)}
+              className="text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              title="Ver Historial"
+            >
+              <Clock className="w-4 h-4" strokeWidth={1.5} />
+            </Button>
           )}
 
           <Button
@@ -160,6 +127,7 @@ function InventoryTableRow({
             size="sm"
             onClick={() => onEdit(item)}
             className="text-[#2196F3] hover:text-[#1976D2] hover:bg-blue-50"
+            title="Editar"
           >
             <Edit2 className="w-4 h-4" strokeWidth={1.5} />
           </Button>
@@ -168,6 +136,7 @@ function InventoryTableRow({
             size="sm"
             onClick={() => onDelete(item.id)}
             className="text-red-500 hover:text-red-700 hover:bg-red-50"
+            title="Eliminar"
           >
             <Trash2 className="w-4 h-4" strokeWidth={1.5} />
           </Button>
@@ -182,9 +151,8 @@ export function InventoryTable({
   onEdit,
   onDelete,
   onAddToCart,
-  usdValue,
-  eurValue,
-  defaultCurrency,
+  onViewHistory,
+  showBuyingPrice,
 }: InventoryTableProps) {
   if (items.length === 0) {
     return (
@@ -194,9 +162,9 @@ export function InventoryTable({
             <Package className="w-8 h-8 text-gray-400" strokeWidth={1.5} />
           </div>
           <div>
-            <h3 className="text-gray-900 mb-1">No se encontro el producto</h3>
+            <h3 className="text-gray-900 mb-1">No hay productos encontrados</h3>
             <p className="text-sm text-gray-500 font-light">
-              Agrega productos o ajusta tu busqueda para ver resultados
+              Agrega productos o ajusta tu búsqueda
             </p>
           </div>
         </div>
@@ -211,19 +179,21 @@ export function InventoryTable({
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                Nombre del Producto
+                Producto
               </th>
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                Codigo de Barra
+                Código
               </th>
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                Precio de Compra
+                Precio Venta
               </th>
+              {showBuyingPrice && (
+                <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
+                  Precio Compra
+                </th>
+              )}
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                Precio de Venta
-              </th>
-              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                Fecha de Adicion
+                Fecha Creación
               </th>
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Stock
@@ -241,9 +211,8 @@ export function InventoryTable({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onAddToCart={onAddToCart}
-                usdValue={usdValue}
-                eurValue={eurValue}
-                defaultCurrency={defaultCurrency}
+                onViewHistory={onViewHistory}
+                showBuyingPrice={showBuyingPrice}
               />
             ))}
           </tbody>
@@ -254,11 +223,11 @@ export function InventoryTable({
       <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
         <div className="flex items-center justify-between text-sm">
           <div className="text-gray-600">
-            Productos Totales:{" "}
+            Total Productos:{" "}
             <span className="text-[#1A1A1A] font-medium">{items.length}</span>
           </div>
           <div className="text-gray-600">
-            Unidades Totales:{" "}
+            Total Stock:{" "}
             <span className="text-[#1A1A1A] font-medium">
               {items.reduce((sum, item) => sum + item.quantity, 0)}
             </span>
