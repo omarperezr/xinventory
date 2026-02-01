@@ -76,6 +76,7 @@ export function SearchView({ onEditItem, onDeleteItem }: SearchViewProps) {
         onDelete={onDeleteItem}
         onAddToCart={addToCart}
         showBuyingPrice={currentUser?.role === "admin"}
+        searchView={true}
       />
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg md:relative md:bg-[#2196F3] md:text-white md:rounded-lg md:shadow-md md:border-0 md:mt-8">

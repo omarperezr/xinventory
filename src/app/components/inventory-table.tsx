@@ -12,6 +12,7 @@ interface InventoryTableProps {
   onAddToCart?: (item: InventoryItem, quantity: number) => void;
   onViewHistory?: (item: InventoryItem) => void;
   showBuyingPrice?: boolean;
+  searchView?: boolean;
 }
 
 function InventoryTableRow({
@@ -21,6 +22,7 @@ function InventoryTableRow({
   onAddToCart,
   onViewHistory,
   showBuyingPrice,
+  searchView = false,
 }: {
   item: InventoryItem;
   onEdit: (item: InventoryItem) => void;
@@ -28,6 +30,7 @@ function InventoryTableRow({
   onAddToCart?: (item: InventoryItem, quantity: number) => void;
   onViewHistory?: (item: InventoryItem) => void;
   showBuyingPrice?: boolean;
+  searchView?: boolean;
 }) {
   const { formatPrice } = useApp();
   const [quantityToAdd, setQuantityToAdd] = useState(1);
@@ -122,24 +125,28 @@ function InventoryTableRow({
             </Button>
           )}
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onEdit(item)}
-            className="text-[#2196F3] hover:text-[#1976D2] hover:bg-blue-50"
-            title="Editar"
-          >
-            <Edit2 className="w-4 h-4" strokeWidth={1.5} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onDelete(item.id)}
-            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-            title="Eliminar"
-          >
-            <Trash2 className="w-4 h-4" strokeWidth={1.5} />
-          </Button>
+          {!searchView && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEdit(item)}
+                className="text-[#2196F3] hover:text-[#1976D2] hover:bg-blue-50"
+                title="Editar"
+              >
+                <Edit2 className="w-4 h-4" strokeWidth={1.5} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDelete(item.id)}
+                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                title="Eliminar"
+              >
+                <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+              </Button>
+            </>
+          )}
         </div>
       </td>
     </tr>
@@ -153,6 +160,7 @@ export function InventoryTable({
   onAddToCart,
   onViewHistory,
   showBuyingPrice,
+  searchView = false,
 }: InventoryTableProps) {
   if (items.length === 0) {
     return (
@@ -198,9 +206,11 @@ export function InventoryTable({
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Stock
               </th>
-              <th className="text-right px-6 py-4 text-sm text-gray-600 font-normal">
-                Acciones
-              </th>
+              {!searchView && (
+                <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
+                  Acciones
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -213,6 +223,7 @@ export function InventoryTable({
                 onAddToCart={onAddToCart}
                 onViewHistory={onViewHistory}
                 showBuyingPrice={showBuyingPrice}
+                searchView={searchView}
               />
             ))}
           </tbody>
