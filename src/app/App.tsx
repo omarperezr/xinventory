@@ -114,20 +114,7 @@ function AppContent() {
             element={
               <SearchView
                 onEditItem={handleEditItem}
-                onDeleteItem={(id) => {
-                  // Only admin can delete, handled in AdminView usually,
-                  // but if accessed here, we should probably check role or redirect.
-                  // For now, let's just show a toast if they try?
-                  // Actually SearchView calls onDeleteItem, but we removed the logic from here
-                  // and put it in AdminView.
-                  // We can pass a dummy or actual delete if user is admin.
-                  // Let's rely on the button being hidden in InventoryTable if not admin (which we didn't do yet).
-                  // But SearchView receives onDeleteItem.
-                  // I'll leave it empty here or wire it up if needed.
-                  toast.error(
-                    "Solo los administradores pueden eliminar desde la vista de administración",
-                  );
-                }}
+                onDeleteItem={(id) => {}}
               />
             }
           />

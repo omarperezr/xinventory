@@ -88,7 +88,7 @@ function InventoryTableRow({
         </div>
       </td>
       <td className="px-6 py-4">
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify gap-2">
           {onAddToCart && (
             <div className="flex items-center mr-2 bg-gray-50 p-1 rounded-md border border-gray-200">
               <Input
@@ -206,9 +206,13 @@ export function InventoryTable({
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Stock
               </th>
-              {!searchView && (
+              {!searchView ? (
                 <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                   Acciones
+                </th>
+              ) : (
+                <th className="text-left px-4 py-4 text-sm text-gray-600 font-normal">
+                  Agregar al Carrito
                 </th>
               )}
             </tr>
