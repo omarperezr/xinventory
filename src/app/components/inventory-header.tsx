@@ -6,7 +6,6 @@ import {
   History,
   BarChart2,
   User,
-  LogOut,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -18,110 +17,80 @@ import {
 } from "./ui/select";
 import { useApp } from "../context/app-context";
 import { useAuth } from "../context/auth-context";
-import { Button } from "./ui/button";
+
+// 1. Configuration to share logic between Desktop and Mobile views
+const NAV_ITEMS = [
+  { label: "Admin", path: "/", icon: LayoutGrid, adminOnly: true },
+  { label: "Buscar", path: "/search", icon: Search, adminOnly: false },
+  { label: "Total", path: "/total", icon: ShoppingCart, adminOnly: false },
+  { label: "Historial", path: "/history", icon: History, adminOnly: false },
+  { label: "Reportes", path: "/reports", icon: BarChart2, adminOnly: true },
+];
 
 export function InventoryHeader() {
   const location = useLocation();
   const { currency, setCurrency } = useApp();
-  const { currentUser, users, login, logout } = useAuth();
+  const { currentUser, users, login } = useAuth();
 
   const isAdmin = currentUser?.role === "admin";
-  const isDashboard = location.pathname === "/";
-  const isSearch = location.pathname === "/search";
-  const isTotal = location.pathname === "/total";
-  const isHistory = location.pathname === "/history";
-  const isReports = location.pathname === "/reports";
+
+  // Helper to check active state
+  const isActivePath = (path: string) => location.pathname === path;
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-8 py-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#2196F3] rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" strokeWidth={1.5} />
+    <>
+      {/* --- MAIN HEADER --- */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left Section: Logo & Desktop Nav */}
+            <div className="flex items-center gap-4 md:gap-8">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#2196F3] rounded-lg flex items-center justify-center shrink-0">
+                  <Package className="w-5 h-5 text-white" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h1 className="text-[#1A1A1A] tracking-tight font-semibold">
+                    XInventory
+                  </h1>
+                  <p className="hidden sm:block text-sm text-gray-500 font-light">
+                    Gestión de productos
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-[#1A1A1A] tracking-tight">Inventario</h1>
-                <p className="text-sm text-gray-500 font-light">
-                  Gestión de productos
-                </p>
-              </div>
+
+              {/* DESKTOP NAVIGATION (Hidden on Mobile) */}
+              <nav className="hidden md:flex items-center bg-gray-100/80 p-1 rounded-lg">
+                {NAV_ITEMS.map((item) => {
+                  if (item.adminOnly && !isAdmin) return null;
+                  const active = isActivePath(item.path);
+                  const Icon = item.icon;
+
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        active
+                          ? "bg-white text-[#2196F3] shadow-sm"
+                          : "text-gray-500 hover:text-gray-900"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 mr-2" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
             </div>
 
-            <nav className="hidden md:flex items-center bg-gray-100/80 p-1 rounded-lg">
-              {isAdmin && (
-                <Link
-                  to="/"
-                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    isDashboard
-                      ? "bg-white text-[#2196F3] shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
-                >
-                  <LayoutGrid className="w-4 h-4 mr-2" />
-                  Admin
-                </Link>
-              )}
-              <Link
-                to="/search"
-                className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  isSearch
-                    ? "bg-white text-[#2196F3] shadow-sm"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-              >
-                <Search className="w-4 h-4 mr-2" />
-                Buscar
-              </Link>
-              <Link
-                to="/total"
-                className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  isTotal
-                    ? "bg-white text-[#2196F3] shadow-sm"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-              >
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                Total
-              </Link>
-              <Link
-                to="/history"
-                className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  isHistory
-                    ? "bg-white text-[#2196F3] shadow-sm"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-              >
-                <History className="w-4 h-4 mr-2" />
-                Historial
-              </Link>
-              {isAdmin && (
-                <Link
-                  to="/reports"
-                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    isReports
-                      ? "bg-white text-[#2196F3] shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
-                >
-                  <BarChart2 className="w-4 h-4 mr-2" />
-                  Reportes
-                </Link>
-              )}
-            </nav>
-          </div>
-
-          <div className="flex items-center justify-between md:justify-end gap-3">
-            {/* Mobile Nav - simplified */}
-
-            <div className="flex items-center gap-3">
-              {/* Currency Selector */}
+            {/* Right Section: Controls */}
+            <div className="flex items-center gap-2 md:gap-3">
               <Select
                 value={currency}
                 onValueChange={(val: any) => setCurrency(val)}
               >
-                <SelectTrigger className="w-[100px] border-gray-300 rounded-lg h-9 text-sm">
+                <SelectTrigger className="w-[80px] md:w-[100px] border-gray-300 rounded-lg h-9 text-xs md:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -153,7 +122,37 @@ export function InventoryHeader() {
             </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* --- MOBILE BOTTOM NAVIGATION (Hidden on Desktop) --- */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <div className="flex justify-around items-center h-16">
+          {NAV_ITEMS.map((item) => {
+            if (item.adminOnly && !isAdmin) return null;
+            const active = isActivePath(item.path);
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${
+                  active ? "text-[#2196F3]" : "text-gray-400"
+                }`}
+              >
+                <Icon
+                  className={`w-5 h-5 ${active ? "fill-current" : ""}`}
+                  strokeWidth={active ? 2 : 1.5}
+                />
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Spacer to prevent content being hidden behind bottom nav on mobile */}
+      {/* <div className="h-20 md:hidden" /> */}
+    </>
   );
 }
