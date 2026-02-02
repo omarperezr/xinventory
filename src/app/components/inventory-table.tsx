@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { format } from "date-fns";
 import { useState } from "react";
-import { useApp, InventoryItem } from "../context/app-context";
+import { useApp, InventoryItem, applyDiscount } from "../context/app-context";
 
 interface InventoryTableProps {
   items: InventoryItem[];
@@ -54,16 +54,21 @@ function InventoryTableRow({
       <td className="px-6 py-4">
         <div className="text-gray-600 font-mono text-sm">{item.barcode}</div>
       </td>
-      <td className="px-6 py-4">
-        <div className="text-[#1A1A1A] font-medium">
-          {formatPrice(item.sellingPrice)}
-        </div>
-      </td>
       {showBuyingPrice && (
         <td className="px-6 py-4">
           <div className="text-gray-500">{formatPrice(item.buyingPrice)}</div>
         </td>
       )}
+      <td className="px-6 py-4">
+        <div className="text-[#1A1A1A] font-medium">
+          {formatPrice(item.sellingPrice)}
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="text-[#1A1A1A] font-medium">
+          {formatPrice(applyDiscount(item.sellingPrice, item.discount))}
+        </div>
+      </td>
       <td className="px-6 py-4">
         <div className="text-gray-600 text-sm">
           {/* dateAdded is stored as string in JSON but Date in logic, handle safely */}
@@ -192,14 +197,17 @@ export function InventoryTable({
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Código
               </th>
-              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                Precio Venta
-              </th>
               {showBuyingPrice && (
                 <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                   Precio Compra
                 </th>
               )}
+              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
+                Precio Venta
+              </th>
+              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
+                Descuento
+              </th>
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Fecha Creación
               </th>

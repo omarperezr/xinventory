@@ -30,7 +30,14 @@ export interface InventoryItem {
   currency: string;
   image?: string;
   history: ItemHistoryRecord[];
+  discount?: number; // Discount percentage (0-100)
 }
+
+// Helper function to calculate discounted price
+export const applyDiscount = (price: number, discount?: number): number => {
+  if (!discount || discount <= 0) return price;
+  return price * (1 - discount / 100);
+};
 
 export interface CartItem extends InventoryItem {
   cartQuantity: number;
@@ -278,7 +285,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // --- CART CALCULATIONS ---
   // Calculates based on Selling Price in BS
   const subtotal = cartItems.reduce(
-    (sum, item) => sum + item.sellingPrice * item.cartQuantity,
+    (sum, item) =>
+      sum + applyDiscount(item.sellingPrice, item.discount) * item.cartQuantity,
     0,
   );
 

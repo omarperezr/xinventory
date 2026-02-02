@@ -49,6 +49,8 @@ export function InventoryForm({
   // Notes for history (only for edits/adds)
   const [notes, setNotes] = useState("");
 
+  const [discount, setDiscount] = useState(0);
+
   useEffect(() => {
     if (editItem) {
       setName(editItem.name);
@@ -62,6 +64,7 @@ export function InventoryForm({
       setQuantity(editItem.quantity);
       setUnit(editItem.unit);
       setIncludesTaxes(editItem.includesTaxes);
+      setDiscount(editItem.discount || 0); // Add discount to editItem handling
     }
   }, [editItem]);
 
@@ -119,6 +122,7 @@ export function InventoryForm({
         unit,
         includesTaxes,
         currency: "BS", // System base currency
+        discount: discount, // Add discount to item data
       },
       notes,
     );
@@ -279,6 +283,27 @@ export function InventoryForm({
               />
             </div>
             {getConversions(sellingPrice, sellingCurrency)}
+          </div>
+
+          {/* Discount */}
+          <div className="space-y-2">
+            <Label
+              htmlFor="discount"
+              className="text-sm text-gray-700 font-normal"
+            >
+              Descuento (%)
+            </Label>
+            <Input
+              id="discount"
+              type="number"
+              step="1"
+              min="0"
+              max="100"
+              value={discount}
+              onChange={(e) => setDiscount(parseFloat(e.target.value))}
+              placeholder="0.00"
+              className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
+            />
           </div>
 
           {/* Stock Quantity */}
