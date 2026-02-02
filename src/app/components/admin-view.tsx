@@ -110,6 +110,7 @@ export function AdminView({
         onSubmit={editingItem ? handleUpdateItem : handleAddItem}
         editItem={editingItem}
         onCancelEdit={onCancelEdit}
+        rates={rates}
       />
 
       <InventoryTable

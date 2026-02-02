@@ -88,7 +88,7 @@ function InventoryTableRow({
         </div>
       </td>
       <td className="px-6 py-4">
-        <div className="flex items-center justify gap-2">
+        <div className="flex items-center justify-end gap-2">
           {onAddToCart && (
             <div className="flex items-center mr-2 bg-gray-50 p-1 rounded-md border border-gray-200">
               <Input

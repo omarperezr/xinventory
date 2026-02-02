@@ -21,21 +21,30 @@ interface InventoryFormProps {
   ) => void;
   editItem?: InventoryItem;
   onCancelEdit?: () => void;
+  rates: { USD: number; EUR: number };
 }
+
+type InputCurrency = "BS" | "USD" | "EUR";
 
 export function InventoryForm({
   onSubmit,
   editItem,
   onCancelEdit,
+  rates,
 }: InventoryFormProps) {
   const [name, setName] = useState("");
   const [barcode, setBarcode] = useState("");
+
+  // Prices are stored as strings to allow empty input
   const [buyingPrice, setBuyingPrice] = useState("");
-  const [sellingPrice, setSellingPrice] = useState(""); // Formerly 'price'
+  const [buyingCurrency, setBuyingCurrency] = useState<InputCurrency>("BS");
+
+  const [sellingPrice, setSellingPrice] = useState("");
+  const [sellingCurrency, setSellingCurrency] = useState<InputCurrency>("BS");
+
   const [quantity, setQuantity] = useState(1);
   const [unit, setUnit] = useState<UnitType>("units");
   const [includesTaxes, setIncludesTaxes] = useState(false);
-  const [, setDateAdded] = useState<Date>(new Date());
 
   // Notes for history (only for edits/adds)
   const [notes, setNotes] = useState("");
@@ -44,34 +53,72 @@ export function InventoryForm({
     if (editItem) {
       setName(editItem.name);
       setBarcode(editItem.barcode);
+      // Edit item prices are always in BS
       setBuyingPrice(editItem.buyingPrice.toString());
+      setBuyingCurrency("BS");
       setSellingPrice(editItem.sellingPrice.toString());
+      setSellingCurrency("BS");
+
       setQuantity(editItem.quantity);
       setUnit(editItem.unit);
       setIncludesTaxes(editItem.includesTaxes);
-      // We don't set dateAdded from editItem because that's "creation date",
-      // but maybe we want to preserve it?
-      // The prompt says "on the day x new product was brought into the system".
-      // Usually dateAdded is immutable.
-      // I'll leave it as "Date Added" for new items, but hide/disable for edits?
-      // For now, I'll keep it simple.
     }
   }, [editItem]);
+
+  // Helper to convert any input to BS
+  const toBS = (amount: number, currency: InputCurrency): number => {
+    if (currency === "BS") return amount;
+    if (currency === "USD") return amount * rates.USD;
+    if (currency === "EUR") return amount * rates.EUR;
+    return amount;
+  };
+
+  // Helper to display conversions
+  const getConversions = (amountStr: string, currency: InputCurrency) => {
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount)) return null;
+
+    const amountInBs = toBS(amount, currency);
+
+    const inUSD = amountInBs / rates.USD;
+    const inEUR = amountInBs / rates.EUR;
+    const inBS = amountInBs;
+
+    return (
+      <div className="text-xs text-gray-500 mt-1 flex gap-2">
+        <span className={currency === "BS" ? "font-bold text-[#2196F3]" : ""}>
+          Bs {inBS.toFixed(2)}
+        </span>
+        <span className="text-gray-300">|</span>
+        <span className={currency === "USD" ? "font-bold text-[#2196F3]" : ""}>
+          $ {inUSD.toFixed(2)}
+        </span>
+        <span className="text-gray-300">|</span>
+        <span className={currency === "EUR" ? "font-bold text-[#2196F3]" : ""}>
+          € {inEUR.toFixed(2)}
+        </span>
+      </div>
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !barcode || !sellingPrice || !buyingPrice) return;
 
+    // Convert inputs to BS for storage
+    const finalBuyingPrice = toBS(parseFloat(buyingPrice), buyingCurrency);
+    const finalSellingPrice = toBS(parseFloat(sellingPrice), sellingCurrency);
+
     onSubmit(
       {
         name,
         barcode,
-        buyingPrice: parseFloat(buyingPrice),
-        sellingPrice: parseFloat(sellingPrice),
+        buyingPrice: finalBuyingPrice,
+        sellingPrice: finalSellingPrice,
         quantity,
         unit,
         includesTaxes,
-        currency: "BS", // Always BS as base
+        currency: "BS", // System base currency
       },
       notes,
     );
@@ -85,8 +132,11 @@ export function InventoryForm({
       setQuantity(1);
       setUnit("units");
       setIncludesTaxes(false);
-      setDateAdded(new Date());
       setNotes("");
+      // Keep currencies as is for convenience? Or reset?
+      // Resetting to BS is safer
+      setBuyingCurrency("BS");
+      setSellingCurrency("BS");
     }
   };
 
@@ -163,19 +213,35 @@ export function InventoryForm({
               htmlFor="buyingPrice"
               className="text-sm text-gray-700 font-normal"
             >
-              Precio de Compra (Bs)
+              Precio de Compra
             </Label>
-            <Input
-              id="buyingPrice"
-              type="number"
-              step="0.01"
-              min="0"
-              value={buyingPrice}
-              onChange={(e) => setBuyingPrice(e.target.value)}
-              placeholder="0.00"
-              className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
-              required
-            />
+            <div className="flex gap-2">
+              <Select
+                value={buyingCurrency}
+                onValueChange={(v: InputCurrency) => setBuyingCurrency(v)}
+              >
+                <SelectTrigger className="w-[80px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BS">Bs</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                id="buyingPrice"
+                type="number"
+                step="0.01"
+                min="0"
+                value={buyingPrice}
+                onChange={(e) => setBuyingPrice(e.target.value)}
+                placeholder="0.00"
+                className="flex-1 border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
+                required
+              />
+            </div>
+            {getConversions(buyingPrice, buyingCurrency)}
           </div>
 
           {/* Selling Price */}
@@ -184,19 +250,35 @@ export function InventoryForm({
               htmlFor="sellingPrice"
               className="text-sm text-gray-700 font-normal"
             >
-              Precio de Venta (Bs)
+              Precio de Venta
             </Label>
-            <Input
-              id="sellingPrice"
-              type="number"
-              step="0.01"
-              min="0"
-              value={sellingPrice}
-              onChange={(e) => setSellingPrice(e.target.value)}
-              placeholder="0.00"
-              className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
-              required
-            />
+            <div className="flex gap-2">
+              <Select
+                value={sellingCurrency}
+                onValueChange={(v: InputCurrency) => setSellingCurrency(v)}
+              >
+                <SelectTrigger className="w-[80px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BS">Bs</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                id="sellingPrice"
+                type="number"
+                step="0.01"
+                min="0"
+                value={sellingPrice}
+                onChange={(e) => setSellingPrice(e.target.value)}
+                placeholder="0.00"
+                className="flex-1 border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
+                required
+              />
+            </div>
+            {getConversions(sellingPrice, sellingCurrency)}
           </div>
 
           {/* Stock Quantity */}
