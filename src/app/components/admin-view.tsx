@@ -8,12 +8,6 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { DollarSign, Euro, History, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
-
-// Helper function to calculate discounted price
-const applyDiscount = (price: number, discount?: number): number => {
-  if (!discount || discount <= 0) return price;
-  return price * (1 - discount / 100);
-};
 import {
   Dialog,
   DialogContent,

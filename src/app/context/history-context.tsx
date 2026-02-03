@@ -7,6 +7,7 @@ import {
 } from "react";
 import { CartItem, PaymentRecord } from "./app-context";
 import { toast } from "sonner";
+import { dbService } from "../services/db";
 
 export interface TransactionItem extends CartItem {
   quantityReturned: number;
@@ -45,20 +46,54 @@ const HistoryContext = createContext<HistoryContextType | undefined>(undefined);
 export function HistoryProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("transactionHistory");
-    if (saved) {
-      try {
-        setTransactions(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load history", e);
-      }
+  const refreshTransactions = () => {
+    try {
+      const txRows = dbService.exec(
+        "SELECT * FROM transactions ORDER BY date DESC",
+      );
+      const itemRows = dbService.exec("SELECT * FROM transaction_items");
+
+      const mappedTransactions = txRows.map((tx: any) => {
+        const items = itemRows
+          .filter((i: any) => i.transactionId === tx.id)
+          .map((i: any) => ({
+            id: i.itemId,
+            name: i.name,
+            sellingPrice: i.price,
+            cartQuantity: i.quantity,
+            quantityReturned: i.quantityReturned || 0,
+            applyDiscount: i.discountApplied === 1,
+            discount: i.discountValue || 0,
+            // Minimal fields to satisfy types
+            barcode: "",
+            buyingPrice: 0,
+            quantity: 0,
+            unit: "units",
+            includesTaxes: false,
+            currency: "BS",
+            history: [],
+          }));
+
+        return {
+          ...tx,
+          payments: JSON.parse(tx.payments || "[]"),
+          images: JSON.parse(tx.images || "[]"),
+          items,
+        };
+      });
+      setTransactions(mappedTransactions);
+    } catch (e) {
+      console.error("Failed to load history from DB", e);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    localStorage.setItem("transactionHistory", JSON.stringify(transactions));
-  }, [transactions]);
+    const init = async () => {
+      await dbService.waitForInit();
+      refreshTransactions();
+    };
+    init();
+  }, []);
 
   const addTransaction = (
     items: CartItem[],
@@ -69,19 +104,52 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     userId: string,
     notes?: string,
   ) => {
-    const newTransaction: Transaction = {
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
-      items: items.map((item) => ({ ...item, quantityReturned: 0 })),
-      subtotal,
-      tax,
-      total,
-      images: [],
-      payments,
-      notes,
-      userId,
-    };
-    setTransactions((prev) => [newTransaction, ...prev]);
+    const id = Date.now().toString();
+    const date = new Date().toISOString();
+
+    try {
+      dbService.exec(
+        `
+            INSERT INTO transactions (id, date, subtotal, tax, total, payments, notes, userId, images)
+            VALUES ($id, $date, $subtotal, $tax, $total, $payments, $notes, $userId, $images)
+        `,
+        {
+          $id: id,
+          $date: date,
+          $subtotal: subtotal,
+          $tax: tax,
+          $total: total,
+          $payments: JSON.stringify(payments),
+          $notes: notes || "",
+          $userId: userId,
+          $images: JSON.stringify([]),
+        },
+      );
+
+      items.forEach((item, idx) => {
+        dbService.exec(
+          `
+                INSERT INTO transaction_items (id, transactionId, itemId, name, price, quantity, quantityReturned, discountApplied, discountValue)
+                VALUES ($id, $transactionId, $itemId, $name, $price, $quantity, 0, $discountApplied, $discountValue)
+            `,
+          {
+            $id: id + "-" + idx,
+            $transactionId: id,
+            $itemId: item.id,
+            $name: item.name,
+            $price: item.sellingPrice,
+            $quantity: item.cartQuantity,
+            $discountApplied: item.applyDiscount ? 1 : 0,
+            $discountValue: item.discount || 0,
+          },
+        );
+      });
+
+      refreshTransactions();
+    } catch (e) {
+      console.error("Error saving transaction", e);
+      toast.error("Error al guardar venta");
+    }
   };
 
   const returnItem = (
@@ -89,34 +157,67 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     itemId: string,
     quantity: number,
   ) => {
-    setTransactions((prev) =>
-      prev.map((t) => {
-        if (t.id !== transactionId) return t;
+    try {
+      // Find the specific transaction item row.
+      // itemId in table is the product id.
+      const row = dbService.exec(
+        `
+            SELECT quantityReturned FROM transaction_items 
+            WHERE transactionId = $tid AND itemId = $iid
+        `,
+        { $tid: transactionId, $iid: itemId },
+      );
 
-        const updatedItems = t.items.map((item) => {
-          if (item.id !== itemId) return item;
-          return {
-            ...item,
-            quantityReturned: item.quantityReturned + quantity,
-          };
-        });
+      if (row.length > 0) {
+        const currentReturned = row[0].quantityReturned || 0;
+        dbService.exec(
+          `
+                UPDATE transaction_items 
+                SET quantityReturned = $qty 
+                WHERE transactionId = $tid AND itemId = $iid
+            `,
+          {
+            $qty: currentReturned + quantity,
+            $tid: transactionId,
+            $iid: itemId,
+          },
+        );
 
-        return { ...t, items: updatedItems };
-      }),
-    );
+        refreshTransactions();
+        toast.success("Devolución registrada");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al procesar devolución");
+    }
   };
 
   const addImageToTransaction = (
     transactionId: string,
     imageBase64: string,
   ) => {
-    setTransactions((prev) =>
-      prev.map((t) => {
-        if (t.id !== transactionId) return t;
-        return { ...t, images: [...t.images, imageBase64] };
-      }),
-    );
-    toast.success("Imagen adjuntada a la transacción");
+    try {
+      const row = dbService.exec(
+        "SELECT images FROM transactions WHERE id = $id",
+        { $id: transactionId },
+      );
+      if (row.length > 0) {
+        const images = JSON.parse(row[0].images || "[]");
+        images.push(imageBase64);
+        dbService.exec(
+          "UPDATE transactions SET images = $images WHERE id = $id",
+          {
+            $images: JSON.stringify(images),
+            $id: transactionId,
+          },
+        );
+        refreshTransactions();
+        toast.success("Imagen adjuntada a la transacción");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al guardar imagen");
+    }
   };
 
   return (

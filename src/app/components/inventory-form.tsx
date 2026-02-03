@@ -45,11 +45,10 @@ export function InventoryForm({
   const [quantity, setQuantity] = useState(1);
   const [unit, setUnit] = useState<UnitType>("units");
   const [includesTaxes, setIncludesTaxes] = useState(false);
+  const [discount, setDiscount] = useState("0"); // Discount percentage
 
   // Notes for history (only for edits/adds)
   const [notes, setNotes] = useState("");
-
-  const [discount, setDiscount] = useState(0);
 
   useEffect(() => {
     if (editItem) {
@@ -64,7 +63,7 @@ export function InventoryForm({
       setQuantity(editItem.quantity);
       setUnit(editItem.unit);
       setIncludesTaxes(editItem.includesTaxes);
-      setDiscount(editItem.discount || 0); // Add discount to editItem handling
+      setDiscount(editItem.discount ? editItem.discount.toString() : "0");
     }
   }, [editItem]);
 
@@ -122,7 +121,7 @@ export function InventoryForm({
         unit,
         includesTaxes,
         currency: "BS", // System base currency
-        discount: discount, // Add discount to item data
+        discount: parseFloat(discount) || 0,
       },
       notes,
     );
@@ -136,6 +135,7 @@ export function InventoryForm({
       setQuantity(1);
       setUnit("units");
       setIncludesTaxes(false);
+      setDiscount("0");
       setNotes("");
       // Keep currencies as is for convenience? Or reset?
       // Resetting to BS is safer
@@ -293,17 +293,22 @@ export function InventoryForm({
             >
               Descuento (%)
             </Label>
-            <Input
-              id="discount"
-              type="number"
-              step="1"
-              min="0"
-              max="100"
-              value={discount}
-              onChange={(e) => setDiscount(parseFloat(e.target.value))}
-              placeholder="0.00"
-              className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
-            />
+            <div className="relative">
+              <Input
+                id="discount"
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                placeholder="0"
+                className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+                %
+              </span>
+            </div>
           </div>
 
           {/* Stock Quantity */}

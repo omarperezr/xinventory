@@ -10,11 +10,11 @@ import {
   X,
   CreditCard,
   Banknote,
-  DollarSign,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
+import { Checkbox } from "./ui/checkbox";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -57,6 +57,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
     savedCarts,
     updateCartItemQuantity,
     removeFromCart,
+    toggleCartItemDiscount,
     clearCart,
     saveCart,
     loadCart,
@@ -204,75 +205,118 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {filteredItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-[#1A1A1A]">
-                            {item.name}
-                          </div>
-                          <div className="text-xs text-gray-500 font-mono">
-                            {item.barcode}
-                          </div>
-                          {item.includesTaxes && (
-                            <div className="text-[10px] text-blue-600 bg-blue-50 inline-block px-1 rounded mt-1">
-                              Con Impuestos
+                    {filteredItems.map((item) => {
+                      const finalPrice =
+                        item.applyDiscount && item.discount > 0
+                          ? item.sellingPrice * (1 - item.discount / 100)
+                          : item.sellingPrice;
+
+                      return (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-[#1A1A1A]">
+                              {item.name}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {formatPrice(item.sellingPrice)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
+                            <div className="text-xs text-gray-500 font-mono">
+                              {item.barcode}
+                            </div>
+                            {item.includesTaxes && (
+                              <div className="text-[10px] text-blue-600 bg-blue-50 inline-block px-1 rounded mt-1">
+                                Con Impuestos
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            <div className="flex flex-col">
+                              <span>{formatPrice(item.sellingPrice)}</span>
+                              {item.discount > 0 && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Checkbox
+                                    id={`discount-${item.id}`}
+                                    checked={item.applyDiscount}
+                                    onCheckedChange={(checked) =>
+                                      toggleCartItemDiscount(
+                                        item.id,
+                                        checked as boolean,
+                                      )
+                                    }
+                                    className="h-3 w-3"
+                                  />
+                                  <Label
+                                    htmlFor={`discount-${item.id}`}
+                                    className="text-xs text-green-600 cursor-pointer font-medium"
+                                  >
+                                    Desc. {item.discount}%
+                                  </Label>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() =>
+                                  updateCartItemQuantity(
+                                    item.id,
+                                    item.cartQuantity - 1,
+                                  )
+                                }
+                                className="p-1 rounded hover:bg-gray-200 text-gray-600"
+                              >
+                                <Minus className="w-4 h-4" />
+                              </button>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.cartQuantity}
+                                onChange={(e) =>
+                                  updateCartItemQuantity(
+                                    item.id,
+                                    parseInt(e.target.value) || 0,
+                                  )
+                                }
+                                className="w-16 text-center h-8"
+                              />
+                              <button
+                                onClick={() =>
+                                  updateCartItemQuantity(
+                                    item.id,
+                                    item.cartQuantity + 1,
+                                  )
+                                }
+                                className="p-1 rounded hover:bg-gray-200 text-gray-600"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right font-medium text-[#1A1A1A]">
+                            {item.applyDiscount && item.discount > 0 ? (
+                              <div className="flex flex-col items-end">
+                                <span className="text-xs text-gray-400 line-through">
+                                  {formatPrice(
+                                    item.sellingPrice * item.cartQuantity,
+                                  )}
+                                </span>
+                                <span className="text-green-600">
+                                  {formatPrice(finalPrice * item.cartQuantity)}
+                                </span>
+                              </div>
+                            ) : (
+                              formatPrice(finalPrice * item.cartQuantity)
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
                             <button
-                              onClick={() =>
-                                updateCartItemQuantity(
-                                  item.id,
-                                  item.cartQuantity - 1,
-                                )
-                              }
-                              className="p-1 rounded hover:bg-gray-200 text-gray-600"
+                              onClick={() => removeFromCart(item.id)}
+                              className="text-gray-400 hover:text-red-500 transition-colors"
                             >
-                              <Minus className="w-4 h-4" />
+                              <X className="w-4 h-4" />
                             </button>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={item.cartQuantity}
-                              onChange={(e) =>
-                                updateCartItemQuantity(
-                                  item.id,
-                                  parseInt(e.target.value) || 0,
-                                )
-                              }
-                              className="w-16 text-center h-8"
-                            />
-                            <button
-                              onClick={() =>
-                                updateCartItemQuantity(
-                                  item.id,
-                                  item.cartQuantity + 1,
-                                )
-                              }
-                              className="p-1 rounded hover:bg-gray-200 text-gray-600"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right font-medium text-[#1A1A1A]">
-                          {formatPrice(item.sellingPrice * item.cartQuantity)}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => removeFromCart(item.id)}
-                            className="text-gray-400 hover:text-red-500 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                   <tfoot className="bg-gray-50 border-t border-gray-200">
                     <tr>

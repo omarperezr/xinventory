@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useNavigate,
+} from "react-router-dom";
 import { InventoryHeader } from "./components/inventory-header";
 import { AdminView } from "./components/admin-view";
 import { SearchView } from "./components/search-view";
@@ -114,7 +119,11 @@ function AppContent() {
             element={
               <SearchView
                 onEditItem={handleEditItem}
-                onDeleteItem={(id) => {}}
+                onDeleteItem={(id) => {
+                  toast.error(
+                    "Solo los administradores pueden eliminar desde la vista de administración",
+                  );
+                }}
               />
             }
           />
@@ -126,7 +135,23 @@ function AppContent() {
             path="/history"
             element={<HistoryView onReturnInventory={handleReturnInventory} />}
           />
-          <Route path="/reports" element={<ReportsView />} />
+          <Route
+            path="/reports"
+            element={
+              currentUser?.role === "admin" ? (
+                <ReportsView />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="text-red-500 font-medium text-lg mb-2">
+                    Acceso Restringido
+                  </div>
+                  <p className="text-gray-500">
+                    Solo los administradores pueden ver los reportes.
+                  </p>
+                </div>
+              )
+            }
+          />
         </Routes>
       </main>
     </div>

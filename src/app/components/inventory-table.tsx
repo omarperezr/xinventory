@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { format } from "date-fns";
 import { useState } from "react";
-import { useApp, InventoryItem, applyDiscount } from "../context/app-context";
+import { useApp, InventoryItem } from "../context/app-context";
 
 interface InventoryTableProps {
   items: InventoryItem[];
@@ -12,7 +12,6 @@ interface InventoryTableProps {
   onAddToCart?: (item: InventoryItem, quantity: number) => void;
   onViewHistory?: (item: InventoryItem) => void;
   showBuyingPrice?: boolean;
-  searchView?: boolean;
 }
 
 function InventoryTableRow({
@@ -22,7 +21,6 @@ function InventoryTableRow({
   onAddToCart,
   onViewHistory,
   showBuyingPrice,
-  searchView = false,
 }: {
   item: InventoryItem;
   onEdit: (item: InventoryItem) => void;
@@ -30,7 +28,6 @@ function InventoryTableRow({
   onAddToCart?: (item: InventoryItem, quantity: number) => void;
   onViewHistory?: (item: InventoryItem) => void;
   showBuyingPrice?: boolean;
-  searchView?: boolean;
 }) {
   const { formatPrice } = useApp();
   const [quantityToAdd, setQuantityToAdd] = useState(1);
@@ -54,21 +51,16 @@ function InventoryTableRow({
       <td className="px-6 py-4">
         <div className="text-gray-600 font-mono text-sm">{item.barcode}</div>
       </td>
-      {showBuyingPrice && (
-        <td className="px-6 py-4">
-          <div className="text-gray-500">{formatPrice(item.buyingPrice)}</div>
-        </td>
-      )}
       <td className="px-6 py-4">
         <div className="text-[#1A1A1A] font-medium">
           {formatPrice(item.sellingPrice)}
         </div>
       </td>
-      <td className="px-6 py-4">
-        <div className="text-[#1A1A1A] font-medium">
-          {formatPrice(applyDiscount(item.sellingPrice, item.discount))}
-        </div>
-      </td>
+      {showBuyingPrice && (
+        <td className="px-6 py-4">
+          <div className="text-gray-500">{formatPrice(item.buyingPrice)}</div>
+        </td>
+      )}
       <td className="px-6 py-4">
         <div className="text-gray-600 text-sm">
           {/* dateAdded is stored as string in JSON but Date in logic, handle safely */}
@@ -130,28 +122,24 @@ function InventoryTableRow({
             </Button>
           )}
 
-          {!searchView && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEdit(item)}
-                className="text-[#2196F3] hover:text-[#1976D2] hover:bg-blue-50"
-                title="Editar"
-              >
-                <Edit2 className="w-4 h-4" strokeWidth={1.5} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(item.id)}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                title="Eliminar"
-              >
-                <Trash2 className="w-4 h-4" strokeWidth={1.5} />
-              </Button>
-            </>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit(item)}
+            className="text-[#2196F3] hover:text-[#1976D2] hover:bg-blue-50"
+            title="Editar"
+          >
+            <Edit2 className="w-4 h-4" strokeWidth={1.5} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(item.id)}
+            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+            title="Eliminar"
+          >
+            <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+          </Button>
         </div>
       </td>
     </tr>
@@ -165,7 +153,6 @@ export function InventoryTable({
   onAddToCart,
   onViewHistory,
   showBuyingPrice,
-  searchView = false,
 }: InventoryTableProps) {
   if (items.length === 0) {
     return (
@@ -197,32 +184,23 @@ export function InventoryTable({
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Código
               </th>
+              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
+                Precio Venta
+              </th>
               {showBuyingPrice && (
                 <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                   Precio Compra
                 </th>
               )}
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                Precio Venta
-              </th>
-              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                Descuento
-              </th>
-              <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Fecha Creación
               </th>
               <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Stock
               </th>
-              {!searchView ? (
-                <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                  Acciones
-                </th>
-              ) : (
-                <th className="text-left px-4 py-4 text-sm text-gray-600 font-normal">
-                  Agregar al Carrito
-                </th>
-              )}
+              <th className="text-right px-6 py-4 text-sm text-gray-600 font-normal">
+                Acciones
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -235,7 +213,6 @@ export function InventoryTable({
                 onAddToCart={onAddToCart}
                 onViewHistory={onViewHistory}
                 showBuyingPrice={showBuyingPrice}
-                searchView={searchView}
               />
             ))}
           </tbody>
