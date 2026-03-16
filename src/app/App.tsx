@@ -11,6 +11,7 @@ import { SearchView } from "./components/search-view";
 import { TotalView } from "./components/total-view";
 import { HistoryView } from "./components/history-view";
 import { ReportsView } from "./components/reports-view";
+import { LoginPage } from "./components/login-page";
 import {
   AppProvider,
   useApp,
@@ -38,6 +39,11 @@ function AppContent() {
   const [editingItem, setEditingItem] = useState<InventoryItem | undefined>();
   const navigate = useNavigate();
 
+  // Show login page if no user is authenticated
+  if (!currentUser) {
+    return <LoginPage />;
+  }
+
   const handleEditItem = (item: InventoryItem) => {
     setEditingItem(item);
     navigate("/");
@@ -53,7 +59,6 @@ function AppContent() {
   const handleCheckout = (cartItems: CartItem[]) => {
     if (!currentUser) return;
 
-    // Update Inventory (Deduct Stock)
     cartItems.forEach((cartItem) => {
       const originalItem = items.find((i) => i.id === cartItem.id);
       if (originalItem) {
@@ -69,7 +74,6 @@ function AppContent() {
       }
     });
 
-    // Add to History
     addTransaction(
       cartItems,
       subtotal,
@@ -102,7 +106,7 @@ function AppContent() {
 
       <InventoryHeader />
 
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-4 md:py-8">
         <Routes>
           <Route
             path="/"
@@ -145,7 +149,7 @@ function AppContent() {
                   <div className="text-red-500 font-medium text-lg mb-2">
                     Acceso Restringido
                   </div>
-                  <p className="text-gray-500">
+                  <p className="text-gray-500 text-sm">
                     Solo los administradores pueden ver los reportes.
                   </p>
                 </div>

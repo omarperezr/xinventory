@@ -6,7 +6,7 @@ import { useApp, InventoryItem } from "../context/app-context";
 import { useAuth } from "../context/auth-context";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { DollarSign, Euro, History, ArrowRight } from "lucide-react";
+import { DollarSign, Euro, History, ArrowRight, Search } from "lucide-react";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -15,6 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 interface AdminViewProps {
   editingItem?: InventoryItem;
@@ -33,10 +40,12 @@ export function AdminView({
   const navigate = useNavigate();
 
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterBy, setFilterBy] = useState("all");
 
   useEffect(() => {
     if (currentUser?.role !== "admin") {
-      navigate("/search"); // Redirect non-admins
+      navigate("/search");
     }
   }, [currentUser, navigate]);
 
@@ -60,6 +69,20 @@ export function AdminView({
       onCancelEdit();
     }
   };
+
+  // Filter items based on search term
+  const filteredItems = items.filter((item) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    if (filterBy === "name") return item.name.toLowerCase().includes(term);
+    if (filterBy === "barcode")
+      return item.barcode.toLowerCase().includes(term);
+    // 'all'
+    return (
+      item.name.toLowerCase().includes(term) ||
+      item.barcode.toLowerCase().includes(term)
+    );
+  });
 
   if (!currentUser || currentUser.role !== "admin") return null;
 
@@ -113,8 +136,41 @@ export function AdminView({
         rates={rates}
       />
 
+      {/* Admin Inventory Search Bar */}
+      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <h3 className="text-base font-medium text-gray-900 whitespace-nowrap">
+            Inventario
+            <span className="ml-2 text-sm font-normal text-gray-400">
+              ({filteredItems.length} de {items.length} productos)
+            </span>
+          </h3>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:ml-auto sm:max-w-md">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Buscar en inventario..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 h-9 text-sm"
+              />
+            </div>
+            <Select value={filterBy} onValueChange={setFilterBy}>
+              <SelectTrigger className="w-full sm:w-[150px] h-9 text-sm border-gray-300">
+                <SelectValue placeholder="Filtrar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todo</SelectItem>
+                <SelectItem value="name">Nombre</SelectItem>
+                <SelectItem value="barcode">Código</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
       <InventoryTable
-        items={items}
+        items={filteredItems}
         onEdit={onEditItem}
         onDelete={(id) => deleteItem(id, currentUser?.name || "Admin")}
         showBuyingPrice
