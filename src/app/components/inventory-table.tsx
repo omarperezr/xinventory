@@ -111,7 +111,7 @@ function InventoryTableRow({
 
       {/* Actions */}
       <td className="px-2 md:px-6 py-2 md:py-4">
-        <div className="flex items-center justify-end gap-1 md:gap-2">
+        <div className="flex items-center justify gap-1 md:gap-2">
           {/* Add to cart — always visible, compact on mobile */}
           {onAddToCart && (
             <div className="flex items-center bg-gray-50 rounded-md border border-gray-200">
@@ -151,26 +151,30 @@ function InventoryTableRow({
           )}
 
           {/* Edit */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onEdit(item)}
-            className="text-[#2196F3] hover:text-[#1976D2] hover:bg-blue-50 h-7 w-7 p-0"
-            title="Editar"
-          >
-            <Edit2 className="w-3.5 h-3.5" strokeWidth={1.5} />
-          </Button>
+          {onViewHistory && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onEdit(item)}
+              className="text-[#2196F3] hover:text-[#1976D2] hover:bg-blue-50 h-7 w-7 p-0"
+              title="Editar"
+            >
+              <Edit2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </Button>
+          )}
 
           {/* Delete — desktop only */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onDelete(item.id)}
-            className="hidden md:flex text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
-            title="Eliminar"
-          >
-            <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
-          </Button>
+          {onViewHistory && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(item.id)}
+              className="hidden md:flex text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+              title="Eliminar"
+            >
+              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </Button>
+          )}
         </div>
       </td>
     </tr>
@@ -241,7 +245,7 @@ export function InventoryTable({
                 Stock
               </th>
               {/* Actions — always */}
-              <th className="text-right px-2 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
+              <th className="text-left px-2 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
                 Acc.
               </th>
             </tr>
