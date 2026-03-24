@@ -1,4 +1,4 @@
-import { Edit2, Trash2, Package, Plus, Clock } from "lucide-react";
+import { Edit2, Trash2, Package, Plus, Clock, Minus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { format } from "date-fns";
@@ -32,11 +32,7 @@ function InventoryTableRow({
   const { formatPrice } = useApp();
   const [quantityToAdd, setQuantityToAdd] = useState(1);
 
-  const unitLabel = {
-    units: "u",
-    kg: "kg",
-    liters: "L",
-  }[item.unit || "units"];
+  const unitLabel = { units: "u", kg: "kg", liters: "L" }[item.unit || "units"];
 
   const stockColor =
     item.quantity === 0
@@ -47,75 +43,62 @@ function InventoryTableRow({
 
   return (
     <tr className="hover:bg-gray-50 transition-colors">
-      {/* Product name — always visible */}
       <td className="px-3 md:px-6 py-2 md:py-4">
-        <div className="text-[#1A1A1A] font-medium text-xs md:text-sm leading-tight">
+        <div className="text-xs md:text-sm font-medium text-[#1A1A1A] leading-tight">
           {item.name}
         </div>
         {item.includesTaxes && (
-          <span className="text-[9px] md:text-[10px] uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+          <span className="text-[9px] uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
             +IVA
           </span>
         )}
-        {/* On mobile, show barcode inline under name */}
-        <div className="md:hidden text-[10px] text-gray-400 font-mono mt-0.5 truncate max-w-[100px]">
+        <div className="md:hidden text-[10px] text-gray-400 font-mono mt-0.5 truncate max-w-[90px]">
           {item.barcode}
         </div>
       </td>
 
-      {/* Barcode — desktop only */}
       <td className="hidden md:table-cell px-6 py-4">
-        <div className="text-gray-600 font-mono text-sm">{item.barcode}</div>
+        <span className="text-gray-600 font-mono text-sm">{item.barcode}</span>
       </td>
 
-      {/* Selling price — always visible */}
       <td className="px-3 md:px-6 py-2 md:py-4">
-        <div className="text-[#1A1A1A] font-medium text-xs md:text-sm">
+        <div className="text-xs md:text-sm font-medium text-[#1A1A1A]">
           {formatPrice(item.sellingPrice)}
         </div>
-        {/* On mobile: show discount inline */}
         {item.discount > 0 && (
-          <div className="text-[10px] text-orange-600 md:hidden">
-            -{item.discount}%
-          </div>
+          <div className="text-[10px] text-orange-600">-{item.discount}%</div>
         )}
       </td>
 
-      {/* Buying price — desktop only, admin only */}
       {showBuyingPrice && (
         <td className="hidden md:table-cell px-6 py-4">
-          <div className="text-gray-500 text-sm">
+          <span className="text-gray-500 text-sm">
             {formatPrice(item.buyingPrice)}
-          </div>
+          </span>
         </td>
       )}
 
-      {/* Date created — desktop only */}
       <td className="hidden md:table-cell px-6 py-4">
-        <div className="text-gray-600 text-sm">
+        <span className="text-gray-600 text-sm">
           {item.history?.[0]?.date
             ? format(new Date(item.history[0].date), "dd MMM yyyy")
             : "N/A"}
-        </div>
-      </td>
-
-      {/* Stock — always visible, compact on mobile */}
-      <td className="px-3 md:px-6 py-2 md:py-4">
-        <span
-          className={`inline-flex items-center px-1.5 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-sm font-medium ${stockColor}`}
-        >
-          {item.quantity}
-          <span className="ml-0.5 md:ml-1 opacity-70">{unitLabel}</span>
         </span>
       </td>
 
-      {/* Actions */}
+      <td className="px-3 md:px-6 py-2 md:py-4">
+        <span
+          className={`inline-flex items-center px-1.5 md:px-2.5 py-0.5 rounded-full text-[10px] md:text-xs font-medium ${stockColor}`}
+        >
+          {item.quantity}
+          <span className="ml-0.5 opacity-70">{unitLabel}</span>
+        </span>
+      </td>
+
       <td className="px-2 md:px-6 py-2 md:py-4">
-        <div className="flex items-center justify gap-1 md:gap-2">
-          {/* Add to cart — always visible, compact on mobile */}
+        <div className="flex items-center gap-1 md:gap-2">
           {onAddToCart && (
             <div className="flex items-center bg-gray-50 rounded-md border border-gray-200">
-              {/* Hide qty input on mobile, show only + button */}
               <Input
                 type="number"
                 min="1"
@@ -123,12 +106,12 @@ function InventoryTableRow({
                 onChange={(e) =>
                   setQuantityToAdd(Math.max(1, parseInt(e.target.value) || 1))
                 }
-                className="hidden md:block w-14 h-7 text-xs border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-right pr-1"
+                className="hidden md:block w-12 h-7 text-xs border-0 focus-visible:ring-0 bg-transparent text-right pr-1"
               />
               <Button
                 size="sm"
                 onClick={() => onAddToCart(item, quantityToAdd)}
-                className="bg-[#2196F3] hover:bg-[#1976D2] text-white h-7 w-7 p-0 rounded-md"
+                className="bg-[#2196F3] hover:bg-[#1976D2] text-white h-7 w-7 md:h-7 md:w-auto md:px-2 p-0 rounded-md"
                 title="Agregar al Total"
                 disabled={item.quantity === 0}
               >
@@ -137,7 +120,6 @@ function InventoryTableRow({
             </div>
           )}
 
-          {/* History — desktop only */}
           {onViewHistory && (
             <Button
               variant="ghost"
@@ -150,7 +132,6 @@ function InventoryTableRow({
             </Button>
           )}
 
-          {/* Edit */}
           {onViewHistory && (
             <Button
               variant="ghost"
@@ -163,7 +144,6 @@ function InventoryTableRow({
             </Button>
           )}
 
-          {/* Delete — desktop only */}
           {onViewHistory && (
             <Button
               variant="ghost"
@@ -181,6 +161,91 @@ function InventoryTableRow({
   );
 }
 
+// ── Mobile card for search view (no edit/delete, just add to cart) ─────────────
+function MobileSearchCard({
+  item,
+  onAddToCart,
+}: {
+  item: InventoryItem;
+  onAddToCart: (item: InventoryItem, qty: number) => void;
+}) {
+  const { formatPrice } = useApp();
+  const [qty, setQty] = useState(1);
+
+  const stockColor =
+    item.quantity === 0
+      ? "text-red-600"
+      : item.quantity < 10
+        ? "text-yellow-600"
+        : "text-green-600";
+
+  const unitLabel = { units: "u", kg: "kg", liters: "L" }[item.unit || "units"];
+
+  return (
+    <div className="p-3 border-b border-gray-100 last:border-0">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-[#1A1A1A] leading-tight">
+            {item.name}
+          </p>
+          <p className="text-[10px] text-gray-400 font-mono mt-0.5 truncate">
+            {item.barcode}
+          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {item.includesTaxes && (
+              <span className="text-[9px] uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+                +IVA
+              </span>
+            )}
+            {item.discount > 0 && (
+              <span className="text-[9px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded">
+                -{item.discount}%
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className="text-sm font-semibold text-[#2196F3]">
+            {formatPrice(item.sellingPrice)}
+          </p>
+          <p className={`text-xs font-medium ${stockColor}`}>
+            {item.quantity} {unitLabel}
+          </p>
+        </div>
+      </div>
+      {/* Add to cart controls */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+          <button
+            onClick={() => setQty((q) => Math.max(1, q - 1))}
+            className="px-2 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600"
+          >
+            <Minus className="w-3 h-3" />
+          </button>
+          <span className="px-3 py-1 text-sm font-medium min-w-[2rem] text-center">
+            {qty}
+          </span>
+          <button
+            onClick={() => setQty((q) => q + 1)}
+            className="px-2 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600"
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => onAddToCart(item, qty)}
+          disabled={item.quantity === 0}
+          className="flex-1 bg-[#2196F3] hover:bg-[#1976D2] text-white h-8 text-xs"
+        >
+          <Plus className="w-3.5 h-3.5 mr-1" />
+          Agregar al Total
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function InventoryTable({
   items,
   onEdit,
@@ -189,21 +254,20 @@ export function InventoryTable({
   onViewHistory,
   showBuyingPrice,
 }: InventoryTableProps) {
+  const isSearchMode = !!onAddToCart && !onViewHistory;
+
   if (items.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-10 md:p-16 text-center">
+      <div className="bg-white rounded-lg border border-gray-200 p-10 md:p-14 text-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center">
-            <Package
-              className="w-6 h-6 md:w-8 md:h-8 text-gray-400"
-              strokeWidth={1.5}
-            />
+          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+            <Package className="w-6 h-6 text-gray-400" strokeWidth={1.5} />
           </div>
           <div>
-            <h3 className="text-gray-900 text-sm md:text-base mb-1">
+            <h3 className="text-gray-900 text-sm mb-1">
               No hay productos encontrados
             </h3>
-            <p className="text-xs md:text-sm text-gray-500 font-light">
+            <p className="text-xs text-gray-500">
               Agrega productos o ajusta tu búsqueda
             </p>
           </div>
@@ -214,37 +278,46 @@ export function InventoryTable({
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-      <div className="overflow-x-auto">
+      {/* ── Mobile card list (search mode only) ── */}
+      {isSearchMode && (
+        <div className="md:hidden">
+          {items.map((item) => (
+            <MobileSearchCard
+              key={item.id}
+              item={item}
+              onAddToCart={onAddToCart!}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── Desktop table (always) / mobile table for admin view ── */}
+      <div
+        className={`${isSearchMode ? "hidden md:block" : "block"} overflow-x-auto`}
+      >
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
-              {/* Product — always */}
               <th className="text-left px-3 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
                 Producto
               </th>
-              {/* Barcode — desktop */}
               <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Código
               </th>
-              {/* Selling price — always */}
               <th className="text-left px-3 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
                 P. Venta
               </th>
-              {/* Buying price — desktop + admin only */}
               {showBuyingPrice && (
                 <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
                   P. Compra
                 </th>
               )}
-              {/* Date — desktop */}
               <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Creación
               </th>
-              {/* Stock — always */}
               <th className="text-left px-3 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
                 Stock
               </th>
-              {/* Actions — always */}
               <th className="text-left px-2 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
                 Acc.
               </th>
@@ -266,19 +339,19 @@ export function InventoryTable({
         </table>
       </div>
 
-      {/* Summary Footer */}
-      <div className="border-t border-gray-200 bg-gray-50 px-3 md:px-6 py-2 md:py-4">
+      {/* Summary footer */}
+      <div className="border-t border-gray-200 bg-gray-50 px-3 md:px-6 py-2 md:py-3">
         <div className="flex items-center justify-between text-xs md:text-sm">
-          <div className="text-gray-600">
+          <span className="text-gray-600">
             Productos:{" "}
-            <span className="text-[#1A1A1A] font-medium">{items.length}</span>
-          </div>
-          <div className="text-gray-600">
-            Stock Total:{" "}
-            <span className="text-[#1A1A1A] font-medium">
-              {items.reduce((sum, item) => sum + item.quantity, 0)}
+            <span className="font-medium text-[#1A1A1A]">{items.length}</span>
+          </span>
+          <span className="text-gray-600">
+            Stock:{" "}
+            <span className="font-medium text-[#1A1A1A]">
+              {items.reduce((s, i) => s + i.quantity, 0)}
             </span>
-          </div>
+          </span>
         </div>
       </div>
     </div>
