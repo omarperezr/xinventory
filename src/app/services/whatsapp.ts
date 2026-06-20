@@ -10,9 +10,6 @@ function buildCaption(
     `*${item.name}*`,
     `Marca: ${item.brand}`,
     `Precio: $ ${item.sellingPrice.toFixed(2)}`,
-    `Precio: ${formatPrice(item.sellingPrice)}`,
-    `Stock: ${item.quantity} ${item.unit}`,
-    `Código: ${item.barcode}`,
   ].join("\n");
 }
 
