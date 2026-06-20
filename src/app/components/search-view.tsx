@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { Search, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Search, Plus, SlidersHorizontal } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
-import { InventoryTable } from "./inventory-table";
+import { ProductCard } from "./product-card";
 import { useApp, InventoryItem } from "../context/app-context";
 import { useAuth } from "../context/auth-context";
 import { useNavigate } from "react-router-dom";
@@ -19,42 +19,74 @@ interface SearchViewProps {
   onDeleteItem: (id: string) => void;
 }
 
-export function SearchView({ onEditItem, onDeleteItem }: SearchViewProps) {
+const STOCK_FILTERS = [
+  { value: "all", label: "Todo el stock" },
+  { value: "in", label: "Disponible" },
+  { value: "low", label: "Stock bajo (<10)" },
+  { value: "out", label: "Agotado" },
+];
+
+export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteItem }: SearchViewProps) {
   const { items, addToCart, totalAmount, formatPrice } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBy, setFilterBy] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [brandFilter, setBrandFilter] = useState("all");
+  const [stockFilter, setStockFilter] = useState("all");
 
   const isAdmin = currentUser?.role === "admin";
 
-  const filteredItems = items.filter((item) => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    if (filterBy === "name") return item.name.toLowerCase().includes(term);
-    if (filterBy === "barcode")
-      return item.barcode.toLowerCase().includes(term);
-    return (
-      item.name.toLowerCase().includes(term) ||
-      item.barcode.toLowerCase().includes(term)
-    );
-  });
+  const types = useMemo(
+    () => Array.from(new Set(items.map((i) => i.type || "unassigned"))).sort(),
+    [items],
+  );
+  const brands = useMemo(
+    () => Array.from(new Set(items.map((i) => i.brand || "generic"))).sort(),
+    [items],
+  );
+
+  const filteredItems = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return items.filter((item) => {
+      if (term) {
+        const matches =
+          filterBy === "name"
+            ? item.name.toLowerCase().includes(term)
+            : filterBy === "barcode"
+              ? item.barcode.toLowerCase().includes(term)
+              : item.name.toLowerCase().includes(term) ||
+                item.barcode.toLowerCase().includes(term);
+        if (!matches) return false;
+      }
+      if (typeFilter !== "all" && (item.type || "unassigned") !== typeFilter)
+        return false;
+      if (brandFilter !== "all" && (item.brand || "generic") !== brandFilter)
+        return false;
+      if (stockFilter === "in" && item.quantity <= 0) return false;
+      if (stockFilter === "low" && !(item.quantity > 0 && item.quantity < 10))
+        return false;
+      if (stockFilter === "out" && item.quantity !== 0) return false;
+      return true;
+    });
+  }, [items, searchTerm, filterBy, typeFilter, brandFilter, stockFilter]);
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Search Bar */}
-      <div className="bg-white p-4 md:p-6 rounded-lg border border-gray-200 shadow-sm space-y-3 md:space-y-4">
+      {/* Search & Filters */}
+      <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-200 shadow-sm space-y-3 md:space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base md:text-lg font-semibold text-gray-900">
+          <h2 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-gray-400" />
             Buscar Inventario
           </h2>
-          {/* Admin: quick add button visible next to title on mobile */}
           {isAdmin && (
             <Button
               size="sm"
               onClick={() => navigate("/")}
-              className="md:hidden bg-[#2196F3] hover:bg-[#1976D2] text-white h-8 px-3 text-xs flex items-center gap-1.5 rounded-lg"
+              className="md:hidden bg-gray-900 hover:bg-gray-700 text-white h-8 px-3 text-xs flex items-center gap-1.5 rounded-lg"
             >
               <Plus className="w-3.5 h-3.5" />
               Agregar
@@ -69,12 +101,12 @@ export function SearchView({ onEditItem, onDeleteItem }: SearchViewProps) {
               placeholder="Buscar productos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-9 md:h-10 border-gray-300 focus:border-[#2196F3] text-sm"
+              className="pl-9 h-9 md:h-10 border-gray-300 focus:border-gray-900 text-sm rounded-xl"
             />
           </div>
           <Select value={filterBy} onValueChange={setFilterBy}>
-            <SelectTrigger className="w-full sm:w-[160px] h-9 md:h-10 border-gray-300 text-sm">
-              <SelectValue placeholder="Filtrar por" />
+            <SelectTrigger className="w-full sm:w-[140px] h-9 md:h-10 border-gray-300 text-sm rounded-xl">
+              <SelectValue placeholder="Buscar por" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todo</SelectItem>
@@ -84,37 +116,84 @@ export function SearchView({ onEditItem, onDeleteItem }: SearchViewProps) {
           </Select>
         </div>
 
-        {searchTerm && (
-          <p className="text-xs text-gray-500">
-            {filteredItems.length} resultado
-            {filteredItems.length !== 1 ? "s" : ""} para «{searchTerm}»
-          </p>
-        )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="h-9 border-gray-300 text-sm rounded-xl">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              {types.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={brandFilter} onValueChange={setBrandFilter}>
+            <SelectTrigger className="h-9 border-gray-300 text-sm rounded-xl">
+              <SelectValue placeholder="Marca" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las marcas</SelectItem>
+              {brands.map((b) => (
+                <SelectItem key={b} value={b}>
+                  {b}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={stockFilter} onValueChange={setStockFilter}>
+            <SelectTrigger className="h-9 border-gray-300 text-sm rounded-xl col-span-2 sm:col-span-1">
+              <SelectValue placeholder="Stock" />
+            </SelectTrigger>
+            <SelectContent>
+              {STOCK_FILTERS.map((f) => (
+                <SelectItem key={f.value} value={f.value}>
+                  {f.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <p className="text-xs text-gray-500">
+          {filteredItems.length} resultado{filteredItems.length !== 1 ? "s" : ""}
+        </p>
       </div>
 
-      {/* Inventory Table */}
-      <InventoryTable
-        items={filteredItems}
-        onEdit={onEditItem}
-        onDelete={onDeleteItem}
-        onAddToCart={addToCart}
-        showBuyingPrice={isAdmin}
-      />
+      {/* Product Grid */}
+      {filteredItems.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-200 p-10 md:p-14 text-center">
+          <h3 className="text-gray-900 text-sm mb-1">
+            No hay productos encontrados
+          </h3>
+          <p className="text-xs text-gray-500">
+            Agrega productos o ajusta tus filtros
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+          {filteredItems.map((item) => (
+            <ProductCard key={item.id} item={item} onAddToCart={addToCart} />
+          ))}
+        </div>
+      )}
 
       {/* Total bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg z-40 md:relative md:bg-[#2196F3] md:text-white md:rounded-lg md:shadow-md md:border-0 md:mt-8 md:z-auto md:px-6 md:py-4">
-        {/* On mobile: leave space for nav bar at bottom */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg z-40 md:relative md:bg-gray-900 md:text-white md:rounded-2xl md:shadow-md md:border-0 md:mt-8 md:z-auto md:px-6 md:py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center md:px-0">
           <div className="text-xs md:text-lg font-medium text-gray-900 md:text-white">
             Valor Total (Con Impuestos)
           </div>
-          <div className="text-lg md:text-3xl font-bold text-[#2196F3] md:text-white">
+          <div className="text-lg md:text-3xl font-bold text-gray-900 md:text-white">
             {formatPrice(totalAmount)}
           </div>
         </div>
       </div>
 
-      {/* Mobile bottom spacer (nav + total bar) */}
       <div className="md:hidden h-28" />
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -6,12 +6,27 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { InventoryHeader } from "./components/inventory-header";
-import { AdminView } from "./components/admin-view";
-import { SearchView } from "./components/search-view";
-import { TotalView } from "./components/total-view";
-import { HistoryView } from "./components/history-view";
-import { ReportsView } from "./components/reports-view";
 import { LoginPage } from "./components/login-page";
+
+const AdminView = lazy(() =>
+  import("./components/admin-view").then((m) => ({ default: m.AdminView })),
+);
+const SearchView = lazy(() =>
+  import("./components/search-view").then((m) => ({ default: m.SearchView })),
+);
+const TotalView = lazy(() =>
+  import("./components/total-view").then((m) => ({ default: m.TotalView })),
+);
+const HistoryView = lazy(() =>
+  import("./components/history-view").then((m) => ({
+    default: m.HistoryView,
+  })),
+);
+const ReportsView = lazy(() =>
+  import("./components/reports-view").then((m) => ({
+    default: m.ReportsView,
+  })),
+);
 import {
   AppProvider,
   useApp,
@@ -107,6 +122,13 @@ function AppContent() {
       <InventoryHeader />
 
       <main className="max-w-7xl mx-auto px-4 md:px-8 py-4 md:py-8">
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
+              Cargando...
+            </div>
+          }
+        >
         <Routes>
           <Route
             path="/"
@@ -157,6 +179,7 @@ function AppContent() {
             }
           />
         </Routes>
+        </Suspense>
       </main>
     </div>
   );

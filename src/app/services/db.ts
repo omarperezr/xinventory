@@ -60,7 +60,10 @@ class DatabaseService {
         unit TEXT DEFAULT 'units',
         includesTaxes INTEGER DEFAULT 0, -- boolean 0 or 1
         currency TEXT DEFAULT 'BS',
-        discount REAL DEFAULT 0
+        discount REAL DEFAULT 0,
+        images TEXT DEFAULT '[]', -- JSON array of compressed image data URLs
+        type TEXT DEFAULT 'unassigned',
+        brand TEXT DEFAULT 'generic'
       );
 
       CREATE TABLE IF NOT EXISTS history (
@@ -126,6 +129,28 @@ class DatabaseService {
       );
     } catch (e) {
       // Columns likely exist
+    }
+
+    try {
+      this.db.run("ALTER TABLE items ADD COLUMN images TEXT DEFAULT '[]'");
+    } catch (e) {
+      // Column likely exists
+    }
+
+    try {
+      this.db.run(
+        "ALTER TABLE items ADD COLUMN type TEXT DEFAULT 'unassigned'",
+      );
+    } catch (e) {
+      // Column likely exists
+    }
+
+    try {
+      this.db.run(
+        "ALTER TABLE items ADD COLUMN brand TEXT DEFAULT 'generic'",
+      );
+    } catch (e) {
+      // Column likely exists
     }
   }
 

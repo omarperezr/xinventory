@@ -31,6 +31,9 @@ export interface InventoryItem {
   currency: string;
   discount: number; // Percentage 0-100
   image?: string;
+  images: string[]; // Compressed data URLs
+  type: string; // Product type/category, default "unassigned"
+  brand: string; // Product brand, default "generic"
   history: ItemHistoryRecord[];
 }
 
@@ -133,11 +136,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
             newStock: typeof h.newStock === "number" ? h.newStock : undefined,
           }));
 
+        let images: string[] = [];
+        try {
+          images = item.images ? JSON.parse(item.images) : [];
+        } catch {
+          images = [];
+        }
+
         return {
           ...item,
           buyingPrice: item.buyingPrice || 0,
           includesTaxes: item.includesTaxes === 1,
           discount: item.discount || 0,
+          images,
+          type: item.type || "unassigned",
+          brand: item.brand || "generic",
           history: itemHistory,
         };
       });
@@ -182,8 +195,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       dbService.exec(
         `
-            INSERT INTO items (id, name, barcode, buyingPrice, sellingPrice, quantity, unit, includesTaxes, currency, discount)
-            VALUES ($id, $name, $barcode, $buyingPrice, $sellingPrice, $quantity, $unit, $includesTaxes, $currency, $discount)
+            INSERT INTO items (id, name, barcode, buyingPrice, sellingPrice, quantity, unit, includesTaxes, currency, discount, images, type, brand)
+            VALUES ($id, $name, $barcode, $buyingPrice, $sellingPrice, $quantity, $unit, $includesTaxes, $currency, $discount, $images, $type, $brand)
         `,
         {
           $id: id,
@@ -196,6 +209,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           $includesTaxes: newItemData.includesTaxes ? 1 : 0,
           $currency: newItemData.currency,
           $discount: newItemData.discount || 0,
+          $images: JSON.stringify(newItemData.images || []),
+          $type: newItemData.type || "unassigned",
+          $brand: newItemData.brand || "generic",
         },
       );
 
@@ -234,9 +250,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       dbService.exec(
         `
-            UPDATE items 
-            SET name=$name, barcode=$barcode, buyingPrice=$buyingPrice, sellingPrice=$sellingPrice, 
-                quantity=$quantity, unit=$unit, includesTaxes=$includesTaxes, discount=$discount 
+            UPDATE items
+            SET name=$name, barcode=$barcode, buyingPrice=$buyingPrice, sellingPrice=$sellingPrice,
+                quantity=$quantity, unit=$unit, includesTaxes=$includesTaxes, discount=$discount,
+                images=$images, type=$type, brand=$brand
             WHERE id=$id
         `,
         {
@@ -248,6 +265,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           $unit: updatedItem.unit,
           $includesTaxes: updatedItem.includesTaxes ? 1 : 0,
           $discount: updatedItem.discount || 0,
+          $images: JSON.stringify(updatedItem.images || []),
+          $type: updatedItem.type || "unassigned",
+          $brand: updatedItem.brand || "generic",
           $id: updatedItem.id,
         },
       );
