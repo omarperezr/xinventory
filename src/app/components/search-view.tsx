@@ -48,17 +48,27 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
     [items],
   );
 
+  // Smart search: tokenizes the query and matches each token as a LIKE
+  // (substring, case-insensitive) against the relevant field(s) instead of
+  // requiring an exact/equal match — every token must match somewhere.
   const filteredItems = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    const tokens = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return items.filter((item) => {
-      if (term) {
-        const matches =
+      if (tokens.length > 0) {
+        const haystacks =
           filterBy === "name"
-            ? item.name.toLowerCase().includes(term)
+            ? [item.name.toLowerCase()]
             : filterBy === "barcode"
-              ? item.barcode.toLowerCase().includes(term)
-              : item.name.toLowerCase().includes(term) ||
-                item.barcode.toLowerCase().includes(term);
+              ? [item.barcode.toLowerCase()]
+              : [
+                  item.name.toLowerCase(),
+                  item.barcode.toLowerCase(),
+                  (item.brand || "").toLowerCase(),
+                  (item.type || "").toLowerCase(),
+                ];
+        const matches = tokens.every((token) =>
+          haystacks.some((field) => field.includes(token)),
+        );
         if (!matches) return false;
       }
       if (typeFilter !== "all" && (item.type || "unassigned") !== typeFilter)

@@ -103,6 +103,24 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Normalizes free-text fields for consistent, efficient DB lookups:
+// uppercase, trimmed, internal whitespace collapsed to single spaces.
+function normalizeText(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+function normalizeItemText<T extends { name: string; barcode: string; type: string; brand: string }>(
+  item: T,
+): T {
+  return {
+    ...item,
+    name: normalizeText(item.name),
+    barcode: normalizeText(item.barcode),
+    type: normalizeText(item.type || "unassigned"),
+    brand: normalizeText(item.brand || "generic"),
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   // Inventory State
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -186,9 +204,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // --- INVENTORY ACTIONS ---
   const addItem = (
-    newItemData: Omit<InventoryItem, "id" | "history">,
+    rawItemData: Omit<InventoryItem, "id" | "history">,
     user: string,
   ) => {
+    const newItemData = normalizeItemText(rawItemData);
     const id = Date.now().toString();
     const date = new Date().toISOString();
 
@@ -240,10 +259,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updateItem = (
-    updatedItem: InventoryItem,
+    rawUpdatedItem: InventoryItem,
     user: string,
     notes?: string,
   ) => {
+    const updatedItem = normalizeItemText(rawUpdatedItem);
     const date = new Date().toISOString();
     const oldItem = items.find((i) => i.id === updatedItem.id);
 
