@@ -21,7 +21,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          'sql-engine': ['sql.js', 'localforage'],
+          supabase: ['@supabase/supabase-js'],
           charts: ['recharts'],
         },
       },

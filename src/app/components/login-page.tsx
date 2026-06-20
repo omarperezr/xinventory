@@ -22,7 +22,7 @@ export function LoginPage() {
     // Small delay for UX feel
     await new Promise((r) => setTimeout(r, 150));
 
-    const result = login(email.trim(), password);
+    const result = await login(email.trim(), password);
     if (!result.success) {
       setError(result.error || "Error al iniciar sesión");
     }

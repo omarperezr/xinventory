@@ -7,7 +7,7 @@ import {
 } from "react";
 import { CartItem, PaymentRecord } from "./app-context";
 import { toast } from "sonner";
-import { dbService } from "../services/db";
+import { supabase } from "../services/supabase";
 
 export interface TransactionItem extends CartItem {
   quantityReturned: number;
@@ -23,7 +23,7 @@ export interface Transaction {
   images: string[];
   payments: PaymentRecord[];
   notes?: string;
-  userId: string; // User who performed the transaction
+  userId: string;
 }
 
 interface HistoryContextType {
@@ -38,7 +38,7 @@ interface HistoryContextType {
     notes?: string,
   ) => void;
   returnItem: (transactionId: string, itemId: string, quantity: number) => void;
-  addImageToTransaction: (transactionId: string, imageBase64: string) => void;
+  addImageToTransaction: (transactionId: string, imageUrl: string) => void;
 }
 
 const HistoryContext = createContext<HistoryContextType | undefined>(undefined);
@@ -46,56 +46,63 @@ const HistoryContext = createContext<HistoryContextType | undefined>(undefined);
 export function HistoryProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const refreshTransactions = () => {
+  const refreshTransactions = async () => {
     try {
-      const txRows = dbService.exec(
-        "SELECT * FROM transactions ORDER BY date DESC",
-      );
-      const itemRows = dbService.exec("SELECT * FROM transaction_items");
+      const [{ data: txRows, error: txErr }, { data: itemRows, error: itemErr }] =
+        await Promise.all([
+          supabase.from("transactions").select("*").order("date", { ascending: false }),
+          supabase.from("transaction_items").select("*"),
+        ]);
+      if (txErr) throw txErr;
+      if (itemErr) throw itemErr;
 
-      const mappedTransactions = txRows.map((tx: any) => {
-        const items = itemRows
-          .filter((i: any) => i.transactionId === tx.id)
+      const mapped: Transaction[] = (txRows || []).map((tx: any) => {
+        const items: TransactionItem[] = (itemRows || [])
+          .filter((i: any) => i.transaction_id === tx.id)
           .map((i: any) => ({
-            id: i.itemId,
+            id: i.item_id,
             name: i.name,
-            sellingPrice: i.price,
+            sellingPrice: Number(i.price_usd) || 0,
             cartQuantity: i.quantity,
-            quantityReturned: i.quantityReturned || 0,
-            applyDiscount: i.discountApplied === 1,
-            discount: i.discountValue || 0,
-            // Minimal fields to satisfy types
+            quantityReturned: i.quantity_returned || 0,
+            applyDiscount: i.discount_applied,
+            discount: Number(i.discount_value) || 0,
             barcode: "",
             buyingPrice: 0,
             quantity: 0,
             unit: "units",
             includesTaxes: false,
-            currency: "BS",
+            currency: "USD",
+            images: [],
+            type: "UNASSIGNED",
+            brand: "GENERIC",
             history: [],
           }));
 
         return {
-          ...tx,
-          payments: JSON.parse(tx.payments || "[]"),
-          images: JSON.parse(tx.images || "[]"),
+          id: tx.id,
+          date: tx.date,
+          subtotal: Number(tx.subtotal_usd) || 0,
+          tax: Number(tx.tax_usd) || 0,
+          total: Number(tx.total_usd) || 0,
+          payments: tx.payments || [],
+          images: tx.images || [],
+          notes: tx.notes,
+          userId: tx.user_id,
           items,
         };
       });
-      setTransactions(mappedTransactions);
+      setTransactions(mapped);
     } catch (e) {
-      console.error("Failed to load history from DB", e);
+      console.error("Failed to load history from Supabase", e);
     }
   };
 
   useEffect(() => {
-    const init = async () => {
-      await dbService.waitForInit();
-      refreshTransactions();
-    };
-    init();
+    refreshTransactions();
   }, []);
 
-  const addTransaction = (
+  const addTransaction = async (
     items: CartItem[],
     subtotal: number,
     tax: number,
@@ -104,116 +111,95 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     userId: string,
     notes?: string,
   ) => {
-    const id = Date.now().toString();
-    const date = new Date().toISOString();
-
     try {
-      dbService.exec(
-        `
-            INSERT INTO transactions (id, date, subtotal, tax, total, payments, notes, userId, images)
-            VALUES ($id, $date, $subtotal, $tax, $total, $payments, $notes, $userId, $images)
-        `,
-        {
-          $id: id,
-          $date: date,
-          $subtotal: subtotal,
-          $tax: tax,
-          $total: total,
-          $payments: JSON.stringify(payments),
-          $notes: notes || "",
-          $userId: userId,
-          $images: JSON.stringify([]),
-        },
-      );
+      const { data: tx, error } = await supabase
+        .from("transactions")
+        .insert({
+          subtotal_usd: subtotal,
+          tax_usd: tax,
+          total_usd: total,
+          payments,
+          notes: notes || "",
+          user_id: userId,
+          images: [],
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
 
-      items.forEach((item, idx) => {
-        dbService.exec(
-          `
-                INSERT INTO transaction_items (id, transactionId, itemId, name, price, quantity, quantityReturned, discountApplied, discountValue)
-                VALUES ($id, $transactionId, $itemId, $name, $price, $quantity, 0, $discountApplied, $discountValue)
-            `,
-          {
-            $id: id + "-" + idx,
-            $transactionId: id,
-            $itemId: item.id,
-            $name: item.name,
-            $price: item.sellingPrice,
-            $quantity: item.cartQuantity,
-            $discountApplied: item.applyDiscount ? 1 : 0,
-            $discountValue: item.discount || 0,
-          },
-        );
-      });
+      const rows = items.map((item) => ({
+        transaction_id: tx.id,
+        item_id: item.id,
+        name: item.name,
+        price_usd: item.sellingPrice,
+        quantity: item.cartQuantity,
+        quantity_returned: 0,
+        discount_applied: item.applyDiscount,
+        discount_value: item.discount || 0,
+      }));
+      const { error: itemsErr } = await supabase
+        .from("transaction_items")
+        .insert(rows);
+      if (itemsErr) throw itemsErr;
 
-      refreshTransactions();
+      await refreshTransactions();
     } catch (e) {
       console.error("Error saving transaction", e);
       toast.error("Error al guardar venta");
     }
   };
 
-  const returnItem = (
+  const returnItem = async (
     transactionId: string,
     itemId: string,
     quantity: number,
   ) => {
     try {
-      // Find the specific transaction item row.
-      // itemId in table is the product id.
-      const row = dbService.exec(
-        `
-            SELECT quantityReturned FROM transaction_items 
-            WHERE transactionId = $tid AND itemId = $iid
-        `,
-        { $tid: transactionId, $iid: itemId },
-      );
+      const { data: row, error: selErr } = await supabase
+        .from("transaction_items")
+        .select("quantity_returned")
+        .eq("transaction_id", transactionId)
+        .eq("item_id", itemId)
+        .maybeSingle();
+      if (selErr) throw selErr;
+      if (!row) return;
 
-      if (row.length > 0) {
-        const currentReturned = row[0].quantityReturned || 0;
-        dbService.exec(
-          `
-                UPDATE transaction_items 
-                SET quantityReturned = $qty 
-                WHERE transactionId = $tid AND itemId = $iid
-            `,
-          {
-            $qty: currentReturned + quantity,
-            $tid: transactionId,
-            $iid: itemId,
-          },
-        );
+      const { error } = await supabase
+        .from("transaction_items")
+        .update({ quantity_returned: (row.quantity_returned || 0) + quantity })
+        .eq("transaction_id", transactionId)
+        .eq("item_id", itemId);
+      if (error) throw error;
 
-        refreshTransactions();
-        toast.success("Devolución registrada");
-      }
+      await refreshTransactions();
+      toast.success("Devolución registrada");
     } catch (e) {
       console.error(e);
       toast.error("Error al procesar devolución");
     }
   };
 
-  const addImageToTransaction = (
+  const addImageToTransaction = async (
     transactionId: string,
-    imageBase64: string,
+    imageUrl: string,
   ) => {
     try {
-      const row = dbService.exec(
-        "SELECT images FROM transactions WHERE id = $id",
-        { $id: transactionId },
-      );
-      if (row.length > 0) {
-        const images = JSON.parse(row[0].images || "[]");
-        images.push(imageBase64);
-        dbService.exec(
-          "UPDATE transactions SET images = $images WHERE id = $id",
-          {
-            $images: JSON.stringify(images),
-            $id: transactionId,
-          },
-        );
-        refreshTransactions();
-        toast.success("Imagen adjuntada a la transacción");
-      }
+      const { data: row, error: selErr } = await supabase
+        .from("transactions")
+        .select("images")
+        .eq("id", transactionId)
+        .single();
+      if (selErr) throw selErr;
+
+      const images = [...(row.images || []), imageUrl];
+      const { error } = await supabase
+        .from("transactions")
+        .update({ images })
+        .eq("id", transactionId);
+      if (error) throw error;
+
+      await refreshTransactions();
+      toast.success("Imagen adjuntada a la transacción");
     } catch (e) {
       console.error(e);
       toast.error("Error al guardar imagen");

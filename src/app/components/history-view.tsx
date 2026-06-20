@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { toast } from "sonner";
+import { uploadImage } from "../services/image-utils";
 
 interface HistoryViewProps {
   onReturnInventory: (itemId: string, quantity: number) => void;
@@ -51,21 +52,21 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
       ),
   );
 
-  const handleFileUpload = (
+  const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     transactionId: string,
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1024 * 1024) {
-      toast.error("Imagen muy grande. Máximo 1MB.");
-      return;
+    try {
+      const url = await uploadImage(file);
+      addImageToTransaction(transactionId, url);
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al subir imagen");
+    } finally {
+      e.target.value = "";
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      addImageToTransaction(transactionId, reader.result as string);
-    };
-    reader.readAsDataURL(file);
   };
 
   return (

@@ -57,10 +57,10 @@ export function UserManagementPanel() {
   const [editError, setEditError] = useState("");
   const [showEditPwd, setShowEditPwd] = useState(false);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     setCreateError("");
     setCreateSuccess("");
-    const result = registerUser(
+    const result = await registerUser(
       createName,
       createEmail,
       createPassword,
@@ -90,17 +90,22 @@ export function UserManagementPanel() {
     setEditError("");
   };
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!editingUser) return;
     setEditError("");
-    const updates: Partial<Omit<UserType, "id">> = {
+    const updates: Partial<{
+      name: string;
+      email: string;
+      password: string;
+      role: UserRole;
+    }> = {
       name: editName,
       email: editEmail,
       role: editRole,
     };
     if (editPassword) updates.password = editPassword;
 
-    const result = updateUser(editingUser.id, updates);
+    const result = await updateUser(editingUser.id, updates);
     if (!result.success) {
       setEditError(result.error || "Error al actualizar");
       return;
@@ -108,8 +113,8 @@ export function UserManagementPanel() {
     setEditingUser(null);
   };
 
-  const handleDelete = (id: string) => {
-    const result = deleteUser(id);
+  const handleDelete = async (id: string) => {
+    const result = await deleteUser(id);
     if (!result.success) {
       alert(result.error);
     }

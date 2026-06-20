@@ -6,7 +6,7 @@ import {
   ReactNode,
 } from "react";
 import { toast } from "sonner";
-import { dbService } from "../services/db";
+import { supabase } from "../services/supabase";
 
 export type UnitType = "units" | "kg" | "liters";
 
@@ -23,17 +23,17 @@ export interface InventoryItem {
   id: string;
   name: string;
   barcode: string;
-  buyingPrice: number;
-  sellingPrice: number; // Formerly 'price'
+  buyingPrice: number; // Canonical price, always USD
+  sellingPrice: number; // Canonical price, always USD
   quantity: number;
   unit: UnitType;
   includesTaxes: boolean;
   currency: string;
   discount: number; // Percentage 0-100
   image?: string;
-  images: string[]; // Compressed data URLs
-  type: string; // Product type/category, default "unassigned"
-  brand: string; // Product brand, default "generic"
+  images: string[]; // Public Supabase Storage URLs
+  type: string; // Product type/category, default "UNASSIGNED"
+  brand: string; // Product brand, default "GENERIC"
   history: ItemHistoryRecord[];
 }
 
@@ -64,13 +64,13 @@ interface AppContextType {
   updateItem: (item: InventoryItem, user: string, notes?: string) => void;
   deleteItem: (id: string, user: string) => void;
 
-  // Currency
+  // Currency — prices are stored in USD; rates convert USD -> BS/EUR for display
   currency: "BS" | "USD" | "EUR";
   setCurrency: (c: "BS" | "USD" | "EUR") => void;
-  rates: { USD: number; EUR: number };
+  rates: { USD: number; EUR: number }; // Bs per 1 USD, Bs per 1 EUR
   updateRates: (usd: number, eur: number) => void;
-  convertPrice: (priceInBs: number) => number;
-  formatPrice: (priceInBs: number) => string;
+  convertPrice: (priceInUsd: number) => number;
+  formatPrice: (priceInUsd: number) => string;
 
   // Cart
   cartItems: CartItem[];
@@ -121,13 +121,43 @@ function normalizeItemText<T extends { name: string; barcode: string; type: stri
   };
 }
 
+function mapRow(row: any, historyRows: any[]): InventoryItem {
+  const itemHistory: ItemHistoryRecord[] = historyRows
+    .filter((h) => h.item_id === row.id)
+    .map((h) => ({
+      date: h.date,
+      action: h.action,
+      details: h.details,
+      user: h.user_name,
+      previousStock: h.previous_stock ?? undefined,
+      newStock: h.new_stock ?? undefined,
+    }));
+
+  return {
+    id: row.id,
+    name: row.name,
+    barcode: row.barcode,
+    buyingPrice: Number(row.buying_price_usd) || 0,
+    sellingPrice: Number(row.selling_price_usd) || 0,
+    quantity: row.quantity,
+    unit: row.unit,
+    includesTaxes: row.includes_taxes,
+    currency: "USD",
+    discount: Number(row.discount) || 0,
+    images: row.images || [],
+    type: row.type || "UNASSIGNED",
+    brand: row.brand || "GENERIC",
+    history: itemHistory,
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   // Inventory State
   const [items, setItems] = useState<InventoryItem[]>([]);
 
   // Currency State
   const [currency, setCurrency] = useState<"BS" | "USD" | "EUR">("BS");
-  const [rates, setRates] = useState({ USD: 1, EUR: 1 });
+  const [rates, setRates] = useState({ USD: 36.5, EUR: 39.2 });
 
   // Cart State
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -136,66 +166,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [transactionNotes, setTransactionNotes] = useState("");
 
   // --- PERSISTENCE & INITIALIZATION ---
-  const refreshData = () => {
+  const refreshData = async () => {
     try {
-      // Fetch Items
-      const itemsRows = dbService.exec("SELECT * FROM items");
-      const historyRows = dbService.exec(
-        "SELECT * FROM history ORDER BY date DESC",
-      );
+      const [{ data: itemRows, error: itemsErr }, { data: historyRows, error: histErr }] =
+        await Promise.all([
+          supabase.from("items").select("*").order("created_at", { ascending: false }),
+          supabase.from("item_history").select("*").order("date", { ascending: false }),
+        ]);
+      if (itemsErr) throw itemsErr;
+      if (histErr) throw histErr;
 
-      const mappedItems = itemsRows.map((item: any) => {
-        const itemHistory = historyRows
-          .filter((h: any) => h.itemId === item.id)
-          .map((h: any) => ({
-            ...h,
-            previousStock:
-              typeof h.previousStock === "number" ? h.previousStock : undefined,
-            newStock: typeof h.newStock === "number" ? h.newStock : undefined,
-          }));
+      setItems((itemRows || []).map((row) => mapRow(row, historyRows || [])));
 
-        let images: string[] = [];
-        try {
-          images = item.images ? JSON.parse(item.images) : [];
-        } catch {
-          images = [];
-        }
-
-        return {
-          ...item,
-          buyingPrice: item.buyingPrice || 0,
-          includesTaxes: item.includesTaxes === 1,
-          discount: item.discount || 0,
-          images,
-          type: item.type || "unassigned",
-          brand: item.brand || "generic",
-          history: itemHistory,
-        };
-      });
-      setItems(mappedItems);
-
-      // Fetch Rates
-      const settings = dbService.exec(
-        "SELECT value FROM settings WHERE key = 'rates'",
-      );
-      if (settings.length > 0) {
-        setRates(JSON.parse(settings[0].value));
+      const { data: settingsRow } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "rates")
+        .maybeSingle();
+      if (settingsRow?.value) {
+        setRates(settingsRow.value as { USD: number; EUR: number });
       }
     } catch (e) {
-      console.error("Error refreshing data from DB", e);
+      console.error("Error refreshing data from Supabase", e);
+      toast.error("Error al cargar datos de Supabase");
     }
   };
 
   useEffect(() => {
-    const init = async () => {
-      await dbService.waitForInit();
-      refreshData();
+    refreshData();
 
-      // Load local storage items that are not in DB (SavedCarts)
-      const loadedSavedCarts = localStorage.getItem("savedCarts");
-      if (loadedSavedCarts) setSavedCarts(JSON.parse(loadedSavedCarts));
-    };
-    init();
+    const loadedSavedCarts = localStorage.getItem("savedCarts");
+    if (loadedSavedCarts) setSavedCarts(JSON.parse(loadedSavedCarts));
   }, []);
 
   useEffect(() => {
@@ -203,129 +204,95 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [savedCarts]);
 
   // --- INVENTORY ACTIONS ---
-  const addItem = (
+  const addItem = async (
     rawItemData: Omit<InventoryItem, "id" | "history">,
     user: string,
   ) => {
     const newItemData = normalizeItemText(rawItemData);
-    const id = Date.now().toString();
-    const date = new Date().toISOString();
 
     try {
-      dbService.exec(
-        `
-            INSERT INTO items (id, name, barcode, buyingPrice, sellingPrice, quantity, unit, includesTaxes, currency, discount, images, type, brand)
-            VALUES ($id, $name, $barcode, $buyingPrice, $sellingPrice, $quantity, $unit, $includesTaxes, $currency, $discount, $images, $type, $brand)
-        `,
-        {
-          $id: id,
-          $name: newItemData.name,
-          $barcode: newItemData.barcode,
-          $buyingPrice: newItemData.buyingPrice,
-          $sellingPrice: newItemData.sellingPrice,
-          $quantity: newItemData.quantity,
-          $unit: newItemData.unit,
-          $includesTaxes: newItemData.includesTaxes ? 1 : 0,
-          $currency: newItemData.currency,
-          $discount: newItemData.discount || 0,
-          $images: JSON.stringify(newItemData.images || []),
-          $type: newItemData.type || "unassigned",
-          $brand: newItemData.brand || "generic",
-        },
-      );
+      const { data: inserted, error } = await supabase
+        .from("items")
+        .insert({
+          name: newItemData.name,
+          barcode: newItemData.barcode,
+          buying_price_usd: newItemData.buyingPrice,
+          selling_price_usd: newItemData.sellingPrice,
+          quantity: newItemData.quantity,
+          unit: newItemData.unit,
+          includes_taxes: newItemData.includesTaxes,
+          discount: newItemData.discount || 0,
+          images: newItemData.images || [],
+          type: newItemData.type || "UNASSIGNED",
+          brand: newItemData.brand || "GENERIC",
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
 
-      dbService.exec(
-        `
-            INSERT INTO history (id, itemId, action, date, details, user, newStock)
-            VALUES ($id, $itemId, $action, $date, $details, $user, $newStock)
-        `,
-        {
-          $id: Date.now().toString() + "-h",
-          $itemId: id,
-          $action: "create",
-          $date: date,
-          $details: "Producto creado inicialmente",
-          $user: user,
-          $newStock: newItemData.quantity,
-        },
-      );
+      await supabase.from("item_history").insert({
+        item_id: inserted.id,
+        action: "create",
+        details: "Producto creado inicialmente",
+        user_name: user,
+        new_stock: newItemData.quantity,
+      });
 
-      refreshData();
+      await refreshData();
       toast.success("Producto agregado exitosamente");
     } catch (e) {
       console.error(e);
-      toast.error("Error al guardar en base de datos");
+      toast.error("Error al guardar en Supabase");
     }
   };
 
-  const updateItem = (
+  const updateItem = async (
     rawUpdatedItem: InventoryItem,
     user: string,
     notes?: string,
   ) => {
     const updatedItem = normalizeItemText(rawUpdatedItem);
-    const date = new Date().toISOString();
     const oldItem = items.find((i) => i.id === updatedItem.id);
 
     try {
-      dbService.exec(
-        `
-            UPDATE items
-            SET name=$name, barcode=$barcode, buyingPrice=$buyingPrice, sellingPrice=$sellingPrice,
-                quantity=$quantity, unit=$unit, includesTaxes=$includesTaxes, discount=$discount,
-                images=$images, type=$type, brand=$brand
-            WHERE id=$id
-        `,
-        {
-          $name: updatedItem.name,
-          $barcode: updatedItem.barcode,
-          $buyingPrice: updatedItem.buyingPrice,
-          $sellingPrice: updatedItem.sellingPrice,
-          $quantity: updatedItem.quantity,
-          $unit: updatedItem.unit,
-          $includesTaxes: updatedItem.includesTaxes ? 1 : 0,
-          $discount: updatedItem.discount || 0,
-          $images: JSON.stringify(updatedItem.images || []),
-          $type: updatedItem.type || "unassigned",
-          $brand: updatedItem.brand || "generic",
-          $id: updatedItem.id,
-        },
-      );
+      const { error } = await supabase
+        .from("items")
+        .update({
+          name: updatedItem.name,
+          barcode: updatedItem.barcode,
+          buying_price_usd: updatedItem.buyingPrice,
+          selling_price_usd: updatedItem.sellingPrice,
+          quantity: updatedItem.quantity,
+          unit: updatedItem.unit,
+          includes_taxes: updatedItem.includesTaxes,
+          discount: updatedItem.discount || 0,
+          images: updatedItem.images || [],
+          type: updatedItem.type || "UNASSIGNED",
+          brand: updatedItem.brand || "GENERIC",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", updatedItem.id);
+      if (error) throw error;
 
-      // Stock Change Log
       if (oldItem && oldItem.quantity !== updatedItem.quantity) {
-        dbService.exec(
-          `
-                INSERT INTO history (id, itemId, action, date, details, user, previousStock, newStock)
-                VALUES ($id, $itemId, 'update', $date, $details, $user, $previousStock, $newStock)
-            `,
-          {
-            $id: Date.now().toString() + "-h1",
-            $itemId: updatedItem.id,
-            $date: date,
-            $details: `Stock modificado: ${oldItem.quantity} -> ${updatedItem.quantity}. ${notes ? `Notas: ${notes}` : ""}`,
-            $user: user,
-            $previousStock: oldItem.quantity,
-            $newStock: updatedItem.quantity,
-          },
-        );
+        await supabase.from("item_history").insert({
+          item_id: updatedItem.id,
+          action: "update",
+          details: `Stock modificado: ${oldItem.quantity} -> ${updatedItem.quantity}. ${notes ? `Notas: ${notes}` : ""}`,
+          user_name: user,
+          previous_stock: oldItem.quantity,
+          new_stock: updatedItem.quantity,
+        });
       } else if (notes) {
-        dbService.exec(
-          `
-                INSERT INTO history (id, itemId, action, date, details, user)
-                VALUES ($id, $itemId, 'update', $date, $details, $user)
-            `,
-          {
-            $id: Date.now().toString() + "-h2",
-            $itemId: updatedItem.id,
-            $date: date,
-            $details: `Actualización: ${notes}`,
-            $user: user,
-          },
-        );
+        await supabase.from("item_history").insert({
+          item_id: updatedItem.id,
+          action: "update",
+          details: `Actualización: ${notes}`,
+          user_name: user,
+        });
       }
 
-      refreshData();
+      await refreshData();
       toast.success("Producto actualizado");
     } catch (e) {
       console.error(e);
@@ -333,11 +300,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const deleteItem = (id: string, user: string) => {
+  const deleteItem = async (id: string, _user: string) => {
     try {
-      dbService.exec("DELETE FROM items WHERE id = $id", { $id: id });
-      dbService.exec("DELETE FROM history WHERE itemId = $id", { $id: id });
-      refreshData();
+      const { error } = await supabase.from("items").delete().eq("id", id);
+      if (error) throw error;
+      await refreshData();
       toast.success("Producto eliminado");
     } catch (e) {
       console.error(e);
@@ -346,26 +313,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // --- CURRENCY ACTIONS ---
-  const updateRates = (usd: number, eur: number) => {
+  const updateRates = async (usd: number, eur: number) => {
     try {
       const ratesObj = { USD: usd, EUR: eur };
-      // Check if exists
-      const exists = dbService.exec(
-        "SELECT key FROM settings WHERE key = 'rates'",
-      );
-      if (exists.length > 0) {
-        dbService.exec(
-          "UPDATE settings SET value = $value WHERE key = 'rates'",
-          { $value: JSON.stringify(ratesObj) },
-        );
-      } else {
-        dbService.exec(
-          "INSERT INTO settings (key, value) VALUES ('rates', $value)",
-          { $value: JSON.stringify(ratesObj) },
-        );
-      }
-
-      refreshData();
+      const { error } = await supabase
+        .from("settings")
+        .upsert({ key: "rates", value: ratesObj });
+      if (error) throw error;
+      setRates(ratesObj);
       toast.success("Tasas de cambio actualizadas");
     } catch (e) {
       console.error(e);
@@ -373,15 +328,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const convertPrice = (priceInBs: number) => {
-    if (currency === "BS") return priceInBs;
-    if (currency === "USD") return priceInBs / rates.USD;
-    if (currency === "EUR") return priceInBs / rates.EUR;
-    return priceInBs;
+  // Base price is always USD. BS/EUR are derived display-only conversions.
+  const convertPrice = (priceInUsd: number) => {
+    if (currency === "USD") return priceInUsd;
+    if (currency === "BS") return priceInUsd * rates.USD;
+    if (currency === "EUR") return (priceInUsd * rates.USD) / rates.EUR;
+    return priceInUsd;
   };
 
-  const formatPrice = (priceInBs: number) => {
-    const converted = convertPrice(priceInBs);
+  const formatPrice = (priceInUsd: number) => {
+    const converted = convertPrice(priceInUsd);
     const symbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
     return `${symbol} ${converted.toFixed(2)}`;
   };
@@ -393,7 +349,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Check if adding this quantity exceeds stock considering what's already in cart
     const existingInCart = cartItems.find((i) => i.id === item.id);
     const currentCartQty = existingInCart ? existingInCart.cartQuantity : 0;
 
@@ -455,8 +410,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTransactionNotes("");
   };
 
-  // --- CART CALCULATIONS ---
-  // Calculates based on Selling Price in BS
+  // --- CART CALCULATIONS (USD base) ---
   const subtotal = cartItems.reduce((sum, item) => {
     let price = item.sellingPrice;
     if (item.applyDiscount && item.discount > 0) {
@@ -465,21 +419,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return sum + price * item.cartQuantity;
   }, 0);
 
-  // Tax is calculated ONLY for items that have includesTaxes = true
   const taxAmount = cartItems.reduce((sum, item) => {
     if (item.includesTaxes) {
       let price = item.sellingPrice;
       if (item.applyDiscount && item.discount > 0) {
         price = price * (1 - item.discount / 100);
       }
-      return sum + price * item.cartQuantity * 0.1; // 10% tax
+      return sum + price * item.cartQuantity * 0.1;
     }
     return sum;
   }, 0);
 
   const totalAmount = subtotal + taxAmount;
 
-  // Payment math
   const amountPaid = currentPayments.reduce((sum, p) => sum + p.amount, 0);
   const remainingDue = totalAmount - amountPaid;
 

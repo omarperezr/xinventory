@@ -53,15 +53,15 @@ function LoginDialog({
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError("");
-    const ok = login(email, password);
-    if (ok) {
+    const result = await login(email, password);
+    if (result.success) {
       onOpenChange(false);
       setEmail("");
       setPassword("");
     } else {
-      setError("Correo o contraseña incorrectos");
+      setError(result.error || "Correo o contraseña incorrectos");
     }
   };
 
@@ -144,7 +144,7 @@ function UserManagementDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { users, addUser, deleteUser, currentUser } = useAuth();
+  const { users, registerUser, deleteUser, currentUser } = useAuth();
   const [tab, setTab] = useState<"list" | "create">("list");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -163,10 +163,10 @@ function UserManagementDialog({
     setSuccess("");
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     setError("");
     setSuccess("");
-    const result = addUser(name, email, password, role);
+    const result = await registerUser(name, email, password, role);
     if (result.success) {
       setSuccess("Usuario creado exitosamente");
       resetForm();
@@ -274,7 +274,7 @@ function UserManagementDialog({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteUser(u.id)}
+                      onClick={async () => { await deleteUser(u.id); }}
                       className="text-red-400 hover:text-red-600 hover:bg-red-50 h-7 w-7 p-0"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

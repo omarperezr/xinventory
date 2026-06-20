@@ -21,7 +21,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import { InventoryItem, UnitType } from "../context/app-context";
-import { compressImages } from "../services/image-utils";
+import { uploadImages } from "../services/image-utils";
+import { toast } from "sonner";
 
 interface InventoryFormProps {
   onSubmit: (
@@ -68,11 +69,11 @@ export function InventoryForm({
     if (editItem) {
       setName(editItem.name);
       setBarcode(editItem.barcode);
-      // Edit item prices are always in BS
+      // Canonical prices are always stored in USD
       setBuyingPrice(editItem.buyingPrice.toString());
-      setBuyingCurrency("BS");
+      setBuyingCurrency("USD");
       setSellingPrice(editItem.sellingPrice.toString());
-      setSellingCurrency("BS");
+      setSellingCurrency("USD");
 
       setQuantity(editItem.quantity);
       setUnit(editItem.unit);
@@ -89,8 +90,11 @@ export function InventoryForm({
     if (files.length === 0) return;
     setCompressing(true);
     try {
-      const compressed = await compressImages(files);
-      setImages((prev) => [...prev, ...compressed]);
+      const uploaded = await uploadImages(files);
+      setImages((prev) => [...prev, ...uploaded]);
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al subir imágenes");
     } finally {
       setCompressing(false);
       e.target.value = "";
@@ -101,11 +105,12 @@ export function InventoryForm({
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Helper to convert any input to BS
-  const toBS = (amount: number, currency: InputCurrency): number => {
-    if (currency === "BS") return amount;
-    if (currency === "USD") return amount * rates.USD;
-    if (currency === "EUR") return amount * rates.EUR;
+  // Helper to convert any input currency to USD — the canonical, non-fluctuating
+  // price. BS/EUR change daily so they're never stored, only USD is.
+  const toUSD = (amount: number, currency: InputCurrency): number => {
+    if (currency === "USD") return amount;
+    if (currency === "BS") return amount / rates.USD;
+    if (currency === "EUR") return (amount * rates.EUR) / rates.USD;
     return amount;
   };
 
@@ -114,11 +119,9 @@ export function InventoryForm({
     const amount = parseFloat(amountStr);
     if (isNaN(amount)) return null;
 
-    const amountInBs = toBS(amount, currency);
-
-    const inUSD = amountInBs / rates.USD;
-    const inEUR = amountInBs / rates.EUR;
-    const inBS = amountInBs;
+    const inUSD = toUSD(amount, currency);
+    const inBS = inUSD * rates.USD;
+    const inEUR = (inUSD * rates.USD) / rates.EUR;
 
     return (
       <div className="text-xs text-gray-500 mt-1 flex gap-2">
@@ -141,9 +144,9 @@ export function InventoryForm({
     e.preventDefault();
     if (!name || !barcode || !sellingPrice || !buyingPrice) return;
 
-    // Convert inputs to BS for storage
-    const finalBuyingPrice = toBS(parseFloat(buyingPrice), buyingCurrency);
-    const finalSellingPrice = toBS(parseFloat(sellingPrice), sellingCurrency);
+    // Convert inputs to USD for storage — the canonical base price
+    const finalBuyingPrice = toUSD(parseFloat(buyingPrice), buyingCurrency);
+    const finalSellingPrice = toUSD(parseFloat(sellingPrice), sellingCurrency);
 
     onSubmit(
       {
@@ -154,7 +157,7 @@ export function InventoryForm({
         quantity,
         unit,
         includesTaxes,
-        currency: "BS", // System base currency
+        currency: "USD", // System base currency
         discount: parseFloat(discount) || 0,
         type: type || "unassigned",
         brand: brand || "generic",
@@ -177,10 +180,8 @@ export function InventoryForm({
       setBrand("generic");
       setImages([]);
       setNotes("");
-      // Keep currencies as is for convenience? Or reset?
-      // Resetting to BS is safer
-      setBuyingCurrency("BS");
-      setSellingCurrency("BS");
+      setBuyingCurrency("USD");
+      setSellingCurrency("USD");
     }
   };
 
