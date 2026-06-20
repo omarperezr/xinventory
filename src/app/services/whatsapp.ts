@@ -1,13 +1,15 @@
 import { InventoryItem } from "../context/app-context";
 
+// item.sellingPrice is the canonical USD price; formatPrice converts it to
+// the currently selected display currency (BS/USD/EUR).
 function buildCaption(
   item: InventoryItem,
-  formatPrice: (priceInBs: number) => string,
+  formatPrice: (priceInUsd: number) => string,
 ) {
   return [
     `*${item.name}*`,
     `Marca: ${item.brand}`,
-    `Tipo: ${item.type}`,
+    `Precio: $ ${item.sellingPrice.toFixed(2)}`,
     `Precio: ${formatPrice(item.sellingPrice)}`,
     `Stock: ${item.quantity} ${item.unit}`,
     `Código: ${item.barcode}`,
@@ -16,7 +18,7 @@ function buildCaption(
 
 export function shareProductToWhatsApp(
   item: InventoryItem,
-  formatPrice: (priceInBs: number) => string,
+  formatPrice: (priceInUsd: number) => string,
 ) {
   const text = encodeURIComponent(buildCaption(item, formatPrice));
   window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
@@ -27,13 +29,13 @@ export function shareProductToWhatsApp(
 // only carry text. Falls back to opening WhatsApp with the caption only.
 export async function shareImageToWhatsApp(
   item: InventoryItem,
-  imageDataUrl: string,
-  formatPrice: (priceInBs: number) => string,
+  imageUrl: string,
+  formatPrice: (priceInUsd: number) => string,
 ) {
   const caption = buildCaption(item, formatPrice);
 
   try {
-    const res = await fetch(imageDataUrl);
+    const res = await fetch(imageUrl);
     const blob = await res.blob();
     const file = new File([blob], `${item.name || "producto"}.jpg`, {
       type: blob.type || "image/jpeg",
