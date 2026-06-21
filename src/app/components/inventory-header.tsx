@@ -32,6 +32,7 @@ import { ProfileDialog } from "./profile-dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -145,13 +146,14 @@ function UserManagementDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { users, registerUser, deleteUser, currentUser } = useAuth();
+  const { users, registerUser, deleteUser, updateUser, currentUser } = useAuth();
   const [tab, setTab] = useState<"list" | "create">("list");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [role, setRole] = useState<UserRole>("seller");
+  const [canEditPrice, setCanEditPrice] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -160,6 +162,7 @@ function UserManagementDialog({
     setEmail("");
     setPassword("");
     setRole("seller");
+    setCanEditPrice(false);
     setError("");
     setSuccess("");
   };
@@ -167,7 +170,7 @@ function UserManagementDialog({
   const handleCreate = async () => {
     setError("");
     setSuccess("");
-    const result = await registerUser(name, email, password, role);
+    const result = await registerUser(name, email, password, role, canEditPrice);
     if (result.success) {
       setSuccess("Usuario creado exitosamente");
       resetForm();
@@ -261,6 +264,22 @@ function UserManagementDialog({
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {u.role === "seller" && (
+                    <label
+                      className="flex items-center gap-1.5 cursor-pointer select-none"
+                      title="Permitir que este vendedor modifique el precio de venta"
+                    >
+                      <Checkbox
+                        checked={u.canEditPrice}
+                        onCheckedChange={(c) =>
+                          updateUser(u.id, { canEditPrice: c as boolean })
+                        }
+                      />
+                      <span className="text-xs text-gray-500 hidden sm:inline">
+                        Editar precio
+                      </span>
+                    </label>
+                  )}
                   <span
                     className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
                       u.role === "admin"
@@ -355,6 +374,18 @@ function UserManagementDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            {role === "seller" && (
+              <label className="flex items-center gap-2 cursor-pointer select-none bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+                <Checkbox
+                  checked={canEditPrice}
+                  onCheckedChange={(c) => setCanEditPrice(c as boolean)}
+                />
+                <span className="text-sm text-gray-700">
+                  Permitir modificar precio de venta
+                </span>
+              </label>
+            )}
 
             {error && (
               <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md border border-red-100">
