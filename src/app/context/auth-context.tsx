@@ -34,6 +34,14 @@ interface AuthContextType {
     id: string,
     updates: Partial<{ name: string; email: string; password: string; role: UserRole }>,
   ) => Promise<Result>;
+  // Self-service profile management
+  updateOwnName: (name: string) => Promise<Result>;
+  requestEmailChange: (newEmail: string) => Promise<Result>;
+  requestPasswordReset: () => Promise<Result>;
+  confirmPasswordReset: (
+    code: string,
+    newPassword: string,
+  ) => Promise<Result>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,55 +54,100 @@ function rpcErrorMessage(message: string): string {
       return "Ya existe un usuario con ese correo";
     case "CANNOT_DELETE_SELF":
       return "No puedes eliminar tu propio usuario";
+    case "INVALID_INPUT":
+      return "Datos inválidos";
+    case "NOT_AUTHENTICATED":
+      return "Sesión expirada, inicia sesión de nuevo";
     default:
       return message;
   }
 }
 
+async function callAdminUsers(body: Record<string, unknown>): Promise<Result> {
+  const { data, error } = await supabase.functions.invoke("admin-users", {
+    body,
+  });
+  if (error) {
+    const message =
+      (data as any)?.error || error.message || "Error desconocido";
+    return { success: false, error: rpcErrorMessage(message) };
+  }
+  if (data?.error) {
+    return { success: false, error: rpcErrorMessage(data.error) };
+  }
+  return { success: true };
+}
+
+function mapProfile(profile: any): User {
+  return {
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    role: profile.role,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
-  const refreshUsers = async (adminId: string) => {
-    const { data, error } = await supabase.rpc("list_users", {
-      p_admin_id: adminId,
-    });
-    if (!error && data) setUsers(data as User[]);
+  const loadProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, name, email, role")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error || !data) {
+      setCurrentUser(null);
+      return;
+    }
+    setCurrentUser(mapProfile(data));
+  };
+
+  const refreshUsers = async () => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, name, email, role")
+      .order("created_at");
+    if (!error && data) setUsers(data.map(mapProfile));
   };
 
   useEffect(() => {
-    const stored = localStorage.getItem("app_current_user_v2");
-    if (stored) {
-      const user = JSON.parse(stored) as User;
-      setCurrentUser(user);
-      if (user.role === "admin") refreshUsers(user.id);
-    }
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) loadProfile(data.session.user.id);
+      setLoaded(true);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        loadProfile(session.user.id);
+      } else {
+        setCurrentUser(null);
+        setUsers([]);
+      }
+    });
+
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem("app_current_user_v2", JSON.stringify(currentUser));
-      if (currentUser.role === "admin") refreshUsers(currentUser.id);
-    } else {
-      localStorage.removeItem("app_current_user_v2");
-      setUsers([]);
-    }
-  }, [currentUser]);
+    if (loaded && currentUser?.role === "admin") refreshUsers();
+  }, [loaded, currentUser?.id, currentUser?.role]);
 
   const login = async (email: string, password: string): Promise<Result> => {
-    const { data, error } = await supabase.rpc("login_user", {
-      p_email: email,
-      p_password: password,
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
-    if (error || !data || data.length === 0) {
+    if (error) {
       return { success: false, error: "Correo o contraseña incorrectos" };
     }
-    setCurrentUser(data[0] as User);
     return { success: true };
   };
 
   const logout = () => {
-    setCurrentUser(null);
+    supabase.auth.signOut();
   };
 
   const registerUser = async (
@@ -103,7 +156,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     role: UserRole,
   ): Promise<Result> => {
-    if (!currentUser) return { success: false, error: "No autenticado" };
     if (!name.trim()) return { success: false, error: "El nombre es requerido" };
     if (!email.trim()) return { success: false, error: "El correo es requerido" };
     if (password.length < 6)
@@ -112,56 +164,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: "La contraseña debe tener al menos 6 caracteres",
       };
 
-    const { error } = await supabase.rpc("admin_create_user", {
-      p_admin_id: currentUser.id,
-      p_name: name,
-      p_email: email,
-      p_password: password,
-      p_role: role,
-    });
-    if (error) return { success: false, error: rpcErrorMessage(error.message) };
-
-    await refreshUsers(currentUser.id);
-    return { success: true };
+    const result = await callAdminUsers({ action: "create", name, email, password, role });
+    if (result.success) await refreshUsers();
+    return result;
   };
 
   const updateUser = async (
     id: string,
     updates: Partial<{ name: string; email: string; password: string; role: UserRole }>,
   ): Promise<Result> => {
-    if (!currentUser) return { success: false, error: "No autenticado" };
-    const target = users.find((u) => u.id === id);
-    if (!target) return { success: false, error: "Usuario no encontrado" };
-
-    const { error } = await supabase.rpc("admin_update_user", {
-      p_admin_id: currentUser.id,
-      p_user_id: id,
-      p_name: updates.name ?? target.name,
-      p_email: updates.email ?? target.email,
-      p_password: updates.password || null,
-      p_role: updates.role ?? target.role,
-    });
-    if (error) return { success: false, error: rpcErrorMessage(error.message) };
-
-    await refreshUsers(currentUser.id);
-    if (currentUser.id === id) {
-      setCurrentUser((prev) =>
-        prev ? { ...prev, ...updates, password: undefined } as User : prev,
-      );
+    if (updates.password && updates.password.length < 6) {
+      return {
+        success: false,
+        error: "La contraseña debe tener al menos 6 caracteres",
+      };
     }
-    return { success: true };
+    const result = await callAdminUsers({ action: "update", id, ...updates });
+    if (result.success) {
+      await refreshUsers();
+      if (currentUser?.id === id) await loadProfile(id);
+    }
+    return result;
   };
 
   const deleteUser = async (id: string): Promise<Result> => {
+    const result = await callAdminUsers({ action: "delete", id });
+    if (result.success) await refreshUsers();
+    return result;
+  };
+
+  // --- Self-service profile management ---
+
+  const updateOwnName = async (name: string): Promise<Result> => {
     if (!currentUser) return { success: false, error: "No autenticado" };
+    if (!name.trim()) return { success: false, error: "El nombre es requerido" };
+    const { error } = await supabase
+      .from("profiles")
+      .update({ name: name.trim() })
+      .eq("id", currentUser.id);
+    if (error) return { success: false, error: error.message };
+    await loadProfile(currentUser.id);
+    return { success: true };
+  };
 
-    const { error } = await supabase.rpc("admin_delete_user", {
-      p_admin_id: currentUser.id,
-      p_user_id: id,
+  // Supabase sends a confirmation link to the NEW address; the email only
+  // updates (and our profiles row syncs via trigger) once the user clicks it.
+  const requestEmailChange = async (newEmail: string): Promise<Result> => {
+    if (!newEmail.trim()) return { success: false, error: "El correo es requerido" };
+    const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  };
+
+  // Sends a 6-digit OTP code (Supabase recovery email) to the current
+  // account's address, which confirmPasswordReset verifies before allowing
+  // the password change.
+  const requestPasswordReset = async (): Promise<Result> => {
+    if (!currentUser) return { success: false, error: "No autenticado" };
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      currentUser.email,
+    );
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  };
+
+  const confirmPasswordReset = async (
+    code: string,
+    newPassword: string,
+  ): Promise<Result> => {
+    if (!currentUser) return { success: false, error: "No autenticado" };
+    if (newPassword.length < 6)
+      return {
+        success: false,
+        error: "La contraseña debe tener al menos 6 caracteres",
+      };
+    const { error: verifyErr } = await supabase.auth.verifyOtp({
+      email: currentUser.email,
+      token: code,
+      type: "recovery",
     });
-    if (error) return { success: false, error: rpcErrorMessage(error.message) };
+    if (verifyErr) return { success: false, error: "Código inválido o expirado" };
 
-    await refreshUsers(currentUser.id);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { success: false, error: error.message };
     return { success: true };
   };
 
@@ -175,6 +260,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         registerUser,
         deleteUser,
         updateUser,
+        updateOwnName,
+        requestEmailChange,
+        requestPasswordReset,
+        confirmPasswordReset,
       }}
     >
       {children}

@@ -28,6 +28,7 @@ import {
 } from "./ui/select";
 import { useApp } from "../context/app-context";
 import { useAuth, UserRole } from "../context/auth-context";
+import { ProfileDialog } from "./profile-dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
@@ -389,6 +390,7 @@ export function InventoryHeader() {
   const [showLogin, setShowLogin] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showUserMgmt, setShowUserMgmt] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   const isAdmin = currentUser?.role === "admin";
   const isDashboard = location.pathname === "/";
@@ -541,6 +543,16 @@ export function InventoryHeader() {
                             {currentUser.email}
                           </p>
                         </div>
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            setShowProfile(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <User className="w-4 h-4 text-gray-500" />
+                          Mi Perfil
+                        </button>
                         {isAdmin && (
                           <button
                             onClick={() => {
@@ -643,6 +655,7 @@ export function InventoryHeader() {
         open={showUserMgmt}
         onOpenChange={setShowUserMgmt}
       />
+      <ProfileDialog open={showProfile} onOpenChange={setShowProfile} />
     </>
   );
 }
