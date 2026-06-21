@@ -73,10 +73,19 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
       if (txErr) throw txErr;
       if (itemErr) throw itemErr;
 
+      // Group line items by transaction once (O(n+m)) instead of re-scanning
+      // the full item list for every transaction (O(n*m)), which would not
+      // scale as the history grows.
+      const itemsByTx = new Map<string, any[]>();
+      for (const i of itemRows || []) {
+        const bucket = itemsByTx.get(i.transaction_id);
+        if (bucket) bucket.push(i);
+        else itemsByTx.set(i.transaction_id, [i]);
+      }
+
       const mapped: Transaction[] = (txRows || []).map((tx: any) => {
-        const items: TransactionItem[] = (itemRows || [])
-          .filter((i: any) => i.transaction_id === tx.id)
-          .map((i: any) => ({
+        const items: TransactionItem[] = (itemsByTx.get(tx.id) || []).map(
+          (i: any) => ({
             id: i.item_id,
             name: i.name,
             sellingPrice: Number(i.price_usd) || 0,
@@ -95,7 +104,8 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
             brand: "GENERIC",
             notes: "",
             history: [],
-          }));
+          }),
+        );
 
         // Derive effective totals from the line items so returns and admin
         // price edits flow through automatically. The blended tax rate is taken

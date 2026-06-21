@@ -455,6 +455,11 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                   Detalles del Pago
                 </h3>
                 <div className="grid gap-1">
+                  {selectedTransaction.payments.length === 0 && (
+                    <p className="text-xs text-gray-400 italic">
+                      Sin detalles de pago registrados
+                    </p>
+                  )}
                   {selectedTransaction.payments.map((p, i) => (
                     <div key={i} className="flex justify-between text-xs">
                       <span className="text-gray-600">{p.method}</span>

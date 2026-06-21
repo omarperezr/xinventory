@@ -128,10 +128,6 @@ function LoginDialog({
           >
             Entrar
           </Button>
-
-          <p className="text-xs text-gray-400 text-center">
-            Admin demo: admin@inventario.com / admin123
-          </p>
         </div>
       </DialogContent>
     </Dialog>
