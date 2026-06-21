@@ -7,6 +7,7 @@ import {
   X,
   FileText,
   ImagePlus,
+  Loader2,
 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -28,7 +29,7 @@ interface InventoryFormProps {
   onSubmit: (
     item: Omit<InventoryItem, "id" | "history">,
     notes?: string,
-  ) => void;
+  ) => void | Promise<void>;
   editItem?: InventoryItem;
   onCancelEdit?: () => void;
   rates: { USD: number; EUR: number };
@@ -61,6 +62,7 @@ export function InventoryForm({
   const [brand, setBrand] = useState("GENERICO");
   const [images, setImages] = useState<string[]>([]);
   const [compressing, setCompressing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Persistent product notes (stored on the item, shown in detail view)
   const [itemNotes, setItemNotes] = useState("");
@@ -144,9 +146,10 @@ export function InventoryForm({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !barcode || !sellingPrice || !buyingPrice) return;
+    if (submitting) return;
 
     // Convert inputs to USD for storage — the canonical base price.
     // Allow more than two decimals on input but round to cents for storage.
@@ -158,24 +161,29 @@ export function InventoryForm({
       toUSD(parseFloat(sellingPrice), sellingCurrency),
     );
 
-    onSubmit(
-      {
-        name,
-        barcode,
-        buyingPrice: finalBuyingPrice,
-        sellingPrice: finalSellingPrice,
-        quantity,
-        unit,
-        includesTaxes,
-        currency: "USD", // System base currency
-        discount: parseFloat(discount) || 0,
-        type: type || "N/A",
-        brand: brand || "GENERICO",
-        images,
-        notes: itemNotes,
-      },
-      notes,
-    );
+    setSubmitting(true);
+    try {
+      await onSubmit(
+        {
+          name,
+          barcode,
+          buyingPrice: finalBuyingPrice,
+          sellingPrice: finalSellingPrice,
+          quantity,
+          unit,
+          includesTaxes,
+          currency: "USD", // System base currency
+          discount: parseFloat(discount) || 0,
+          type: type || "N/A",
+          brand: brand || "GENERICO",
+          images,
+          notes: itemNotes,
+        },
+        notes,
+      );
+    } finally {
+      setSubmitting(false);
+    }
 
     // Reset form
     if (!editItem) {
@@ -549,9 +557,19 @@ export function InventoryForm({
         <div className="flex justify-end pt-4">
           <Button
             type="submit"
-            className="bg-[#2196F3] hover:bg-[#1976D2] text-white rounded-lg px-8 shadow-sm"
+            disabled={submitting || compressing}
+            className="bg-[#2196F3] hover:bg-[#1976D2] text-white rounded-lg px-8 shadow-sm disabled:opacity-60"
           >
-            {editItem ? "Actualizar Producto" : "Agregar Producto"}
+            {submitting ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Guardando…
+              </span>
+            ) : editItem ? (
+              "Actualizar Producto"
+            ) : (
+              "Agregar Producto"
+            )}
           </Button>
         </div>
       </form>

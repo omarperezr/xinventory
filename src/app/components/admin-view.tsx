@@ -78,15 +78,15 @@ export function AdminView({
     item: Omit<InventoryItem, "id" | "history">,
     notes?: string,
   ) => {
-    addItem(item, currentUser?.name || "Desconocido");
+    return addItem(item, currentUser?.name || "Desconocido");
   };
 
-  const handleUpdateItem = (
+  const handleUpdateItem = async (
     item: Omit<InventoryItem, "id" | "history">,
     notes?: string,
   ) => {
     if (editingItem) {
-      updateItem(
+      await updateItem(
         { ...item, id: editingItem.id, history: editingItem.history },
         currentUser?.name || "Desconocido",
         notes,

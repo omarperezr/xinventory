@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Trash2,
   Search,
@@ -10,6 +10,7 @@ import {
   X,
   CreditCard,
   Banknote,
+  Loader2,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -35,6 +36,55 @@ import { Label } from "./ui/label";
 import { toast } from "sonner";
 import { useApp, CartItem } from "../context/app-context";
 
+// Inline editable unit price for a cart line. Shows the price in the active
+// display currency and commits the change (converted back to USD) on blur or
+// Enter, so a seller can close a sale at a price different from the default.
+function EditablePrice({ item }: { item: CartItem }) {
+  const { convertPrice, convertToUsd, currency, updateCartItemPrice } = useApp();
+  const symbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
+  const [value, setValue] = useState(convertPrice(item.sellingPrice).toFixed(2));
+
+  // Keep the field in sync when the underlying price or currency changes
+  // from elsewhere (currency switch, cart reload) and we're not editing.
+  useEffect(() => {
+    setValue(convertPrice(item.sellingPrice).toFixed(2));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.sellingPrice, currency]);
+
+  const commit = () => {
+    const parsed = parseFloat(value);
+    if (isNaN(parsed) || parsed < 0) {
+      setValue(convertPrice(item.sellingPrice).toFixed(2));
+      return;
+    }
+    updateCartItemPrice(item.id, convertToUsd(parsed));
+  };
+
+  return (
+    <div className="relative w-24">
+      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+        {symbol}
+      </span>
+      <Input
+        type="number"
+        step="0.01"
+        min="0"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        className="h-8 pl-7 pr-1 text-sm"
+        title="Editar precio de venta"
+      />
+    </div>
+  );
+}
+
 const PAYMENT_METHODS = [
   "Efectivo",
   "Tarjeta de Crédito",
@@ -48,7 +98,7 @@ const PAYMENT_METHODS = [
 ];
 
 interface TotalViewProps {
-  onCheckout?: (items: CartItem[]) => void;
+  onCheckout?: (items: CartItem[]) => void | Promise<void>;
 }
 
 export function TotalView({ onCheckout }: TotalViewProps) {
@@ -81,6 +131,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
+  const [processing, setProcessing] = useState(false);
 
   const filteredItems = cartItems.filter(
     (item) =>
@@ -88,7 +139,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
       item.barcode.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  const handleAddPayment = () => {
+  const handleAddPayment = async () => {
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
       toast.error("Por favor ingrese un monto válido");
@@ -104,7 +155,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
         setChangeAmount(Math.abs(remaining));
         setIsChangeModalOpen(true);
       } else {
-        handleCompleteTransaction();
+        await handleCompleteTransaction();
       }
     } else {
       toast.success(
@@ -113,12 +164,18 @@ export function TotalView({ onCheckout }: TotalViewProps) {
     }
   };
 
-  const handleCompleteTransaction = () => {
-    if (onCheckout) onCheckout(cartItems);
-    clearPayments();
-    clearCart();
-    setIsChangeModalOpen(false);
-    setIsPaymentModalOpen(false);
+  const handleCompleteTransaction = async () => {
+    if (processing) return;
+    setProcessing(true);
+    try {
+      if (onCheckout) await onCheckout(cartItems);
+      clearPayments();
+      clearCart();
+      setIsChangeModalOpen(false);
+      setIsPaymentModalOpen(false);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const isOverpaid = remainingDue < -0.01;
@@ -224,8 +281,8 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                               )}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-600">
-                              <div className="flex flex-col">
-                                <span>{formatPrice(item.sellingPrice)}</span>
+                              <div className="flex flex-col gap-1">
+                                <EditablePrice item={item} />
                                 {item.discount > 0 && (
                                   <div className="flex items-center gap-1.5 mt-1">
                                     <Checkbox
@@ -389,10 +446,8 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                               <p className="text-sm font-medium text-[#1A1A1A] truncate">
                                 {item.name}
                               </p>
-                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                <span className="text-xs text-gray-500">
-                                  {formatPrice(item.sellingPrice)}
-                                </span>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <EditablePrice item={item} />
                                 {item.includesTaxes && (
                                   <span className="text-[9px] text-blue-600 bg-blue-50 px-1 rounded">
                                     +IVA
@@ -680,9 +735,17 @@ export function TotalView({ onCheckout }: TotalViewProps) {
             </Button>
             <Button
               onClick={handleAddPayment}
-              className="bg-[#2196F3] hover:bg-[#1976D2] w-full sm:w-auto"
+              disabled={processing}
+              className="bg-[#2196F3] hover:bg-[#1976D2] w-full sm:w-auto disabled:opacity-60"
             >
-              Confirmar Pago
+              {processing ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Procesando…
+                </span>
+              ) : (
+                "Confirmar Pago"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -711,9 +774,17 @@ export function TotalView({ onCheckout }: TotalViewProps) {
           <DialogFooter>
             <Button
               onClick={handleCompleteTransaction}
-              className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-5"
+              disabled={processing}
+              className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-5 disabled:opacity-60"
             >
-              Listo (Entregado)
+              {processing ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Procesando…
+                </span>
+              ) : (
+                "Listo (Entregado)"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

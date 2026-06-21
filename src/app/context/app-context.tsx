@@ -61,14 +61,14 @@ export interface SavedCart {
 interface AppContextType {
   // Inventory
   items: InventoryItem[];
-  addItem: (item: Omit<InventoryItem, "id" | "history">, user: string) => void;
+  addItem: (item: Omit<InventoryItem, "id" | "history">, user: string) => Promise<void>;
   updateItem: (
     item: InventoryItem,
     user: string,
     notes?: string,
     silent?: boolean,
-  ) => void;
-  deleteItem: (id: string, user: string) => void;
+  ) => Promise<void>;
+  deleteItem: (id: string, user: string) => Promise<void>;
 
   // Currency — prices are stored in USD; rates convert USD -> BS/EUR for display
   currency: "BS" | "USD" | "EUR";
@@ -76,6 +76,7 @@ interface AppContextType {
   rates: { USD: number; EUR: number }; // Bs per 1 USD, Bs per 1 EUR
   updateRates: (usd: number, eur: number) => void;
   convertPrice: (priceInUsd: number) => number;
+  convertToUsd: (priceInDisplay: number) => number;
   formatPrice: (priceInUsd: number) => string;
 
   // Cart
@@ -83,6 +84,7 @@ interface AppContextType {
   addToCart: (item: InventoryItem, quantity: number) => void;
   removeFromCart: (itemId: string) => void;
   updateCartItemQuantity: (itemId: string, quantity: number) => void;
+  updateCartItemPrice: (itemId: string, sellingPriceUsd: number) => void;
   toggleCartItemDiscount: (itemId: string, apply: boolean) => void;
   clearCart: () => void;
 
@@ -346,6 +348,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return priceInUsd;
   };
 
+  // Inverse of convertPrice: takes an amount entered in the active display
+  // currency and returns the canonical USD value to store.
+  const convertToUsd = (priceInDisplay: number) => {
+    if (currency === "USD") return priceInDisplay;
+    if (currency === "BS") return priceInDisplay / rates.USD;
+    if (currency === "EUR") return (priceInDisplay * rates.EUR) / rates.USD;
+    return priceInDisplay;
+  };
+
   const formatPrice = (priceInUsd: number) => {
     const converted = convertPrice(priceInUsd);
     const symbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
@@ -402,6 +413,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setCartItems((prev) =>
       prev.map((i) => (i.id === itemId ? { ...i, cartQuantity: quantity } : i)),
+    );
+  };
+
+  // Overrides the unit selling price for a single cart line (e.g. the seller
+  // closed the sale at a different price). Only affects this cart entry — the
+  // stored inventory price is untouched.
+  const updateCartItemPrice = (itemId: string, sellingPriceUsd: number) => {
+    if (isNaN(sellingPriceUsd) || sellingPriceUsd < 0) return;
+    setCartItems((prev) =>
+      prev.map((i) =>
+        i.id === itemId ? { ...i, sellingPrice: sellingPriceUsd } : i,
+      ),
     );
   };
 
@@ -503,11 +526,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         rates,
         updateRates,
         convertPrice,
+        convertToUsd,
         formatPrice,
         cartItems,
         addToCart,
         removeFromCart,
         updateCartItemQuantity,
+        updateCartItemPrice,
         toggleCartItemDiscount,
         clearCart,
         subtotal,

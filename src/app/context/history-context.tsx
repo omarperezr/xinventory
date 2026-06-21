@@ -36,8 +36,8 @@ interface HistoryContextType {
     payments: PaymentRecord[],
     userId: string,
     notes?: string,
-  ) => void;
-  returnItem: (transactionId: string, itemId: string, quantity: number) => void;
+  ) => Promise<void>;
+  returnItem: (transactionId: string, itemId: string, quantity: number) => Promise<void>;
   addImageToTransaction: (transactionId: string, imageUrl: string) => void;
 }
 

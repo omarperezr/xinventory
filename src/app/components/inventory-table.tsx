@@ -1,4 +1,4 @@
-import { Edit2, Trash2, Package, Plus, Clock, Minus } from "lucide-react";
+import { Edit2, Trash2, Package, Plus, Clock, Minus, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { format } from "date-fns";
@@ -8,7 +8,7 @@ import { useApp, InventoryItem } from "../context/app-context";
 interface InventoryTableProps {
   items: InventoryItem[];
   onEdit: (item: InventoryItem) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
   onAddToCart?: (item: InventoryItem, quantity: number) => void;
   onViewHistory?: (item: InventoryItem) => void;
   showBuyingPrice?: boolean;
@@ -24,13 +24,24 @@ function InventoryTableRow({
 }: {
   item: InventoryItem;
   onEdit: (item: InventoryItem) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
   onAddToCart?: (item: InventoryItem, quantity: number) => void;
   onViewHistory?: (item: InventoryItem) => void;
   showBuyingPrice?: boolean;
 }) {
   const { formatPrice } = useApp();
   const [quantityToAdd, setQuantityToAdd] = useState(1);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await onDelete(item.id);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const unitLabel = { units: "u", kg: "kg", liters: "L" }[item.unit || "units"];
 
@@ -148,11 +159,16 @@ function InventoryTableRow({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onDelete(item.id)}
-              className="hidden md:flex text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="hidden md:flex text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0 disabled:opacity-60"
               title="Eliminar"
             >
-              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+              {deleting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+              )}
             </Button>
           )}
         </div>

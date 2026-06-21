@@ -95,26 +95,27 @@ function AppContent() {
     setEditingItem(undefined);
   };
 
-  const handleCheckout = (cartItems: CartItem[]) => {
+  const handleCheckout = async (cartItems: CartItem[]) => {
     if (!currentUser) return;
 
-    cartItems.forEach((cartItem) => {
-      const originalItem = items.find((i) => i.id === cartItem.id);
-      if (originalItem) {
+    await Promise.all(
+      cartItems.map((cartItem) => {
+        const originalItem = items.find((i) => i.id === cartItem.id);
+        if (!originalItem) return Promise.resolve();
         const newQuantity = Math.max(
           0,
           originalItem.quantity - cartItem.cartQuantity,
         );
-        updateItem(
+        return updateItem(
           { ...originalItem, quantity: newQuantity },
           currentUser.name,
           `Venta realizada (ID Transacción: ${Date.now()})`,
           true,
         );
-      }
-    });
+      }),
+    );
 
-    addTransaction(
+    await addTransaction(
       cartItems,
       subtotal,
       taxAmount,
