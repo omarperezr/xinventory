@@ -14,6 +14,9 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  // Sellers can only edit the selling price of a cart/historical line item
+  // when this is true; admins for whom this is irrelevant are always allowed.
+  canEditPrice: boolean;
 }
 
 type Result = { success: boolean; error?: string };
@@ -28,11 +31,18 @@ interface AuthContextType {
     email: string,
     password: string,
     role: UserRole,
+    canEditPrice?: boolean,
   ) => Promise<Result>;
   deleteUser: (id: string) => Promise<Result>;
   updateUser: (
     id: string,
-    updates: Partial<{ name: string; email: string; password: string; role: UserRole }>,
+    updates: Partial<{
+      name: string;
+      email: string;
+      password: string;
+      role: UserRole;
+      canEditPrice: boolean;
+    }>,
   ) => Promise<Result>;
   // Self-service profile management
   updateOwnName: (name: string) => Promise<Result>;
@@ -85,6 +95,7 @@ function mapProfile(profile: any): User {
     name: profile.name,
     email: profile.email,
     role: profile.role,
+    canEditPrice: !!profile.can_edit_price,
   };
 }
 
@@ -96,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, name, email, role")
+      .select("id, name, email, role, can_edit_price")
       .eq("id", userId)
       .maybeSingle();
     if (error || !data) {
@@ -109,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUsers = async () => {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, name, email, role")
+      .select("id, name, email, role, can_edit_price")
       .order("created_at");
     if (!error && data) setUsers(data.map(mapProfile));
   };
@@ -156,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
     role: UserRole,
+    canEditPrice?: boolean,
   ): Promise<Result> => {
     if (!name.trim()) return { success: false, error: "El nombre es requerido" };
     if (!email.trim()) return { success: false, error: "El correo es requerido" };
@@ -165,14 +177,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: "La contraseña debe tener al menos 6 caracteres",
       };
 
-    const result = await callAdminUsers({ action: "create", name, email, password, role });
+    const result = await callAdminUsers({
+      action: "create",
+      name,
+      email,
+      password,
+      role,
+      canEditPrice: !!canEditPrice,
+    });
     if (result.success) await refreshUsers();
     return result;
   };
 
   const updateUser = async (
     id: string,
-    updates: Partial<{ name: string; email: string; password: string; role: UserRole }>,
+    updates: Partial<{
+      name: string;
+      email: string;
+      password: string;
+      role: UserRole;
+      canEditPrice: boolean;
+    }>,
   ): Promise<Result> => {
     if (updates.password && updates.password.length < 6) {
       return {

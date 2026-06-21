@@ -35,6 +35,7 @@ import {
 import { Label } from "./ui/label";
 import { toast } from "sonner";
 import { useApp, CartItem } from "../context/app-context";
+import { useAuth } from "../context/auth-context";
 
 // Inline editable unit price for a cart line. Shows the price in the active
 // display currency and commits the change (converted back to USD) on blur or
@@ -123,7 +124,13 @@ export function TotalView({ onCheckout }: TotalViewProps) {
     clearPayments,
     amountPaid,
     remainingDue,
+    currency,
+    convertToUsd,
   } = useApp();
+  const { currentUser } = useAuth();
+  const canEditPrice =
+    currentUser?.role === "admin" || currentUser?.canEditPrice === true;
+  const currencySymbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -140,11 +147,14 @@ export function TotalView({ onCheckout }: TotalViewProps) {
   );
 
   const handleAddPayment = async () => {
-    const amount = parseFloat(paymentAmount);
-    if (isNaN(amount) || amount <= 0) {
+    const enteredAmount = parseFloat(paymentAmount);
+    if (isNaN(enteredAmount) || enteredAmount <= 0) {
       toast.error("Por favor ingrese un monto válido");
       return;
     }
+    // The field is in the active display currency; payments are always
+    // stored in the canonical USD basis used by totalAmount/remainingDue.
+    const amount = convertToUsd(enteredAmount);
     addPayment(selectedMethod, amount);
     setPaymentAmount("");
     const newPaid = amountPaid + amount;
@@ -282,7 +292,11 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-600">
                               <div className="flex flex-col gap-1">
-                                <EditablePrice item={item} />
+                                {canEditPrice ? (
+                                  <EditablePrice item={item} />
+                                ) : (
+                                  formatPrice(item.sellingPrice)
+                                )}
                                 {item.discount > 0 && (
                                   <div className="flex items-center gap-1.5 mt-1">
                                     <Checkbox
@@ -447,7 +461,13 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                 {item.name}
                               </p>
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                <EditablePrice item={item} />
+                                {canEditPrice ? (
+                                  <EditablePrice item={item} />
+                                ) : (
+                                  <span className="text-sm text-gray-600">
+                                    {formatPrice(item.sellingPrice)}
+                                  </span>
+                                )}
                                 {item.includesTaxes && (
                                   <span className="text-[9px] text-blue-600 bg-blue-50 px-1 rounded">
                                     +IVA
@@ -699,10 +719,10 @@ export function TotalView({ onCheckout }: TotalViewProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Monto (Bs)</Label>
+              <Label>Monto ({currencySymbol})</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-                  Bs
+                  {currencySymbol}
                 </span>
                 <Input
                   type="number"

@@ -31,6 +31,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
+import { Checkbox } from "./ui/checkbox";
 
 export function UserManagementPanel() {
   const { users, currentUser, registerUser, deleteUser, updateUser } =
@@ -45,6 +46,7 @@ export function UserManagementPanel() {
   const [createEmail, setCreateEmail] = useState("");
   const [createPassword, setCreatePassword] = useState("");
   const [createRole, setCreateRole] = useState<UserRole>("seller");
+  const [createCanEditPrice, setCreateCanEditPrice] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
   const [showCreatePwd, setShowCreatePwd] = useState(false);
@@ -54,6 +56,7 @@ export function UserManagementPanel() {
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState<UserRole>("seller");
+  const [editCanEditPrice, setEditCanEditPrice] = useState(false);
   const [editError, setEditError] = useState("");
   const [showEditPwd, setShowEditPwd] = useState(false);
 
@@ -65,6 +68,7 @@ export function UserManagementPanel() {
       createEmail,
       createPassword,
       createRole,
+      createCanEditPrice,
     );
     if (!result.success) {
       setCreateError(result.error || "Error al crear usuario");
@@ -75,6 +79,7 @@ export function UserManagementPanel() {
     setCreateEmail("");
     setCreatePassword("");
     setCreateRole("seller");
+    setCreateCanEditPrice(false);
     setTimeout(() => {
       setIsCreateOpen(false);
       setCreateSuccess("");
@@ -87,6 +92,7 @@ export function UserManagementPanel() {
     setEditEmail(user.email);
     setEditPassword("");
     setEditRole(user.role);
+    setEditCanEditPrice(user.canEditPrice);
     setEditError("");
   };
 
@@ -98,10 +104,12 @@ export function UserManagementPanel() {
       email: string;
       password: string;
       role: UserRole;
+      canEditPrice: boolean;
     }> = {
       name: editName,
       email: editEmail,
       role: editRole,
+      canEditPrice: editCanEditPrice,
     };
     if (editPassword) updates.password = editPassword;
 
@@ -295,6 +303,22 @@ export function UserManagementPanel() {
               </Select>
             </div>
 
+            {createRole === "seller" && (
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+                <Checkbox
+                  id="create-can-edit-price"
+                  checked={createCanEditPrice}
+                  onCheckedChange={(c) => setCreateCanEditPrice(c as boolean)}
+                />
+                <Label
+                  htmlFor="create-can-edit-price"
+                  className="text-sm cursor-pointer"
+                >
+                  Permitir modificar precio de venta
+                </Label>
+              </div>
+            )}
+
             {createError && (
               <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
                 {createError}
@@ -401,6 +425,22 @@ export function UserManagementPanel() {
                 </SelectContent>
               </Select>
             </div>
+
+            {editRole === "seller" && (
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+                <Checkbox
+                  id="edit-can-edit-price"
+                  checked={editCanEditPrice}
+                  onCheckedChange={(c) => setEditCanEditPrice(c as boolean)}
+                />
+                <Label
+                  htmlFor="edit-can-edit-price"
+                  className="text-sm cursor-pointer"
+                >
+                  Permitir modificar precio de venta
+                </Label>
+              </div>
+            )}
 
             {editError && (
               <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
