@@ -102,6 +102,9 @@ export function ReportsView() {
     dailySales[day] = (dailySales[day] || 0) + t.total;
 
     t.items.forEach((item) => {
+      // Net of returns so reports reflect what was actually kept/sold.
+      const netQty = item.cartQuantity - (item.quantityReturned || 0);
+      if (netQty <= 0) return;
       if (!itemSales[item.id])
         itemSales[item.id] = {
           name: item.name,
@@ -109,10 +112,10 @@ export function ReportsView() {
           total: 0,
           cost: 0,
         };
-      itemSales[item.id].quantity += item.cartQuantity;
-      itemSales[item.id].total += item.cartQuantity * item.sellingPrice;
+      itemSales[item.id].quantity += netQty;
+      itemSales[item.id].total += netQty * item.sellingPrice;
       const buyingPrice = buyingPriceById.get(item.id) ?? 0;
-      itemSales[item.id].cost += item.cartQuantity * buyingPrice;
+      itemSales[item.id].cost += netQty * buyingPrice;
     });
 
     t.payments?.forEach((p) => {

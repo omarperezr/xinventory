@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import {
   History,
@@ -17,10 +17,10 @@ import {
 } from "lucide-react";
 import {
   useHistory,
-  Transaction,
   TransactionItem,
 } from "../context/history-context";
 import { useApp } from "../context/app-context";
+import { useAuth } from "../context/auth-context";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
@@ -38,11 +38,17 @@ interface HistoryViewProps {
 }
 
 export function HistoryView({ onReturnInventory }: HistoryViewProps) {
-  const { transactions, returnItem, addImageToTransaction } = useHistory();
+  const { transactions, returnItem, updateTransactionItemPrice, addImageToTransaction } =
+    useHistory();
   const { formatPrice } = useApp();
+  const { currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "admin";
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTransaction, setSelectedTransaction] =
-    useState<Transaction | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Derive the open transaction from the live list so returns and price edits
+  // reflect immediately in the dialog instead of showing a stale snapshot.
+  const selectedTransaction =
+    transactions.find((t) => t.id === selectedId) ?? null;
 
   const filteredTransactions = transactions.filter(
     (t) =>
@@ -131,7 +137,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                     <tr
                       key={t.id}
                       className="hover:bg-gray-50 cursor-pointer transition-colors"
-                      onClick={() => setSelectedTransaction(t)}
+                      onClick={() => setSelectedId(t.id)}
                     >
                       <td className="px-6 py-4">
                         <span className="font-mono text-xs text-gray-500">
@@ -175,7 +181,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
               <button
                 key={t.id}
                 className="w-full bg-white rounded-lg border border-gray-200 shadow-sm p-4 text-left active:bg-gray-50 transition-colors"
-                onClick={() => setSelectedTransaction(t)}
+                onClick={() => setSelectedId(t.id)}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -225,7 +231,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
       {/* ── Transaction detail dialog ── */}
       <Dialog
         open={!!selectedTransaction}
-        onOpenChange={(open) => !open && setSelectedTransaction(null)}
+        onOpenChange={(open) => !open && setSelectedId(null)}
       >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white w-[calc(100vw-2rem)] md:w-full rounded-xl">
           <DialogHeader>
@@ -261,6 +267,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                         key={item.id}
                         item={item}
                         transactionId={selectedTransaction.id}
+                        isAdmin={isAdmin}
                         onReturn={(qty) => {
                           returnItem(selectedTransaction.id, item.id, qty);
                           onReturnInventory(item.id, qty);
@@ -315,6 +322,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                       key={item.id}
                       item={item}
                       transactionId={selectedTransaction.id}
+                      isAdmin={isAdmin}
                       onReturn={(qty) => {
                         returnItem(selectedTransaction.id, item.id, qty);
                         onReturnInventory(item.id, qty);
@@ -428,19 +436,79 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
   );
 }
 
+// Inline editable unit price for a history line — admins only. Shows the price
+// in the active display currency and commits (converted to USD) on blur/Enter,
+// which recomputes the transaction total and all reports.
+function EditableHistoryPrice({
+  item,
+  transactionId,
+}: {
+  item: TransactionItem;
+  transactionId: string;
+}) {
+  const { convertPrice, convertToUsd, currency } = useApp();
+  const { updateTransactionItemPrice } = useHistory();
+  const symbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
+  const [value, setValue] = useState(convertPrice(item.sellingPrice).toFixed(2));
+
+  useEffect(() => {
+    setValue(convertPrice(item.sellingPrice).toFixed(2));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.sellingPrice, currency]);
+
+  const commit = () => {
+    const parsed = parseFloat(value);
+    if (isNaN(parsed) || parsed < 0) {
+      setValue(convertPrice(item.sellingPrice).toFixed(2));
+      return;
+    }
+    const usd = convertToUsd(parsed);
+    if (Math.abs(usd - item.sellingPrice) < 0.0001) return;
+    updateTransactionItemPrice(transactionId, item.id, usd);
+  };
+
+  return (
+    <div className="relative w-24 ml-auto">
+      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+        {symbol}
+      </span>
+      <Input
+        type="number"
+        step="0.01"
+        min="0"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        className="h-8 pl-7 pr-1 text-sm text-right"
+        title="Editar precio de venta"
+      />
+    </div>
+  );
+}
+
 // ── Desktop row ────────────────────────────────────────────────────────────────
 function TransactionItemRow({
   item,
+  transactionId,
+  isAdmin,
   onReturn,
 }: {
   item: TransactionItem;
   transactionId: string;
+  isAdmin: boolean;
   onReturn: (qty: number) => void;
 }) {
   const { formatPrice } = useApp();
   const [returnMode, setReturnMode] = useState(false);
   const [returnQty, setReturnQty] = useState(1);
   const available = item.cartQuantity - item.quantityReturned;
+  const netQty = item.cartQuantity - item.quantityReturned;
 
   return (
     <tr>
@@ -449,7 +517,11 @@ function TransactionItemRow({
         <div className="text-xs text-gray-400 font-mono">{item.barcode}</div>
       </td>
       <td className="px-4 py-3 text-right text-gray-600">
-        {formatPrice(item.sellingPrice)}
+        {isAdmin ? (
+          <EditableHistoryPrice item={item} transactionId={transactionId} />
+        ) : (
+          formatPrice(item.sellingPrice)
+        )}
       </td>
       <td className="px-4 py-3 text-center">{item.cartQuantity}</td>
       <td className="px-4 py-3 text-center">
@@ -462,7 +534,16 @@ function TransactionItemRow({
         )}
       </td>
       <td className="px-4 py-3 text-right font-medium">
-        {formatPrice(item.sellingPrice * item.cartQuantity)}
+        {item.quantityReturned > 0 ? (
+          <div className="flex flex-col items-end">
+            <span className="text-xs text-gray-400 line-through">
+              {formatPrice(item.sellingPrice * item.cartQuantity)}
+            </span>
+            <span>{formatPrice(item.sellingPrice * netQty)}</span>
+          </div>
+        ) : (
+          formatPrice(item.sellingPrice * item.cartQuantity)
+        )}
       </td>
       <td className="px-4 py-3 text-right">
         {available > 0 &&
@@ -520,16 +601,20 @@ function TransactionItemRow({
 // ── Mobile card ────────────────────────────────────────────────────────────────
 function MobileItemCard({
   item,
+  transactionId,
+  isAdmin,
   onReturn,
 }: {
   item: TransactionItem;
   transactionId: string;
+  isAdmin: boolean;
   onReturn: (qty: number) => void;
 }) {
   const { formatPrice } = useApp();
   const [returnMode, setReturnMode] = useState(false);
   const [returnQty, setReturnQty] = useState(1);
   const available = item.cartQuantity - item.quantityReturned;
+  const netQty = item.cartQuantity - item.quantityReturned;
 
   return (
     <div className="p-3">
@@ -541,14 +626,30 @@ function MobileItemCard({
           <p className="text-[10px] font-mono text-gray-400">{item.barcode}</p>
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="text-sm font-semibold text-gray-900">
-            {formatPrice(item.sellingPrice * item.cartQuantity)}
-          </p>
+          {item.quantityReturned > 0 ? (
+            <p className="text-sm font-semibold text-gray-900">
+              <span className="text-xs text-gray-400 line-through mr-1">
+                {formatPrice(item.sellingPrice * item.cartQuantity)}
+              </span>
+              {formatPrice(item.sellingPrice * netQty)}
+            </p>
+          ) : (
+            <p className="text-sm font-semibold text-gray-900">
+              {formatPrice(item.sellingPrice * item.cartQuantity)}
+            </p>
+          )}
           <p className="text-xs text-gray-500">
             {formatPrice(item.sellingPrice)} × {item.cartQuantity}
           </p>
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="flex items-center justify-end gap-2 mb-2">
+          <span className="text-[10px] text-gray-400">Precio:</span>
+          <EditableHistoryPrice item={item} transactionId={transactionId} />
+        </div>
+      )}
 
       <div className="flex items-center justify-between">
         <div className="flex gap-2 text-xs text-gray-500">

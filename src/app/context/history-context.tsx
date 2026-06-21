@@ -17,13 +17,25 @@ export interface Transaction {
   id: string;
   date: string;
   items: TransactionItem[];
+  // subtotal/tax/total are the EFFECTIVE values: net of returns and reflecting
+  // any admin price edits. originalTotal is the amount charged at sale time,
+  // kept so the UI can show what changed after returns/edits.
   subtotal: number;
   tax: number;
   total: number;
+  originalTotal: number;
   images: string[];
   payments: PaymentRecord[];
   notes?: string;
   userId: string;
+}
+
+// Per-line price after its own discount (the unit price actually charged).
+function effectiveUnitPrice(item: TransactionItem): number {
+  if (item.applyDiscount && item.discount > 0) {
+    return item.sellingPrice * (1 - item.discount / 100);
+  }
+  return item.sellingPrice;
 }
 
 interface HistoryContextType {
@@ -38,6 +50,11 @@ interface HistoryContextType {
     notes?: string,
   ) => Promise<void>;
   returnItem: (transactionId: string, itemId: string, quantity: number) => Promise<void>;
+  updateTransactionItemPrice: (
+    transactionId: string,
+    itemId: string,
+    sellingPriceUsd: number,
+  ) => Promise<void>;
   addImageToTransaction: (transactionId: string, imageUrl: string) => void;
 }
 
@@ -80,12 +97,27 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
             history: [],
           }));
 
+        // Derive effective totals from the line items so returns and admin
+        // price edits flow through automatically. The blended tax rate is taken
+        // from the sale-time snapshot (we don't store a per-line tax flag) and
+        // applied to the net subtotal.
+        const netSubtotal = items.reduce(
+          (s, it) =>
+            s + effectiveUnitPrice(it) * (it.cartQuantity - it.quantityReturned),
+          0,
+        );
+        const creationSubtotal = Number(tx.subtotal_usd) || 0;
+        const creationTax = Number(tx.tax_usd) || 0;
+        const taxRate = creationSubtotal > 0 ? creationTax / creationSubtotal : 0;
+        const netTax = netSubtotal * taxRate;
+
         return {
           id: tx.id,
           date: tx.date,
-          subtotal: Number(tx.subtotal_usd) || 0,
-          tax: Number(tx.tax_usd) || 0,
-          total: Number(tx.total_usd) || 0,
+          subtotal: netSubtotal,
+          tax: netTax,
+          total: netSubtotal + netTax,
+          originalTotal: Number(tx.total_usd) || 0,
           payments: tx.payments || [],
           images: tx.images || [],
           notes: tx.notes,
@@ -187,6 +219,30 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Admin-only: override the unit selling price of a line in a past sale.
+  // Effective totals (and all reports/metrics) recompute on refresh.
+  const updateTransactionItemPrice = async (
+    transactionId: string,
+    itemId: string,
+    sellingPriceUsd: number,
+  ) => {
+    if (isNaN(sellingPriceUsd) || sellingPriceUsd < 0) return;
+    try {
+      const { error } = await supabase
+        .from("transaction_items")
+        .update({ price_usd: sellingPriceUsd })
+        .eq("transaction_id", transactionId)
+        .eq("item_id", itemId);
+      if (error) throw error;
+
+      await refreshTransactions();
+      toast.success("Precio de venta actualizado");
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al actualizar precio");
+    }
+  };
+
   const addImageToTransaction = async (
     transactionId: string,
     imageUrl: string,
@@ -220,6 +276,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         transactions,
         addTransaction,
         returnItem,
+        updateTransactionItemPrice,
         addImageToTransaction,
       }}
     >
