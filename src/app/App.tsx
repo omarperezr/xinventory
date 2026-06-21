@@ -49,10 +49,14 @@ function AppContent() {
   } = useApp();
 
   const { addTransaction } = useHistory();
-  const { currentUser } = useAuth();
+  const { currentUser, loaded } = useAuth();
 
   const [editingItem, setEditingItem] = useState<InventoryItem | undefined>();
   const navigate = useNavigate();
+
+  if (!loaded) {
+    return null;
+  }
 
   // Show login page if no user is authenticated
   if (!currentUser) {

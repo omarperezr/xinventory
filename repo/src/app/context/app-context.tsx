@@ -122,8 +122,8 @@ function normalizeItemText<T extends { name: string; barcode: string; type: stri
     ...item,
     name: normalizeText(item.name),
     barcode: normalizeText(item.barcode),
-    type: normalizeText(item.type || "unassigned"),
-    brand: normalizeText(item.brand || "generic"),
+    type: normalizeText(item.type || "N/A"),
+    brand: normalizeText(item.brand || "GENERICO"),
   };
 }
 

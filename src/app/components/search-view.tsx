@@ -40,11 +40,11 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
   const isAdmin = currentUser?.role === "admin";
 
   const types = useMemo(
-    () => Array.from(new Set(items.map((i) => i.type || "unassigned"))).sort(),
+    () => Array.from(new Set(items.map((i) => i.type || "N/A"))).sort(),
     [items],
   );
   const brands = useMemo(
-    () => Array.from(new Set(items.map((i) => i.brand || "generic"))).sort(),
+    () => Array.from(new Set(items.map((i) => i.brand || "GENERICO"))).sort(),
     [items],
   );
 
@@ -71,9 +71,9 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
         );
         if (!matches) return false;
       }
-      if (typeFilter !== "all" && (item.type || "unassigned") !== typeFilter)
+      if (typeFilter !== "all" && (item.type || "N/A") !== typeFilter)
         return false;
-      if (brandFilter !== "all" && (item.brand || "generic") !== brandFilter)
+      if (brandFilter !== "all" && (item.brand || "GENERICO") !== brandFilter)
         return false;
       if (stockFilter === "in" && item.quantity <= 0) return false;
       if (stockFilter === "low" && !(item.quantity > 0 && item.quantity < 10))

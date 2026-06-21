@@ -42,6 +42,7 @@ interface AuthContextType {
     code: string,
     newPassword: string,
   ) => Promise<Result>;
+  loaded: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -264,6 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         requestEmailChange,
         requestPasswordReset,
         confirmPasswordReset,
+        loaded
       }}
     >
       {children}

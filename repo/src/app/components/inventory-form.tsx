@@ -57,8 +57,8 @@ export function InventoryForm({
   const [includesTaxes, setIncludesTaxes] = useState(false);
   const [discount, setDiscount] = useState("0"); // Discount percentage
 
-  const [type, setType] = useState("unassigned");
-  const [brand, setBrand] = useState("generic");
+  const [type, setType] = useState("N/A");
+  const [brand, setBrand] = useState("GENERICO");
   const [images, setImages] = useState<string[]>([]);
   const [compressing, setCompressing] = useState(false);
 
@@ -82,8 +82,8 @@ export function InventoryForm({
       setUnit(editItem.unit);
       setIncludesTaxes(editItem.includesTaxes);
       setDiscount(editItem.discount ? editItem.discount.toString() : "0");
-      setType(editItem.type || "unassigned");
-      setBrand(editItem.brand || "generic");
+      setType(editItem.type || "N/A");
+      setBrand(editItem.brand || "GENERICO");
       setImages(editItem.images || []);
       setItemNotes(editItem.notes || "");
     }
@@ -167,8 +167,8 @@ export function InventoryForm({
         includesTaxes,
         currency: "USD", // System base currency
         discount: parseFloat(discount) || 0,
-        type: type || "unassigned",
-        brand: brand || "generic",
+        type: type || "N/A",
+        brand: brand || "GENERICO",
         images,
         notes: itemNotes,
       },
@@ -185,8 +185,8 @@ export function InventoryForm({
       setUnit("units");
       setIncludesTaxes(false);
       setDiscount("0");
-      setType("unassigned");
-      setBrand("generic");
+      setType("N/A");
+      setBrand("GENERICO");
       setImages([]);
       setItemNotes("");
       setNotes("");
@@ -407,7 +407,7 @@ export function InventoryForm({
               id="brand"
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
-              placeholder="generic"
+              placeholder="GENERICO"
               className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
             />
           </div>
@@ -421,7 +421,7 @@ export function InventoryForm({
               id="type"
               value={type}
               onChange={(e) => setType(e.target.value)}
-              placeholder="unassigned"
+              placeholder="N/A"
               className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
             />
           </div>
