@@ -206,6 +206,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const loadedSavedCarts = localStorage.getItem("savedCarts");
     if (loadedSavedCarts) setSavedCarts(JSON.parse(loadedSavedCarts));
+
+    // Re-fetch when the user signs in. The initial fetch above runs before
+    // authentication, so RLS returns nothing until a session exists — without
+    // this, data only appears after a manual page refresh.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") refreshData();
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {

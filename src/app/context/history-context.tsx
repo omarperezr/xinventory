@@ -101,6 +101,13 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refreshTransactions();
+
+    // Re-fetch when the user signs in — the initial fetch runs before
+    // authentication, so it returns nothing until a session exists.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") refreshTransactions();
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   const addTransaction = async (
