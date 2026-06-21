@@ -205,6 +205,22 @@ export function UserManagementPanel() {
             </div>
 
             <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+              {user.role === "seller" && (
+                <label
+                  className="flex items-center gap-1.5 mr-2 cursor-pointer select-none"
+                  title="Permitir que este vendedor modifique el precio de venta"
+                >
+                  <Checkbox
+                    checked={user.canEditPrice}
+                    onCheckedChange={(c) =>
+                      updateUser(user.id, { canEditPrice: c as boolean })
+                    }
+                  />
+                  <span className="text-xs text-gray-500 hidden sm:inline">
+                    Editar precio
+                  </span>
+                </label>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

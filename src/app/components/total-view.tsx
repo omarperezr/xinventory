@@ -34,7 +34,7 @@ import {
 } from "./ui/select";
 import { Label } from "./ui/label";
 import { toast } from "sonner";
-import { useApp, CartItem } from "../context/app-context";
+import { useApp, CartItem, PaymentRecord } from "../context/app-context";
 import { useAuth } from "../context/auth-context";
 
 // Inline editable unit price for a cart line. Shows the price in the active
@@ -99,7 +99,10 @@ const PAYMENT_METHODS = [
 ];
 
 interface TotalViewProps {
-  onCheckout?: (items: CartItem[]) => void | Promise<void>;
+  onCheckout?: (
+    items: CartItem[],
+    payments?: PaymentRecord[],
+  ) => void | Promise<void>;
 }
 
 export function TotalView({ onCheckout }: TotalViewProps) {
@@ -139,6 +142,13 @@ export function TotalView({ onCheckout }: TotalViewProps) {
   const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
   const [processing, setProcessing] = useState(false);
+  // Payments captured at the moment the sale was completed. We thread these
+  // through completion explicitly because addPayment's state update has not
+  // flushed yet when we finalize, so reading currentPayments would miss the
+  // final (often only) payment and lose its method in the stored history.
+  const [pendingPayments, setPendingPayments] = useState<
+    PaymentRecord[] | undefined
+  >(undefined);
 
   const filteredItems = cartItems.filter(
     (item) =>
@@ -155,6 +165,10 @@ export function TotalView({ onCheckout }: TotalViewProps) {
     // The field is in the active display currency; payments are always
     // stored in the canonical USD basis used by totalAmount/remainingDue.
     const amount = convertToUsd(enteredAmount);
+    const newPayments: PaymentRecord[] = [
+      ...currentPayments,
+      { method: selectedMethod, amount, timestamp: new Date().toISOString() },
+    ];
     addPayment(selectedMethod, amount);
     setPaymentAmount("");
     const newPaid = amountPaid + amount;
@@ -163,9 +177,10 @@ export function TotalView({ onCheckout }: TotalViewProps) {
       setIsPaymentModalOpen(false);
       if (remaining < -0.01) {
         setChangeAmount(Math.abs(remaining));
+        setPendingPayments(newPayments);
         setIsChangeModalOpen(true);
       } else {
-        await handleCompleteTransaction();
+        await handleCompleteTransaction(newPayments);
       }
     } else {
       toast.success(
@@ -174,13 +189,14 @@ export function TotalView({ onCheckout }: TotalViewProps) {
     }
   };
 
-  const handleCompleteTransaction = async () => {
+  const handleCompleteTransaction = async (payments?: PaymentRecord[]) => {
     if (processing) return;
     setProcessing(true);
     try {
-      if (onCheckout) await onCheckout(cartItems);
+      if (onCheckout) await onCheckout(cartItems, payments);
       clearPayments();
       clearCart();
+      setPendingPayments(undefined);
       setIsChangeModalOpen(false);
       setIsPaymentModalOpen(false);
     } finally {
@@ -775,7 +791,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
       <Dialog
         open={isChangeModalOpen}
         onOpenChange={(o) => {
-          if (!o) handleCompleteTransaction();
+          if (!o) handleCompleteTransaction(pendingPayments);
         }}
       >
         <DialogContent className="sm:max-w-md bg-white border-red-100 w-[calc(100vw-2rem)] rounded-xl">
@@ -793,7 +809,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
           </div>
           <DialogFooter>
             <Button
-              onClick={handleCompleteTransaction}
+              onClick={() => handleCompleteTransaction(pendingPayments)}
               disabled={processing}
               className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-5 disabled:opacity-60"
             >

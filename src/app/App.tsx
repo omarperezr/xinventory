@@ -28,6 +28,7 @@ import {
   useApp,
   CartItem,
   InventoryItem,
+  PaymentRecord,
 } from "./context/app-context";
 import { HistoryProvider, useHistory } from "./context/history-context";
 import { AuthProvider, useAuth } from "./context/auth-context";
@@ -95,7 +96,10 @@ function AppContent() {
     setEditingItem(undefined);
   };
 
-  const handleCheckout = async (cartItems: CartItem[]) => {
+  const handleCheckout = async (
+    cartItems: CartItem[],
+    payments?: PaymentRecord[],
+  ) => {
     if (!currentUser) return;
 
     await Promise.all(
@@ -120,7 +124,7 @@ function AppContent() {
       subtotal,
       taxAmount,
       totalAmount,
-      currentPayments,
+      payments ?? currentPayments,
       currentUser.name,
       transactionNotes,
     );

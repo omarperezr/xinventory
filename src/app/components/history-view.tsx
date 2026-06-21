@@ -44,19 +44,56 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.role === "admin";
   const [searchTerm, setSearchTerm] = useState("");
+  const [userFilter, setUserFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Derive the open transaction from the live list so returns and price edits
   // reflect immediately in the dialog instead of showing a stale snapshot.
   const selectedTransaction =
     transactions.find((t) => t.id === selectedId) ?? null;
 
-  const filteredTransactions = transactions.filter(
-    (t) =>
-      t.id.includes(searchTerm) ||
-      t.items.some((i) =>
-        i.name.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
-  );
+  // Sellers may only see their own sales; admins see everyone's. Transactions
+  // record the seller by name (see App.handleCheckout), so we match on that.
+  const visibleTransactions = isAdmin
+    ? transactions
+    : transactions.filter((t) => t.userId === currentUser?.name);
+
+  // Distinct sellers present in the visible set, for the admin seller filter.
+  const sellers = Array.from(
+    new Set(visibleTransactions.map((t) => t.userId).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b));
+
+  const term = searchTerm.trim().toLowerCase();
+  const userTerm = userFilter.trim().toLowerCase();
+  const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+  const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
+
+  const filteredTransactions = visibleTransactions.filter((t) => {
+    if (term) {
+      const matches =
+        t.id.toLowerCase().includes(term) ||
+        (t.userId || "").toLowerCase().includes(term) ||
+        t.items.some((i) => i.name.toLowerCase().includes(term));
+      if (!matches) return false;
+    }
+    if (userTerm && !(t.userId || "").toLowerCase().includes(userTerm))
+      return false;
+    const time = new Date(t.date).getTime();
+    if (fromTime !== null && time < fromTime) return false;
+    if (toTime !== null && time > toTime) return false;
+    return true;
+  });
+
+  const hasActiveFilters =
+    !!term || !!userTerm || !!dateFrom || !!dateTo;
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setUserFilter("");
+    setDateFrom("");
+    setDateTo("");
+  };
 
   const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -86,25 +123,89 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Buscar por ID o producto…"
+            placeholder={
+              isAdmin
+                ? "Buscar por ID, producto o vendedor…"
+                : "Buscar por ID o producto…"
+            }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9 h-9 text-sm"
           />
         </div>
-        {searchTerm && (
-          <p className="text-xs text-gray-500">
-            {filteredTransactions.length} resultado
-            {filteredTransactions.length !== 1 ? "s" : ""}
-          </p>
+
+        {/* Filters: seller (admins only) + date range */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {isAdmin && (
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <input
+                list="history-sellers"
+                placeholder="Filtrar por vendedor…"
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+                className="w-full h-9 pl-9 pr-3 text-sm rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30"
+              />
+              <datalist id="history-sellers">
+                {sellers.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </div>
+          )}
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <input
+              type="date"
+              aria-label="Desde"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full h-9 pl-9 pr-2 text-sm rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30"
+            />
+          </div>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <input
+              type="date"
+              aria-label="Hasta"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full h-9 pl-9 pr-2 text-sm rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30"
+            />
+          </div>
+        </div>
+
+        {hasActiveFilters && (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-gray-500">
+              {filteredTransactions.length} resultado
+              {filteredTransactions.length !== 1 ? "s" : ""}
+            </p>
+            <button
+              onClick={clearFilters}
+              className="text-xs text-[#2196F3] hover:underline flex items-center gap-1"
+            >
+              <X className="w-3 h-3" />
+              Limpiar filtros
+            </button>
+          </div>
         )}
       </div>
 
       {/* ── List ── */}
-      {transactions.length === 0 ? (
+      {visibleTransactions.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
           <Receipt className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">No hay transacciones aún</p>
+        </div>
+      ) : filteredTransactions.length === 0 ? (
+        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">
+            Ninguna transacción coincide con los filtros
+          </p>
         </div>
       ) : (
         <>
