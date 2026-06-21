@@ -157,13 +157,6 @@ export function LoginPage() {
             </p>
           </div>
         </div>
-
-        {/* Default credentials hint */}
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 space-y-1">
-          <p className="font-medium">Credenciales de demostración:</p>
-          <p>Admin: admin@inventario.com / admin123</p>
-          <p>Vendedor: vendedor@inventario.com / vend123</p>
-        </div>
       </div>
     </div>
   );
