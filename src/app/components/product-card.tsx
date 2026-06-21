@@ -129,10 +129,10 @@ export function ProductCard({ item, onAddToCart }: ProductCardProps) {
 
   const handleShareImage = (index: number) => {
     if (!images[index]) {
-      shareProductToWhatsApp(item, formatPrice);
+      shareProductToWhatsApp(item);
       return;
     }
-    shareImageToWhatsApp(item, images[index], formatPrice);
+    shareImageToWhatsApp(item, images[index]);
   };
 
   const openDetail = () => {

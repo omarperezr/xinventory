@@ -4,7 +4,6 @@ import { InventoryItem } from "../context/app-context";
 // the currently selected display currency (BS/USD/EUR).
 function buildCaption(
   item: InventoryItem,
-  formatPrice: (priceInUsd: number) => string,
 ) {
   return [
     `*${item.name}*`,
@@ -14,10 +13,9 @@ function buildCaption(
 }
 
 export function shareProductToWhatsApp(
-  item: InventoryItem,
-  formatPrice: (priceInUsd: number) => string,
+  item: InventoryItem
 ) {
-  const text = encodeURIComponent(buildCaption(item, formatPrice));
+  const text = encodeURIComponent(buildCaption(item));
   window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
 }
 
@@ -27,9 +25,8 @@ export function shareProductToWhatsApp(
 export async function shareImageToWhatsApp(
   item: InventoryItem,
   imageUrl: string,
-  formatPrice: (priceInUsd: number) => string,
 ) {
-  const caption = buildCaption(item, formatPrice);
+  const caption = buildCaption(item);
 
   try {
     const res = await fetch(imageUrl);
@@ -51,5 +48,5 @@ export async function shareImageToWhatsApp(
     // Fall through to text-only share
   }
 
-  shareProductToWhatsApp(item, formatPrice);
+  shareProductToWhatsApp(item);
 }
