@@ -8,7 +8,18 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
-import { DollarSign, Euro, History, ArrowRight, Search, Check } from "lucide-react";
+import {
+  DollarSign,
+  Euro,
+  History,
+  ArrowRight,
+  Search,
+  Check,
+  Package,
+  AlertTriangle,
+  Wallet,
+  TrendingUp,
+} from "lucide-react";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -24,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { Card, CardContent } from "./ui/card";
 
 interface AdminViewProps {
   editingItem?: InventoryItem;
@@ -36,7 +48,7 @@ export function AdminView({
   onEditItem,
   onCancelEdit,
 }: AdminViewProps) {
-  const { items, addItem, updateItem, deleteItem, rates, updateRates } =
+  const { items, addItem, updateItem, deleteItem, rates, updateRates, formatPrice } =
     useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -111,8 +123,90 @@ export function AdminView({
 
   if (!currentUser || currentUser.role !== "admin") return null;
 
+  const inventoryCost = items.reduce(
+    (sum, i) => sum + i.buyingPrice * i.quantity,
+    0,
+  );
+  const inventoryValue = items.reduce(
+    (sum, i) => sum + i.sellingPrice * i.quantity,
+    0,
+  );
+  const lowStockItems = items.filter((i) => i.quantity > 0 && i.quantity < 10);
+  const outOfStockItems = items.filter((i) => i.quantity === 0);
+  const avgMargin =
+    items.length > 0
+      ? items.reduce(
+          (sum, i) =>
+            sum +
+            (i.sellingPrice > 0
+              ? ((i.sellingPrice - i.buyingPrice) / i.sellingPrice) * 100
+              : 0),
+          0,
+        ) / items.length
+      : 0;
+
   return (
     <div className="space-y-8">
+      {/* Inventory Overview Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="shadow-sm">
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+                Costo de Inventario
+              </p>
+              <Wallet className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+            </div>
+            <p className="text-base md:text-xl font-bold text-gray-900 truncate">
+              {formatPrice(inventoryCost)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+                Valor Potencial de Venta
+              </p>
+              <TrendingUp className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+            </div>
+            <p className="text-base md:text-xl font-bold text-green-600 truncate">
+              {formatPrice(inventoryValue)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+                Bajo / Sin Stock
+              </p>
+              <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+            </div>
+            <p className="text-base md:text-xl font-bold text-gray-900">
+              {lowStockItems.length}
+              <span className="text-red-500"> / {outOfStockItems.length}</span>
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+                Margen Promedio
+              </p>
+              <Package className="w-3.5 h-3.5 text-[#2196F3] flex-shrink-0" />
+            </div>
+            <p className="text-base md:text-xl font-bold text-gray-900">
+              {avgMargin.toFixed(0)}%
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Exchange Rates Section */}
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
         <h3 className="text-lg font-medium text-gray-900 mb-4">

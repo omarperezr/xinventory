@@ -475,17 +475,19 @@ export function InventoryHeader() {
                   <History className="w-4 h-4 mr-2" />
                   Historial
                 </Link>
-                <Link
-                  to="/reports"
-                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    isReports
-                      ? "bg-white text-[#2196F3] shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
-                >
-                  <BarChart2 className="w-4 h-4 mr-2" />
-                  Reportes
-                </Link>
+                {isAdmin && (
+                  <Link
+                    to="/reports"
+                    className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      isReports
+                        ? "bg-white text-[#2196F3] shadow-sm"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    <BarChart2 className="w-4 h-4 mr-2" />
+                    Reportes
+                  </Link>
+                )}
               </nav>
             </div>
 
@@ -634,15 +636,17 @@ export function InventoryHeader() {
             <History className="w-4 h-4" />
             <span className="text-[9px] font-medium">Historial</span>
           </Link>
-          <Link
-            to="/reports"
-            className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-              isReports ? "text-[#2196F3]" : "text-gray-500"
-            }`}
-          >
-            <BarChart2 className="w-4 h-4" />
-            <span className="text-[9px] font-medium">Reportes</span>
-          </Link>
+          {isAdmin && (
+            <Link
+              to="/reports"
+              className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
+                isReports ? "text-[#2196F3]" : "text-gray-500"
+              }`}
+            >
+              <BarChart2 className="w-4 h-4" />
+              <span className="text-[9px] font-medium">Reportes</span>
+            </Link>
+          )}
         </div>
       </div>
 

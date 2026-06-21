@@ -20,10 +20,13 @@ import {
   TrendingDown,
   Award,
   AlertCircle,
+  AlertTriangle,
   DollarSign,
   ShoppingBag,
   Users,
   Package,
+  Wallet,
+  CreditCard,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { format } from "date-fns";
@@ -77,15 +80,18 @@ const CustomAreaTooltip = ({ active, payload, label, formatPrice }: any) => {
 
 export function ReportsView() {
   const { transactions } = useHistory();
-  const { formatPrice } = useApp();
+  const { formatPrice, items } = useApp();
 
   // ── Aggregations ──────────────────────────────────────────────────────
   const itemSales: Record<
     string,
-    { name: string; quantity: number; total: number }
+    { name: string; quantity: number; total: number; cost: number }
   > = {};
   const userSales: Record<string, { total: number; count: number }> = {};
   const dailySales: Record<string, number> = {};
+  const paymentMethodTotals: Record<string, number> = {};
+
+  const buyingPriceById = new Map(items.map((i) => [i.id, i.buyingPrice]));
 
   transactions.forEach((t) => {
     if (!userSales[t.userId]) userSales[t.userId] = { total: 0, count: 0 };
@@ -97,9 +103,20 @@ export function ReportsView() {
 
     t.items.forEach((item) => {
       if (!itemSales[item.id])
-        itemSales[item.id] = { name: item.name, quantity: 0, total: 0 };
+        itemSales[item.id] = {
+          name: item.name,
+          quantity: 0,
+          total: 0,
+          cost: 0,
+        };
       itemSales[item.id].quantity += item.cartQuantity;
       itemSales[item.id].total += item.cartQuantity * item.sellingPrice;
+      const buyingPrice = buyingPriceById.get(item.id) ?? 0;
+      itemSales[item.id].cost += item.cartQuantity * buyingPrice;
+    });
+
+    t.payments?.forEach((p) => {
+      paymentMethodTotals[p.method] = (paymentMethodTotals[p.method] || 0) + p.amount;
     });
   });
 
@@ -109,6 +126,9 @@ export function ReportsView() {
   const sortedUsers = Object.entries(userSales).sort(
     ([, a], [, b]) => b.total - a.total,
   );
+  const sortedByProfit = Object.values(itemSales)
+    .map((i) => ({ ...i, profit: i.total - i.cost }))
+    .sort((a, b) => b.profit - a.profit);
 
   const mostSoldItem = sortedItems[0];
   const leastSoldItem = sortedItems[sortedItems.length - 1];
@@ -116,7 +136,29 @@ export function ReportsView() {
   const worstSeller = sortedUsers[sortedUsers.length - 1];
 
   const totalRevenue = transactions.reduce((s, t) => s + t.total, 0);
+  const totalCost = Object.values(itemSales).reduce((s, i) => s + i.cost, 0);
+  const totalProfit = totalRevenue - totalCost;
+  const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
   const totalTransactions = transactions.length;
+  const avgTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+
+  // ── Current business situation indicators (live inventory, not sales) ──
+  const inventoryCost = items.reduce(
+    (sum, i) => sum + i.buyingPrice * i.quantity,
+    0,
+  );
+  const lowStockItems = items
+    .filter((i) => i.quantity > 0 && i.quantity < 10)
+    .sort((a, b) => a.quantity - b.quantity);
+  const outOfStockItems = items.filter((i) => i.quantity === 0);
+
+  const paymentMethodData = Object.entries(paymentMethodTotals)
+    .sort(([, a], [, b]) => b - a)
+    .map(([method, total], i) => ({
+      method,
+      total,
+      fill: CHART_COLORS[i % CHART_COLORS.length],
+    }));
 
   // ── Chart datasets ────────────────────────────────────────────────────
   const shorten = (name: string, max = 10) =>
@@ -233,6 +275,108 @@ export function ReportsView() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Profitability & business-health KPI cards ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="shadow-sm">
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+                Ganancia Neta
+              </p>
+              <Wallet className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+            </div>
+            <p className="text-base md:text-xl font-bold text-green-600 truncate">
+              {formatPrice(totalProfit)}
+            </p>
+            <p className="text-[10px] md:text-xs text-muted-foreground">
+              Margen: {profitMargin.toFixed(0)}%
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+                Ticket Promedio
+              </p>
+              <ShoppingBag className="w-3.5 h-3.5 text-[#2196F3] flex-shrink-0" />
+            </div>
+            <p className="text-base md:text-xl font-bold text-gray-900 truncate">
+              {formatPrice(avgTicket)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+                Costo de Inventario Actual
+              </p>
+              <Package className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+            </div>
+            <p className="text-base md:text-xl font-bold text-gray-900 truncate">
+              {formatPrice(inventoryCost)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+                Bajo / Sin Stock
+              </p>
+              <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+            </div>
+            <p className="text-base md:text-xl font-bold text-gray-900">
+              {lowStockItems.length}
+              <span className="text-red-500"> / {outOfStockItems.length}</span>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Low stock alert ── */}
+      {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+          <h3 className="font-medium text-gray-900 mb-3 text-sm md:text-base flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-yellow-500" />
+            Alertas de Inventario
+          </h3>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {outOfStockItems.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between p-2.5 bg-red-50 rounded-md border border-red-100"
+              >
+                <span className="text-sm font-medium text-gray-900 truncate">
+                  {item.name}
+                </span>
+                <span className="text-xs font-medium text-red-600 flex-shrink-0">
+                  Sin stock
+                </span>
+              </div>
+            ))}
+            {lowStockItems.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between p-2.5 bg-yellow-50 rounded-md border border-yellow-100"
+              >
+                <span className="text-sm font-medium text-gray-900 truncate">
+                  {item.name}
+                </span>
+                <span className="text-xs font-medium text-yellow-700 flex-shrink-0">
+                  {item.quantity} {item.unit === "units" ? "u" : item.unit}{" "}
+                  restantes
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Stat cards (most/least sold + best/worst seller) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -535,6 +679,42 @@ export function ReportsView() {
             </div>
           )}
 
+          {/* Payment methods breakdown */}
+          {paymentMethodData.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+              <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-[#2196F3]" />
+                Ventas por Método de Pago
+              </h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={paymentMethodData}
+                    dataKey="total"
+                    nameKey="method"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    innerRadius={40}
+                    paddingAngle={3}
+                    label={({ method, percent }) =>
+                      `${method} ${(percent * 100).toFixed(0)}%`
+                    }
+                    labelLine={false}
+                  >
+                    {paymentMethodData.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: any) => [formatPrice(value), "Total"]}
+                    contentStyle={{ fontSize: 12 }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
           {/* Pie – revenue share by product */}
           {topRevenueData.length >= 2 && (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
@@ -631,6 +811,54 @@ export function ReportsView() {
                   </div>
                 );
               })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Profit leaders table ── */}
+      {hasData && (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+          <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
+            Productos Más Rentables (Ganancia)
+          </h3>
+          <div className="space-y-3">
+            {sortedByProfit.slice(0, 5).map((item, idx) => {
+              const maxProfit = sortedByProfit[0]?.profit || 1;
+              const pct = Math.max(
+                0,
+                Math.round((item.profit / maxProfit) * 100),
+              );
+              return (
+                <div key={idx}>
+                  <div className="flex items-center justify-between mb-1 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-mono text-gray-400 flex-shrink-0 w-5">
+                        #{idx + 1}
+                      </span>
+                      <span className="text-sm font-medium text-gray-900 truncate">
+                        {item.name}
+                      </span>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <span
+                        className={`text-sm font-semibold ${item.profit >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {formatPrice(item.profit)}
+                      </span>
+                      <span className="text-xs text-gray-400 ml-1.5">
+                        {item.quantity}u
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-green-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

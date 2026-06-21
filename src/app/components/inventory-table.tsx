@@ -52,17 +52,33 @@ function InventoryTableRow({
         ? "bg-yellow-50 text-yellow-700"
         : "bg-green-50 text-green-700";
 
+  const margin =
+    item.sellingPrice > 0
+      ? ((item.sellingPrice - item.buyingPrice) / item.sellingPrice) * 100
+      : 0;
+  const marginColor =
+    margin <= 0
+      ? "text-red-600"
+      : margin < 15
+        ? "text-yellow-600"
+        : "text-green-600";
+
   return (
     <tr className="hover:bg-gray-50 transition-colors">
       <td className="px-3 md:px-6 py-2 md:py-4">
         <div className="text-xs md:text-sm font-medium text-[#1A1A1A] leading-tight">
           {item.name}
         </div>
-        {item.includesTaxes && (
-          <span className="text-[9px] uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
-            +IVA
+        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+          {item.includesTaxes && (
+            <span className="text-[9px] uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+              +IVA
+            </span>
+          )}
+          <span className="md:hidden text-[9px] uppercase bg-gray-100 text-gray-600 px-1 py-0.5 rounded truncate max-w-[80px]">
+            {item.brand}
           </span>
-        )}
+        </div>
         <div className="md:hidden text-[10px] text-gray-400 font-mono mt-0.5 truncate max-w-[90px]">
           {item.barcode}
         </div>
@@ -70,6 +86,17 @@ function InventoryTableRow({
 
       <td className="hidden md:table-cell px-6 py-4">
         <span className="text-gray-600 font-mono text-sm">{item.barcode}</span>
+      </td>
+
+      <td className="hidden md:table-cell px-6 py-4">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-gray-700 truncate max-w-[110px]">
+            {item.brand}
+          </span>
+          <span className="text-[10px] text-gray-400 uppercase truncate max-w-[110px]">
+            {item.type}
+          </span>
+        </div>
       </td>
 
       <td className="px-3 md:px-6 py-2 md:py-4">
@@ -85,6 +112,14 @@ function InventoryTableRow({
         <td className="hidden md:table-cell px-6 py-4">
           <span className="text-gray-500 text-sm">
             {formatPrice(item.buyingPrice)}
+          </span>
+        </td>
+      )}
+
+      {showBuyingPrice && (
+        <td className="hidden md:table-cell px-6 py-4">
+          <span className={`text-sm font-medium ${marginColor}`}>
+            {margin.toFixed(0)}%
           </span>
         </td>
       )}
@@ -320,12 +355,20 @@ export function InventoryTable({
               <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
                 Código
               </th>
+              <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
+                Marca/Tipo
+              </th>
               <th className="text-left px-3 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
                 P. Venta
               </th>
               {showBuyingPrice && (
                 <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
                   P. Compra
+                </th>
+              )}
+              {showBuyingPrice && (
+                <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
+                  Margen
                 </th>
               )}
               <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
