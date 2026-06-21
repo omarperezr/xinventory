@@ -27,9 +27,17 @@ import {
   Package,
   Wallet,
   CreditCard,
+  FileText,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "./ui/button";
 import { format } from "date-fns";
+import {
+  exportReportPdf,
+  exportReportExcel,
+  ReportData,
+} from "../services/report-export";
 
 const CHART_COLORS = [
   "#2196F3",
@@ -80,7 +88,8 @@ const CustomAreaTooltip = ({ active, payload, label, formatPrice }: any) => {
 
 export function ReportsView() {
   const { transactions } = useHistory();
-  const { formatPrice, items } = useApp();
+  const { formatPrice, items, convertPrice, currency } = useApp();
+  const currencySymbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
 
   // ── Aggregations ──────────────────────────────────────────────────────
   const itemSales: Record<
@@ -197,17 +206,66 @@ export function ReportsView() {
   // ── Empty state ────────────────────────────────────────────────────────
   const hasData = transactions.length > 0;
 
+  // ── Downloadable report (PDF / Excel) ──────────────────────────────────
+  const buildReportData = (): ReportData => ({
+    transactions,
+    symbol: currencySymbol,
+    convert: convertPrice,
+    itemSales: Object.values(itemSales).sort((a, b) => b.total - a.total),
+    userSales: sortedUsers.map(([user, d]) => ({
+      user,
+      total: d.total,
+      count: d.count,
+    })),
+    paymentMethodTotals: paymentMethodData.map((p) => ({
+      method: p.method,
+      total: p.total,
+    })),
+    totals: {
+      revenue: totalRevenue,
+      cost: totalCost,
+      profit: totalProfit,
+      margin: profitMargin,
+      transactions: totalTransactions,
+      avgTicket,
+    },
+  });
+
   return (
     <div className="space-y-4 md:space-y-6 pb-6">
       {/* ── Header ── */}
-      <div className="bg-white p-4 md:p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h2 className="text-base md:text-lg font-medium text-gray-900 flex items-center gap-2">
-          <BarChart2 className="w-5 h-5 text-[#2196F3]" />
-          Reportes y Estadísticas
-        </h2>
-        <p className="text-xs md:text-sm text-gray-500 mt-1">
-          Análisis de rendimiento basado en el historial de transacciones.
-        </p>
+      <div className="bg-white p-4 md:p-6 rounded-lg border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h2 className="text-base md:text-lg font-medium text-gray-900 flex items-center gap-2">
+            <BarChart2 className="w-5 h-5 text-[#2196F3]" />
+            Reportes y Estadísticas
+          </h2>
+          <p className="text-xs md:text-sm text-gray-500 mt-1">
+            Análisis de rendimiento basado en el historial de transacciones.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            disabled={!hasData}
+            onClick={() => exportReportPdf(buildReportData())}
+          >
+            <FileText className="w-4 h-4 mr-1.5 text-red-500" />
+            Descargar PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            disabled={!hasData}
+            onClick={() => exportReportExcel(buildReportData())}
+          >
+            <FileSpreadsheet className="w-4 h-4 mr-1.5 text-green-600" />
+            Descargar Excel
+          </Button>
+        </div>
       </div>
 
       {/* ── KPI summary cards ── */}

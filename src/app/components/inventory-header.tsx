@@ -384,8 +384,10 @@ function UserManagementDialog({
 // ─── Main Header ──────────────────────────────────────────────────────────────
 export function InventoryHeader() {
   const location = useLocation();
-  const { currency, setCurrency } = useApp();
+  const { currency, setCurrency, cartItems, totalAmount, formatPrice } = useApp();
   const { currentUser, logout } = useAuth();
+
+  const cartCount = cartItems.reduce((sum, i) => sum + i.cartQuantity, 0);
 
   const [showLogin, setShowLogin] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -455,14 +457,26 @@ export function InventoryHeader() {
                 </Link>
                 <Link
                   to="/total"
-                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  className={`relative flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                     isTotal
                       ? "bg-white text-[#2196F3] shadow-sm"
                       : "text-gray-500 hover:text-gray-900"
                   }`}
                 >
-                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  <span className="relative mr-2">
+                    <ShoppingCart className="w-4 h-4" />
+                    {cartCount > 0 && (
+                      <span className="absolute -top-2 -right-2 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-bold text-white bg-red-600 rounded-full">
+                        {cartCount}
+                      </span>
+                    )}
+                  </span>
                   Total
+                  {totalAmount > 0 && (
+                    <span className="ml-2 text-xs font-semibold text-[#2196F3]">
+                      {formatPrice(totalAmount)}
+                    </span>
+                  )}
                 </Link>
                 <Link
                   to="/history"
@@ -620,12 +634,21 @@ export function InventoryHeader() {
           </Link>
           <Link
             to="/total"
-            className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
+            className={`relative flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
               isTotal ? "text-[#2196F3]" : "text-gray-500"
             }`}
           >
-            <ShoppingCart className="w-4 h-4" />
-            <span className="text-[9px] font-medium">Total</span>
+            <span className="relative">
+              <ShoppingCart className="w-4 h-4" />
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 min-w-[15px] h-[15px] px-1 flex items-center justify-center text-[9px] font-bold text-white bg-red-600 rounded-full">
+                  {cartCount}
+                </span>
+              )}
+            </span>
+            <span className="text-[9px] font-medium">
+              {totalAmount > 0 ? formatPrice(totalAmount) : "Total"}
+            </span>
           </Link>
           <Link
             to="/history"

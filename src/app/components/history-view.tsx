@@ -233,8 +233,8 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
         open={!!selectedTransaction}
         onOpenChange={(open) => !open && setSelectedId(null)}
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white w-[calc(100vw-2rem)] md:w-full rounded-xl">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-white w-[calc(100vw-2rem)] md:w-full rounded-xl flex flex-col p-4 md:p-5">
+          <DialogHeader className="gap-1">
             <DialogTitle className="text-sm md:text-base">
               Detalles de Transacción
             </DialogTitle>
@@ -246,22 +246,22 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
           </DialogHeader>
 
           {selectedTransaction && (
-            <div className="space-y-6 mt-2">
+            <div className="space-y-3 mt-1 min-h-0 flex-1 overflow-y-auto pr-1">
               {/* Items – responsive table/cards */}
               <div className="border rounded-lg overflow-hidden">
                 {/* Desktop table */}
-                <table className="hidden md:table w-full">
-                  <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-medium">
+                <table className="hidden md:table w-full text-xs">
+                  <thead className="bg-gray-50 text-[10px] uppercase text-gray-500 font-medium">
                     <tr>
-                      <th className="px-4 py-3 text-left">Producto</th>
-                      <th className="px-4 py-3 text-right">Precio</th>
-                      <th className="px-4 py-3 text-center">Comprado</th>
-                      <th className="px-4 py-3 text-center">Devuelto</th>
-                      <th className="px-4 py-3 text-right">Subtotal</th>
-                      <th className="px-4 py-3" />
+                      <th className="px-3 py-1.5 text-left">Producto</th>
+                      <th className="px-3 py-1.5 text-right">Precio</th>
+                      <th className="px-3 py-1.5 text-center">Comprado</th>
+                      <th className="px-3 py-1.5 text-center">Devuelto</th>
+                      <th className="px-3 py-1.5 text-right">Subtotal</th>
+                      <th className="px-3 py-1.5" />
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 text-sm">
+                  <tbody className="divide-y divide-gray-100 text-xs">
                     {selectedTransaction.items.map((item) => (
                       <TransactionItemRow
                         key={item.id}
@@ -275,15 +275,15 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                       />
                     ))}
                   </tbody>
-                  <tfoot className="bg-gray-50 text-sm">
+                  <tfoot className="bg-gray-50 text-xs">
                     <tr>
                       <td
                         colSpan={4}
-                        className="px-4 py-2 text-right text-gray-500"
+                        className="px-3 py-1 text-right text-gray-500"
                       >
                         Subtotal:
                       </td>
-                      <td className="px-4 py-2 text-right font-medium">
+                      <td className="px-3 py-1 text-right font-medium">
                         {formatPrice(selectedTransaction.subtotal)}
                       </td>
                       <td />
@@ -291,11 +291,11 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                     <tr>
                       <td
                         colSpan={4}
-                        className="px-4 py-2 text-right text-gray-500"
+                        className="px-3 py-1 text-right text-gray-500"
                       >
                         Impuestos (10%):
                       </td>
-                      <td className="px-4 py-2 text-right font-medium">
+                      <td className="px-3 py-1 text-right font-medium">
                         {formatPrice(selectedTransaction.tax)}
                       </td>
                       <td />
@@ -303,11 +303,11 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                     <tr className="border-t border-gray-200">
                       <td
                         colSpan={4}
-                        className="px-4 py-3 text-right font-bold text-gray-900"
+                        className="px-3 py-1.5 text-right font-bold text-gray-900"
                       >
                         Total Pagado:
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-[#2196F3]">
+                      <td className="px-3 py-1.5 text-right font-bold text-[#2196F3]">
                         {formatPrice(selectedTransaction.total)}
                       </td>
                       <td />
@@ -316,7 +316,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                 </table>
 
                 {/* Mobile item cards */}
-                <div className="md:hidden divide-y divide-gray-100">
+                <div className="md:hidden divide-y divide-gray-100 max-h-40 overflow-y-auto">
                   {selectedTransaction.items.map((item) => (
                     <MobileItemCard
                       key={item.id}
@@ -330,7 +330,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                     />
                   ))}
                   {/* Mobile totals */}
-                  <div className="p-3 bg-gray-50 space-y-1.5">
+                  <div className="p-2.5 bg-gray-50 space-y-1">
                     <div className="flex justify-between text-xs text-gray-500">
                       <span>Subtotal</span>
                       <span>{formatPrice(selectedTransaction.subtotal)}</span>
@@ -348,14 +348,14 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
               </div>
 
               {/* Payment details */}
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-3">
-                <h3 className="font-medium text-gray-900 flex items-center gap-2 text-sm">
-                  <CreditCard className="w-4 h-4 text-[#2196F3]" />
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2">
+                <h3 className="font-medium text-gray-900 flex items-center gap-2 text-xs">
+                  <CreditCard className="w-3.5 h-3.5 text-[#2196F3]" />
                   Detalles del Pago
                 </h3>
-                <div className="grid gap-2">
+                <div className="grid gap-1">
                   {selectedTransaction.payments.map((p, i) => (
-                    <div key={i} className="flex justify-between text-sm">
+                    <div key={i} className="flex justify-between text-xs">
                       <span className="text-gray-600">{p.method}</span>
                       <span className="font-medium">
                         {formatPrice(p.amount)}
@@ -367,7 +367,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                       (s, p) => s + p.amount,
                       0,
                     ) && (
-                    <div className="flex justify-between text-sm border-t border-gray-200 pt-2 mt-1">
+                    <div className="flex justify-between text-xs border-t border-gray-200 pt-1.5 mt-0.5">
                       <span className="text-gray-600">Cambio Entregado</span>
                       <span className="font-medium text-red-600">
                         -
@@ -382,11 +382,11 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                   )}
                 </div>
                 {selectedTransaction.notes && (
-                  <div className="pt-2 border-t border-gray-200">
+                  <div className="pt-1.5 border-t border-gray-200">
                     <div className="text-xs text-gray-500 flex items-center gap-1 mb-1">
                       <StickyNote className="w-3 h-3" /> Notas
                     </div>
-                    <p className="text-sm text-gray-700 italic bg-white p-2 rounded border border-gray-100">
+                    <p className="text-xs text-gray-700 italic bg-white p-2 rounded border border-gray-100">
                       {selectedTransaction.notes}
                     </p>
                   </div>
@@ -394,15 +394,18 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
               </div>
 
               {/* Images */}
-              <div className="space-y-3">
-                <h3 className="font-medium text-gray-900 flex items-center gap-2 text-sm">
-                  <ImageIcon className="w-4 h-4 text-[#2196F3]" />
+              <div className="space-y-2">
+                <h3 className="font-medium text-gray-900 flex items-center gap-2 text-xs">
+                  <ImageIcon className="w-3.5 h-3.5 text-[#2196F3]" />
                   Adjuntos (Facturas/Recibos)
                 </h3>
-                <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-5 md:grid-cols-8 gap-2">
                   {selectedTransaction.images.map((img, idx) => (
-                    <div
+                    <a
                       key={idx}
+                      href={img}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200"
                     >
                       <img
@@ -410,7 +413,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                         alt="Receipt"
                         className="w-full h-full object-cover"
                       />
-                    </div>
+                    </a>
                   ))}
                   <div className="aspect-square bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors relative">
                     <input
@@ -421,8 +424,8 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                         handleFileUpload(e, selectedTransaction.id)
                       }
                     />
-                    <Upload className="w-5 h-5 text-gray-400 mb-1" />
-                    <span className="text-[10px] text-gray-500 text-center px-1">
+                    <Upload className="w-4 h-4 text-gray-400" />
+                    <span className="text-[9px] text-gray-500 text-center px-1">
                       Subir
                     </span>
                   </div>
@@ -512,28 +515,28 @@ function TransactionItemRow({
 
   return (
     <tr>
-      <td className="px-4 py-3">
+      <td className="px-3 py-1.5">
         <div className="font-medium text-gray-900">{item.name}</div>
-        <div className="text-xs text-gray-400 font-mono">{item.barcode}</div>
+        <div className="text-[10px] text-gray-400 font-mono">{item.barcode}</div>
       </td>
-      <td className="px-4 py-3 text-right text-gray-600">
+      <td className="px-3 py-1.5 text-right text-gray-600">
         {isAdmin ? (
           <EditableHistoryPrice item={item} transactionId={transactionId} />
         ) : (
           formatPrice(item.sellingPrice)
         )}
       </td>
-      <td className="px-4 py-3 text-center">{item.cartQuantity}</td>
-      <td className="px-4 py-3 text-center">
+      <td className="px-3 py-1.5 text-center">{item.cartQuantity}</td>
+      <td className="px-3 py-1.5 text-center">
         {item.quantityReturned > 0 ? (
-          <span className="text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded text-xs">
+          <span className="text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded text-[10px]">
             -{item.quantityReturned}
           </span>
         ) : (
           <span className="text-gray-400">—</span>
         )}
       </td>
-      <td className="px-4 py-3 text-right font-medium">
+      <td className="px-3 py-1.5 text-right font-medium">
         {item.quantityReturned > 0 ? (
           <div className="flex flex-col items-end">
             <span className="text-xs text-gray-400 line-through">
@@ -545,7 +548,7 @@ function TransactionItemRow({
           formatPrice(item.sellingPrice * item.cartQuantity)
         )}
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-3 py-1.5 text-right">
         {available > 0 &&
           (!returnMode ? (
             <Button

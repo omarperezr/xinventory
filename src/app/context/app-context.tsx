@@ -400,6 +400,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         { ...item, cartQuantity: quantity, applyDiscount: false },
       ];
     });
+
+    toast.success(`${item.name} agregado al carrito`, {
+      description: `Cantidad: ${quantity}`,
+    });
   };
 
   const removeFromCart = (itemId: string) => {
