@@ -8,6 +8,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
+import { fetchVenezuelaConversionRates } from "../services/exchange-rates";
 import {
   DollarSign,
   Euro,
@@ -19,6 +20,7 @@ import {
   AlertTriangle,
   Wallet,
   TrendingUp,
+  RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -57,17 +59,39 @@ export function AdminView({
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBy, setFilterBy] = useState("all");
 
-  // Editable rate drafts — only committed to Supabase when "Actualizar" is
+  // Editable rate drafts — only committed to Supabase when "Guardar Tasas" is
   // clicked, so typing/clearing a field doesn't fire a request per keystroke.
   const [usdInput, setUsdInput] = useState("");
   const [eurInput, setEurInput] = useState("");
+  const [fetchingRates, setFetchingRates] = useState(false);
 
   useEffect(() => {
     setUsdInput(rates.USD.toString());
     setEurInput(rates.EUR.toString());
   }, [rates.USD, rates.EUR]);
 
-  const handleUpdateRates = () => {
+  // Pulls today's Bs/USD and Bs/EUR rates from the Alcambio API and fills the
+  // inputs with them. Does not persist anything — "Guardar Tasas" does that.
+  const handleFetchRates = async () => {
+    setFetchingRates(true);
+    try {
+      const fetched = await fetchVenezuelaConversionRates();
+      if (!fetched) {
+        toast.error("No se encontraron tasas para hoy");
+        return;
+      }
+      setUsdInput(fetched.usd.toString());
+      setEurInput(fetched.eur.toString());
+      toast.success("Tasas actualizadas desde Alcambio");
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al obtener tasas");
+    } finally {
+      setFetchingRates(false);
+    }
+  };
+
+  const handleSaveRates = () => {
     const usd = parseFloat(usdInput);
     const eur = parseFloat(eurInput);
     if (isNaN(usd) || usd <= 0 || isNaN(eur) || eur <= 0) {
@@ -225,7 +249,7 @@ export function AdminView({
                 min="0"
                 value={usdInput}
                 onChange={(e) => setUsdInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleUpdateRates()}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveRates()}
                 placeholder="0.00"
                 className="pl-9"
               />
@@ -243,22 +267,34 @@ export function AdminView({
                 min="0"
                 value={eurInput}
                 onChange={(e) => setEurInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleUpdateRates()}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveRates()}
                 placeholder="0.00"
                 className="pl-9"
               />
             </div>
           </div>
         </div>
-        <div className="flex justify-end mt-4">
+        <div className="flex justify-end gap-3 mt-4">
           <Button
             type="button"
-            onClick={handleUpdateRates}
+            variant="outline"
+            onClick={handleFetchRates}
+            disabled={fetchingRates}
+            className="rounded-lg px-6"
+          >
+            <RefreshCw
+              className={`w-4 h-4 mr-2 ${fetchingRates ? "animate-spin" : ""}`}
+            />
+            Actualizar Tasas
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSaveRates}
             disabled={!ratesChanged}
             className="bg-[#2196F3] hover:bg-[#1976D2] text-white rounded-lg px-6 disabled:opacity-50"
           >
             <Check className="w-4 h-4 mr-2" />
-            Actualizar Tasas
+            Guardar Tasas
           </Button>
         </div>
       </div>
