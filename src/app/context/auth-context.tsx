@@ -47,11 +47,7 @@ interface AuthContextType {
   // Self-service profile management
   updateOwnName: (name: string) => Promise<Result>;
   requestEmailChange: (newEmail: string) => Promise<Result>;
-  requestPasswordReset: () => Promise<Result>;
-  confirmPasswordReset: (
-    code: string,
-    newPassword: string,
-  ) => Promise<Result>;
+  updateOwnPassword: (newPassword: string) => Promise<Result>;
   loaded: boolean;
 }
 
@@ -242,35 +238,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { success: true };
   };
 
-  // Sends a 6-digit OTP code (Supabase recovery email) to the current
-  // account's address, which confirmPasswordReset verifies before allowing
-  // the password change.
-  const requestPasswordReset = async (): Promise<Result> => {
-    if (!currentUser) return { success: false, error: "No autenticado" };
-    const { error } = await supabase.auth.resetPasswordForEmail(
-      currentUser.email,
-    );
-    if (error) return { success: false, error: error.message };
-    return { success: true };
-  };
-
-  const confirmPasswordReset = async (
-    code: string,
-    newPassword: string,
-  ): Promise<Result> => {
+  // Updates the password directly via the active session — no email/OTP
+  // round-trip needed since the session already proves identity.
+  const updateOwnPassword = async (newPassword: string): Promise<Result> => {
     if (!currentUser) return { success: false, error: "No autenticado" };
     if (newPassword.length < 6)
       return {
         success: false,
         error: "La contraseña debe tener al menos 6 caracteres",
       };
-    const { error: verifyErr } = await supabase.auth.verifyOtp({
-      email: currentUser.email,
-      token: code,
-      type: "recovery",
-    });
-    if (verifyErr) return { success: false, error: "Código inválido o expirado" };
-
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -288,8 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateUser,
         updateOwnName,
         requestEmailChange,
-        requestPasswordReset,
-        confirmPasswordReset,
+        updateOwnPassword,
         loaded
       }}
     >

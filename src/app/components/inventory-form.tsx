@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ComponentType, ReactNode } from "react";
 import {
   Barcode,
   Plus,
   Minus,
-  Edit,
   X,
   FileText,
   ImagePlus,
   Loader2,
+  Tag,
+  Boxes,
 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -131,15 +132,15 @@ export function InventoryForm({
 
     return (
       <div className="text-xs text-gray-500 mt-1 flex gap-2">
-        <span className={currency === "BS" ? "font-bold text-[#2196F3]" : ""}>
+        <span className={currency === "BS" ? "font-bold text-primary" : ""}>
           Bs {inBS.toFixed(2)}
         </span>
         <span className="text-gray-300">|</span>
-        <span className={currency === "USD" ? "font-bold text-[#2196F3]" : ""}>
+        <span className={currency === "USD" ? "font-bold text-primary" : ""}>
           $ {inUSD.toFixed(2)}
         </span>
         <span className="text-gray-300">|</span>
-        <span className={currency === "EUR" ? "font-bold text-[#2196F3]" : ""}>
+        <span className={currency === "EUR" ? "font-bold text-primary" : ""}>
           € {inEUR.toFixed(2)}
         </span>
       </div>
@@ -209,36 +210,12 @@ export function InventoryForm({
   const decrementQuantity = () => setQuantity((prev) => Math.max(0, prev - 1));
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-8 shadow-sm">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-[#1A1A1A] flex items-center gap-2 font-medium text-lg">
-          {editItem ? (
-            <>
-              <Edit className="w-5 h-5 text-[#2196F3]" strokeWidth={1.5} />
-              Editar Producto
-            </>
-          ) : (
-            "Agregar Nuevo Producto"
-          )}
-        </h2>
-        {editItem && onCancelEdit && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onCancelEdit}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <X className="w-4 h-4" strokeWidth={1.5} />
-          </Button>
-        )}
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Product Name */}
+    <form onSubmit={handleSubmit} className="space-y-7">
+      {/* Identificación */}
+      <FormSection icon={Tag} title="Identificación">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
-            <Label htmlFor="name" className="text-sm text-gray-700 font-normal">
+            <Label htmlFor="name">
               Nombre del Producto
             </Label>
             <Input
@@ -246,19 +223,16 @@ export function InventoryForm({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ej. Harina Pan"
-              className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
               required
             />
           </div>
 
-          {/* Barcode */}
           <div className="space-y-2">
             <Label
               htmlFor="barcode"
-              className="text-sm text-gray-700 font-normal"
             >
               <span className="flex items-center gap-2">
-                <Barcode className="w-4 h-4 text-[#2196F3]" strokeWidth={1.5} />
+                <Barcode className="w-4 h-4 text-primary" strokeWidth={1.5} />
                 Código de Barras
               </span>
             </Label>
@@ -267,16 +241,18 @@ export function InventoryForm({
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
               placeholder="Escanear o ingresar código"
-              className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
               required
             />
           </div>
+        </div>
+      </FormSection>
 
-          {/* Buying Price */}
+      {/* Precios */}
+      <FormSection icon={() => <span className="text-primary font-semibold text-sm w-4 h-4 flex items-center justify-center">$</span>} title="Precios">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
             <Label
               htmlFor="buyingPrice"
-              className="text-sm text-gray-700 font-normal"
             >
               Precio de Compra
             </Label>
@@ -302,18 +278,16 @@ export function InventoryForm({
                 value={buyingPrice}
                 onChange={(e) => setBuyingPrice(e.target.value)}
                 placeholder="0.00"
-                className="flex-1 border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
+                className="flex-1"
                 required
               />
             </div>
             {getConversions(buyingPrice, buyingCurrency)}
           </div>
 
-          {/* Selling Price */}
           <div className="space-y-2">
             <Label
               htmlFor="sellingPrice"
-              className="text-sm text-gray-700 font-normal"
             >
               Precio de Venta
             </Label>
@@ -339,18 +313,16 @@ export function InventoryForm({
                 value={sellingPrice}
                 onChange={(e) => setSellingPrice(e.target.value)}
                 placeholder="0.00"
-                className="flex-1 border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
+                className="flex-1"
                 required
               />
             </div>
             {getConversions(sellingPrice, sellingCurrency)}
           </div>
 
-          {/* Discount */}
           <div className="space-y-2">
             <Label
               htmlFor="discount"
-              className="text-sm text-gray-700 font-normal"
             >
               Descuento (%)
             </Label>
@@ -364,7 +336,6 @@ export function InventoryForm({
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
                 placeholder="0"
-                className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
                 %
@@ -372,9 +343,28 @@ export function InventoryForm({
             </div>
           </div>
 
-          {/* Stock Quantity */}
+          <div className="flex items-center space-x-2 pt-7">
+            <Checkbox
+              id="includesTaxes"
+              checked={includesTaxes}
+              onCheckedChange={(checked) =>
+                setIncludesTaxes(checked as boolean)
+              }
+            />
+            <Label
+              htmlFor="includesTaxes"
+            >
+              Incluye Impuestos
+            </Label>
+          </div>
+        </div>
+      </FormSection>
+
+      {/* Inventario y categorización */}
+      <FormSection icon={Boxes} title="Inventario y Categorización">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
-            <Label className="text-sm text-gray-700 font-normal">
+            <Label>
               Cantidad en Stock
             </Label>
             <div className="flex items-center gap-3">
@@ -383,7 +373,7 @@ export function InventoryForm({
                 variant="outline"
                 size="icon"
                 onClick={decrementQuantity}
-                className="h-10 w-10 rounded-lg border-gray-300 hover:bg-gray-50 hover:border-[#2196F3]"
+                className="h-10 w-10 hover:border-primary"
               >
                 <Minus className="h-4 w-4" strokeWidth={1.5} />
               </Button>
@@ -394,61 +384,29 @@ export function InventoryForm({
                 onChange={(e) =>
                   setQuantity(Math.max(0, parseInt(e.target.value) || 0))
                 }
-                className="flex-1 text-center border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
+                className="flex-1 text-center"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 onClick={incrementQuantity}
-                className="h-10 w-10 rounded-lg border-gray-300 hover:bg-gray-50 hover:border-[#2196F3]"
+                className="h-10 w-10 hover:border-primary"
               >
                 <Plus className="h-4 w-4" strokeWidth={1.5} />
               </Button>
             </div>
           </div>
 
-          {/* Brand */}
           <div className="space-y-2">
-            <Label
-              htmlFor="brand"
-              className="text-sm text-gray-700 font-normal"
-            >
-              Marca
-            </Label>
-            <Input
-              id="brand"
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              placeholder="GENERICO"
-              className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
-            />
-          </div>
-
-          {/* Type */}
-          <div className="space-y-2">
-            <Label htmlFor="type" className="text-sm text-gray-700 font-normal">
-              Tipo / Categoría
-            </Label>
-            <Input
-              id="type"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              placeholder="N/A"
-              className="border-gray-300 rounded-lg focus:border-[#2196F3] focus:ring-[#2196F3]"
-            />
-          </div>
-
-          {/* Unit Type */}
-          <div className="space-y-2">
-            <Label htmlFor="unit" className="text-sm text-gray-700 font-normal">
+            <Label htmlFor="unit">
               Unidad de Medida
             </Label>
             <Select
               value={unit}
               onValueChange={(val: UnitType) => setUnit(val)}
             >
-              <SelectTrigger className="w-full border-gray-300 rounded-lg">
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -459,120 +417,153 @@ export function InventoryForm({
             </Select>
           </div>
 
-          {/* Includes Taxes Checkbox */}
-          <div className="flex items-center space-x-2 pt-8">
-            <Checkbox
-              id="includesTaxes"
-              checked={includesTaxes}
-              onCheckedChange={(checked) =>
-                setIncludesTaxes(checked as boolean)
-              }
-            />
+          <div className="space-y-2">
             <Label
-              htmlFor="includesTaxes"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              htmlFor="brand"
             >
-              Incluye Impuestos
+              Marca
             </Label>
+            <Input
+              id="brand"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="GENERICO"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="type">
+              Tipo / Categoría
+            </Label>
+            <Input
+              id="type"
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              placeholder="N/A"
+            />
           </div>
         </div>
+      </FormSection>
 
-        {/* Images */}
-        <div className="space-y-2 pt-2">
-          <Label className="text-sm text-gray-700 font-normal flex items-center gap-2">
-            <ImagePlus className="w-4 h-4" />
-            Imágenes del Producto
-          </Label>
-          <div className="flex flex-wrap gap-3">
-            {images.map((img, i) => (
-              <div
-                key={i}
-                className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200"
-              >
-                <img
-                  src={img}
-                  alt={`Imagen ${i + 1}`}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeImage(i)}
-                  className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-            <label className="w-20 h-20 rounded-lg border border-dashed border-gray-300 flex items-center justify-center cursor-pointer text-gray-400 hover:border-[#2196F3] hover:text-[#2196F3]">
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageSelect}
-                className="hidden"
+      {/* Imágenes */}
+      <FormSection icon={ImagePlus} title="Imágenes del Producto">
+        <div className="flex flex-wrap gap-3">
+          {images.map((img, i) => (
+            <div
+              key={i}
+              className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200"
+            >
+              <img
+                src={img}
+                alt={`Imagen ${i + 1}`}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
               />
-              {compressing ? "..." : <Plus className="w-5 h-5" />}
-            </label>
+              <button
+                type="button"
+                onClick={() => removeImage(i)}
+                className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+          <label className="w-20 h-20 rounded-lg border border-dashed border-gray-300 flex items-center justify-center cursor-pointer text-gray-400 hover:border-primary hover:text-primary">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            {compressing ? "..." : <Plus className="w-5 h-5" />}
+          </label>
+        </div>
+      </FormSection>
+
+      {/* Notas */}
+      <FormSection icon={FileText} title="Notas">
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <Label
+              htmlFor="itemNotes"
+            >
+              Notas del producto
+            </Label>
+            <Textarea
+              id="itemNotes"
+              placeholder="Información adicional del producto (se muestra en los detalles)..."
+              value={itemNotes}
+              onChange={(e) => setItemNotes(e.target.value)}
+              className="resize-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label
+              htmlFor="notes"
+            >
+              Notas del cambio (Historial)
+            </Label>
+            <Textarea
+              id="notes"
+              placeholder="Explique la razón del cambio de stock o modificación..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="resize-none"
+            />
           </div>
         </div>
+      </FormSection>
 
-        {/* Product Notes (persistent, shown in detail view) */}
-        <div className="space-y-2 pt-2">
-          <Label
-            htmlFor="itemNotes"
-            className="text-sm text-gray-700 font-normal flex items-center gap-2"
-          >
-            <FileText className="w-4 h-4" />
-            Notas del producto
-          </Label>
-          <Textarea
-            id="itemNotes"
-            placeholder="Información adicional del producto (se muestra en los detalles)..."
-            value={itemNotes}
-            onChange={(e) => setItemNotes(e.target.value)}
-            className="resize-none"
-          />
-        </div>
-
-        {/* Notes Section */}
-        <div className="space-y-2 pt-2">
-          <Label
-            htmlFor="notes"
-            className="text-sm text-gray-700 font-normal flex items-center gap-2"
-          >
-            <FileText className="w-4 h-4" />
-            Notas del cambio (Historial)
-          </Label>
-          <Textarea
-            id="notes"
-            placeholder="Explique la razón del cambio de stock o modificación..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="resize-none"
-          />
-        </div>
-
-        <div className="flex justify-end pt-4">
+      <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 -mx-6 px-6 sticky bottom-0 bg-white pb-1">
+        {editItem && onCancelEdit && (
           <Button
-            type="submit"
-            disabled={submitting || compressing}
-            className="bg-[#2196F3] hover:bg-[#1976D2] text-white rounded-lg px-8 shadow-sm disabled:opacity-60"
+            type="button"
+            variant="outline"
+            onClick={onCancelEdit}
           >
-            {submitting ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Guardando…
-              </span>
-            ) : editItem ? (
-              "Actualizar Producto"
-            ) : (
-              "Agregar Producto"
-            )}
+            Cancelar
           </Button>
-        </div>
-      </form>
+        )}
+        <Button
+          type="submit"
+          disabled={submitting || compressing}
+          className="px-8 disabled:opacity-60"
+        >
+          {submitting ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Guardando…
+            </span>
+          ) : editItem ? (
+            "Actualizar Producto"
+          ) : (
+            "Agregar Producto"
+          )}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function FormSection({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        <Icon className="w-4 h-4 text-primary" />
+        {title}
+      </h3>
+      {children}
     </div>
   );
 }

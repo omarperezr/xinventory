@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { InventoryForm } from "./inventory-form";
 import { InventoryTable } from "./inventory-table";
@@ -21,6 +21,10 @@ import {
   Wallet,
   TrendingUp,
   RefreshCw,
+  Trash2,
+  X,
+  Plus,
+  FileSpreadsheet,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -31,6 +35,16 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -38,6 +52,10 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Card, CardContent } from "./ui/card";
+import { Checkbox } from "./ui/checkbox";
+import { InventorySortControl } from "./inventory-sort-control";
+import { sortInventory, SortOption } from "../utils/sortInventory";
+import { parseItemsFromExcel } from "../utils/excelImport";
 
 interface AdminViewProps {
   editingItem?: InventoryItem;
@@ -50,14 +68,86 @@ export function AdminView({
   onEditItem,
   onCancelEdit,
 }: AdminViewProps) {
-  const { items, addItem, updateItem, deleteItem, rates, updateRates, formatPrice } =
-    useApp();
+  const {
+    items,
+    addItem,
+    updateItem,
+    deleteItem,
+    deleteItems,
+    importItems,
+    rates,
+    updateRates,
+    formatPrice,
+  } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBy, setFilterBy] = useState("all");
+  const [sortBy, setSortBy] = useState<SortOption[]>([]);
+
+  // Bulk-delete selection mode
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Add/Edit product dialog
+  const [formOpen, setFormOpen] = useState(false);
+  useEffect(() => {
+    if (editingItem) setFormOpen(true);
+  }, [editingItem]);
+
+  const handleFormOpenChange = (open: boolean) => {
+    setFormOpen(open);
+    if (!open && editingItem) onCancelEdit();
+  };
+
+  // Excel import
+  const [importing, setImporting] = useState(false);
+
+  const handleImportExcel = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setImporting(true);
+    const toastId = toast.loading("Leyendo archivo Excel...");
+    try {
+      const rows = await parseItemsFromExcel(file);
+      if (rows.length === 0) {
+        toast.error("No se encontraron productos válidos en el archivo", { id: toastId });
+        return;
+      }
+      toast.loading(`Importando ${rows.length} producto(s)...`, { id: toastId });
+      const result = await importItems(
+        rows.map((r) => ({
+          name: r.name,
+          barcode: r.barcode,
+          buyingPrice: r.buyingPrice,
+          sellingPrice: r.sellingPrice,
+          quantity: r.quantity,
+          unit: r.unit,
+          includesTaxes: r.includesTaxes,
+          discount: r.discount,
+          type: r.type,
+          brand: r.brand,
+          notes: r.notes,
+        })),
+        currentUser?.name || "Admin",
+      );
+      toast.success(
+        `Importación completa: ${result.created} creado(s), ${result.updated} actualizado(s)`,
+        { id: toastId },
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al importar el archivo Excel", { id: toastId });
+    } finally {
+      setImporting(false);
+    }
+  };
 
   // Editable rate drafts — only committed to Supabase when "Guardar Tasas" is
   // clicked, so typing/clearing a field doesn't fire a request per keystroke.
@@ -145,6 +235,50 @@ export function AdminView({
     );
   });
 
+  const visibleItems = sortInventory(filteredItems, sortBy);
+
+  const toggleSelectMode = () => {
+    setSelectMode((v) => !v);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelectItem = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allVisibleSelected =
+    visibleItems.length > 0 && visibleItems.every((i) => selectedIds.has(i.id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (allVisibleSelected) {
+        const next = new Set(prev);
+        visibleItems.forEach((i) => next.delete(i.id));
+        return next;
+      }
+      const next = new Set(prev);
+      visibleItems.forEach((i) => next.add(i.id));
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      await deleteItems(Array.from(selectedIds), currentUser?.name || "Admin");
+      setSelectedIds(new Set());
+      setSelectMode(false);
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkDelete(false);
+    }
+  };
+
   if (!currentUser || currentUser.role !== "admin") return null;
 
   const inventoryCost = items.reduce(
@@ -222,7 +356,7 @@ export function AdminView({
               <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
                 Margen Promedio
               </p>
-              <Package className="w-3.5 h-3.5 text-[#2196F3] flex-shrink-0" />
+              <Package className="w-3.5 h-3.5 text-primary flex-shrink-0" />
             </div>
             <p className="text-base md:text-xl font-bold text-gray-900">
               {avgMargin.toFixed(0)}%
@@ -232,13 +366,13 @@ export function AdminView({
       </div>
 
       {/* Exchange Rates Section */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">
           Tasas de Cambio (Hoy)
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <Label className="text-sm text-gray-700">
+            <Label>
               Precio USD Hoy (Bs/USD)
             </Label>
             <div className="relative">
@@ -256,7 +390,7 @@ export function AdminView({
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-sm text-gray-700">
+            <Label>
               Precio EUR Hoy (Bs/EUR)
             </Label>
             <div className="relative">
@@ -277,10 +411,10 @@ export function AdminView({
         <div className="flex justify-end gap-3 mt-4">
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
+            className="bg-input-background hover:bg-input-background hover:brightness-100 border border-input text-foreground"
             onClick={handleFetchRates}
             disabled={fetchingRates}
-            className="rounded-lg px-6"
           >
             <RefreshCw
               className={`w-4 h-4 mr-2 ${fetchingRates ? "animate-spin" : ""}`}
@@ -291,7 +425,7 @@ export function AdminView({
             type="button"
             onClick={handleSaveRates}
             disabled={!ratesChanged}
-            className="bg-[#2196F3] hover:bg-[#1976D2] text-white rounded-lg px-6 disabled:opacity-50"
+            className="px-6"
           >
             <Check className="w-4 h-4 mr-2" />
             Guardar Tasas
@@ -299,23 +433,76 @@ export function AdminView({
         </div>
       </div>
 
-      <InventoryForm
-        onSubmit={editingItem ? handleUpdateItem : handleAddItem}
-        editItem={editingItem}
-        onCancelEdit={onCancelEdit}
-        rates={rates}
-      />
+      <div className="flex justify-end gap-2">
+        <label>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleImportExcel}
+            disabled={importing}
+            className="hidden"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            className="bg-input-background hover:bg-input-background hover:brightness-100 border border-input text-foreground"
+            disabled={importing}
+            asChild
+          >
+            <span>
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              {importing ? "Importando..." : "Importar Excel"}
+            </span>
+          </Button>
+        </label>
+        <Button
+          type="button"
+          onClick={() => setFormOpen(true)}
+          className="px-6"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Agregar Producto
+        </Button>
+      </div>
+
+      <Dialog open={formOpen} onOpenChange={handleFormOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
+          <DialogHeader>
+            <DialogTitle>
+              {editingItem ? "Editar Producto" : "Agregar Nuevo Producto"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingItem
+                ? "Actualiza los datos del producto seleccionado."
+                : "Completa la información para agregarlo al inventario."}
+            </DialogDescription>
+          </DialogHeader>
+          <InventoryForm
+            onSubmit={async (item, notes) => {
+              if (editingItem) {
+                await handleUpdateItem(item, notes);
+              } else {
+                await handleAddItem(item, notes);
+              }
+              setFormOpen(false);
+            }}
+            editItem={editingItem}
+            onCancelEdit={() => handleFormOpenChange(false)}
+            rates={rates}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Admin Inventory Search Bar */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           <h3 className="text-base font-medium text-gray-900 whitespace-nowrap">
             Inventario
             <span className="ml-2 text-sm font-normal text-gray-400">
-              ({filteredItems.length} de {items.length} productos)
+              ({visibleItems.length} de {items.length} productos)
             </span>
           </h3>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:ml-auto sm:max-w-md">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:ml-auto sm:max-w-2xl">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
@@ -326,7 +513,7 @@ export function AdminView({
               />
             </div>
             <Select value={filterBy} onValueChange={setFilterBy}>
-              <SelectTrigger className="w-full sm:w-[150px] h-9 text-sm border-gray-300">
+              <SelectTrigger className="w-full sm:w-[150px] h-9 text-sm">
                 <SelectValue placeholder="Filtrar por" />
               </SelectTrigger>
               <SelectContent>
@@ -335,17 +522,85 @@ export function AdminView({
                 <SelectItem value="barcode">Código</SelectItem>
               </SelectContent>
             </Select>
+            <InventorySortControl
+              value={sortBy}
+              onChange={setSortBy}
+              className="h-9 sm:w-[170px]"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={toggleSelectMode}
+              className="h-9 text-sm whitespace-nowrap bg-input-background hover:bg-input-background hover:brightness-100 border border-input text-foreground"
+            >
+              {selectMode ? (
+                <>
+                  <X className="w-3.5 h-3.5 mr-1.5" />
+                  Cancelar
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  Eliminar varios
+                </>
+              )}
+            </Button>
           </div>
         </div>
+
+        {selectMode && (
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+              <Checkbox checked={allVisibleSelected} onCheckedChange={toggleSelectAll} />
+              Seleccionar todos
+            </label>
+            <Button
+              type="button"
+              size="sm"
+              disabled={selectedIds.size === 0}
+              onClick={() => setConfirmBulkDelete(true)}
+              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              Eliminar ({selectedIds.size})
+            </Button>
+          </div>
+        )}
       </div>
 
       <InventoryTable
-        items={filteredItems}
+        items={visibleItems}
         onEdit={onEditItem}
         onDelete={(id) => deleteItem(id, currentUser?.name || "Admin")}
         showBuyingPrice
         onViewHistory={setHistoryItem}
+        selectMode={selectMode}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelectItem}
       />
+
+      {/* Bulk Delete Confirm */}
+      <AlertDialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar {selectedIds.size} producto(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Los productos seleccionados se eliminarán
+              permanentemente del inventario.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {bulkDeleting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* History Dialog */}
       <Dialog
@@ -355,7 +610,7 @@ export function AdminView({
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <History className="w-5 h-5 text-[#2196F3]" />
+              <History className="w-5 h-5 text-primary" />
               Historial de Movimientos
             </DialogTitle>
             <DialogDescription>

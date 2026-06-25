@@ -77,7 +77,7 @@ const CustomAreaTooltip = ({ active, payload, label, formatPrice }: any) => {
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-2.5 shadow-lg text-xs">
         <p className="text-gray-500 mb-1">{label}</p>
-        <p className="font-semibold text-[#2196F3]">
+        <p className="font-semibold text-primary">
           {formatPrice(payload[0].value)}
         </p>
       </div>
@@ -234,10 +234,10 @@ export function ReportsView() {
   return (
     <div className="space-y-4 md:space-y-6 pb-6">
       {/* ── Header ── */}
-      <div className="bg-white p-4 md:p-6 rounded-lg border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h2 className="text-base md:text-lg font-medium text-gray-900 flex items-center gap-2">
-            <BarChart2 className="w-5 h-5 text-[#2196F3]" />
+            <BarChart2 className="w-5 h-5 text-primary" />
             Reportes y Estadísticas
           </h2>
           <p className="text-xs md:text-sm text-gray-500 mt-1">
@@ -290,7 +290,7 @@ export function ReportsView() {
               <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
                 Transacciones
               </p>
-              <ShoppingBag className="w-3.5 h-3.5 text-[#2196F3] flex-shrink-0" />
+              <ShoppingBag className="w-3.5 h-3.5 text-primary flex-shrink-0" />
             </div>
             <p className="text-base md:text-xl font-bold">
               {totalTransactions}
@@ -323,7 +323,7 @@ export function ReportsView() {
               <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
                 Mejor Vendedor
               </p>
-              <Users className="w-3.5 h-3.5 text-[#2196F3] flex-shrink-0" />
+              <Users className="w-3.5 h-3.5 text-primary flex-shrink-0" />
             </div>
             <p className="text-sm md:text-base font-bold truncate">
               {bestSeller?.[0]?.split(" ")[0] ?? "—"}
@@ -362,7 +362,7 @@ export function ReportsView() {
               <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
                 Ticket Promedio
               </p>
-              <ShoppingBag className="w-3.5 h-3.5 text-[#2196F3] flex-shrink-0" />
+              <ShoppingBag className="w-3.5 h-3.5 text-primary flex-shrink-0" />
             </div>
             <p className="text-base md:text-xl font-bold text-gray-900 truncate">
               {formatPrice(avgTicket)}
@@ -402,7 +402,7 @@ export function ReportsView() {
 
       {/* ── Low stock alert ── */}
       {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
           <h3 className="font-medium text-gray-900 mb-3 text-sm md:text-base flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-yellow-500" />
             Alertas de Inventario
@@ -492,7 +492,7 @@ export function ReportsView() {
             <CardTitle className="text-xs md:text-sm font-medium">
               Mejor Vendedor
             </CardTitle>
-            <Award className="h-4 w-4 text-[#2196F3]" />
+            <Award className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent className="px-4 pb-4">
             {bestSeller ? (
@@ -541,7 +541,7 @@ export function ReportsView() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           {/* Daily sales trend */}
           {dailySalesData.length >= 2 && (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6 lg:col-span-2">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 lg:col-span-2">
               <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
                 Tendencia de Ventas Diarias
               </h3>
@@ -593,7 +593,7 @@ export function ReportsView() {
 
           {/* Top products by revenue */}
           {topRevenueData.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
               <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
                 Top Ingresos por Producto
               </h3>
@@ -644,7 +644,7 @@ export function ReportsView() {
 
           {/* Top products by units */}
           {topUnitsData.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
               <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
                 Top Unidades Vendidas
               </h3>
@@ -694,7 +694,7 @@ export function ReportsView() {
 
           {/* Sales by user */}
           {userSalesData.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
               <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
                 Ventas por Vendedor
               </h3>
@@ -742,9 +742,9 @@ export function ReportsView() {
 
           {/* Payment methods breakdown */}
           {paymentMethodData.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
               <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-[#2196F3]" />
+                <CreditCard className="w-4 h-4 text-primary" />
                 Ventas por Método de Pago
               </h3>
               <ResponsiveContainer width="100%" height={220}>
@@ -778,7 +778,7 @@ export function ReportsView() {
 
           {/* Pie – revenue share by product */}
           {topRevenueData.length >= 2 && (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
               <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
                 Distribución de Ingresos
               </h3>
@@ -815,7 +815,7 @@ export function ReportsView() {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <BarChart2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">
             No hay datos para mostrar gráficas
@@ -828,7 +828,7 @@ export function ReportsView() {
 
       {/* ── Detailed table ── */}
       {hasData && (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
           <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
             Ranking de Productos por Ingresos
           </h3>
@@ -878,7 +878,7 @@ export function ReportsView() {
 
       {/* ── Profit leaders table ── */}
       {hasData && (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
           <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
             Productos Más Rentables (Ganancia)
           </h3>

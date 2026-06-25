@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { InventorySortControl } from "./inventory-sort-control";
+import { sortInventory, SortOption } from "../utils/sortInventory";
 
 interface SearchViewProps {
   onEditItem: (item: InventoryItem) => void;
@@ -36,6 +38,7 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
   const [typeFilter, setTypeFilter] = useState("all");
   const [brandFilter, setBrandFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<SortOption[]>([]);
 
   const isAdmin = currentUser?.role === "admin";
 
@@ -83,10 +86,15 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
     });
   }, [items, searchTerm, filterBy, typeFilter, brandFilter, stockFilter]);
 
+  const visibleItems = useMemo(
+    () => sortInventory(filteredItems, sortBy),
+    [filteredItems, sortBy],
+  );
+
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Search & Filters */}
-      <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-200 shadow-sm space-y-3 md:space-y-4">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3 md:space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
             <SlidersHorizontal className="w-4 h-4 text-gray-400" />
@@ -96,7 +104,7 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
             <Button
               size="sm"
               onClick={() => navigate("/")}
-              className="md:hidden bg-gray-900 hover:bg-gray-700 text-white h-8 px-3 text-xs flex items-center gap-1.5 rounded-lg"
+              className="md:hidden h-8 px-3 text-xs flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               Agregar
@@ -111,11 +119,11 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
               placeholder="Buscar productos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-9 md:h-10 border-gray-300 focus:border-gray-900 text-sm rounded-xl"
+              className="pl-9 h-9 md:h-10 text-sm"
             />
           </div>
           <Select value={filterBy} onValueChange={setFilterBy}>
-            <SelectTrigger className="w-full sm:w-[140px] h-9 md:h-10 border-gray-300 text-sm rounded-xl">
+            <SelectTrigger className="w-full sm:w-[140px] h-9 md:h-10 text-sm">
               <SelectValue placeholder="Buscar por" />
             </SelectTrigger>
             <SelectContent>
@@ -124,11 +132,16 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
               <SelectItem value="barcode">Código</SelectItem>
             </SelectContent>
           </Select>
+          <InventorySortControl
+            value={sortBy}
+            onChange={setSortBy}
+            className="h-9 md:h-10 sm:w-[180px]"
+          />
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-9 border-gray-300 text-sm rounded-xl">
+            <SelectTrigger className="h-9 text-sm">
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -142,7 +155,7 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
           </Select>
 
           <Select value={brandFilter} onValueChange={setBrandFilter}>
-            <SelectTrigger className="h-9 border-gray-300 text-sm rounded-xl">
+            <SelectTrigger className="h-9 text-sm">
               <SelectValue placeholder="Marca" />
             </SelectTrigger>
             <SelectContent>
@@ -156,7 +169,7 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
           </Select>
 
           <Select value={stockFilter} onValueChange={setStockFilter}>
-            <SelectTrigger className="h-9 border-gray-300 text-sm rounded-xl col-span-2 sm:col-span-1">
+            <SelectTrigger className="h-9 text-sm col-span-2 sm:col-span-1">
               <SelectValue placeholder="Stock" />
             </SelectTrigger>
             <SelectContent>
@@ -170,13 +183,13 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
         </div>
 
         <p className="text-xs text-gray-500">
-          {filteredItems.length} resultado{filteredItems.length !== 1 ? "s" : ""}
+          {visibleItems.length} resultado{visibleItems.length !== 1 ? "s" : ""}
         </p>
       </div>
 
       {/* Product Grid */}
-      {filteredItems.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-10 md:p-14 text-center">
+      {visibleItems.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-10 md:p-14 text-center">
           <h3 className="text-gray-900 text-sm mb-1">
             No hay productos encontrados
           </h3>
@@ -186,7 +199,7 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-          {filteredItems.map((item) => (
+          {visibleItems.map((item) => (
             <ProductCard key={item.id} item={item} onAddToCart={addToCart} />
           ))}
         </div>

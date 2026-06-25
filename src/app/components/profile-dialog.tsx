@@ -23,8 +23,7 @@ export function ProfileDialog({
     currentUser,
     updateOwnName,
     requestEmailChange,
-    requestPasswordReset,
-    confirmPasswordReset,
+    updateOwnPassword,
   } = useAuth();
 
   const [name, setName] = useState(currentUser?.name || "");
@@ -33,9 +32,8 @@ export function ProfileDialog({
   const [newEmail, setNewEmail] = useState("");
   const [emailMsg, setEmailMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  const [codeRequested, setCodeRequested] = useState(false);
-  const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [passMsg, setPassMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
@@ -46,9 +44,8 @@ export function ProfileDialog({
     setNameMsg(null);
     setNewEmail("");
     setEmailMsg(null);
-    setCodeRequested(false);
-    setCode("");
     setNewPassword("");
+    setConfirmPassword("");
     setPassMsg(null);
   };
 
@@ -72,25 +69,17 @@ export function ProfileDialog({
     );
   };
 
-  const handleRequestCode = async () => {
+  const handleUpdatePassword = async () => {
     setPassMsg(null);
-    const result = await requestPasswordReset();
-    if (result.success) {
-      setCodeRequested(true);
-      setPassMsg({ type: "ok", text: "Se envió un código a tu correo" });
-    } else {
-      setPassMsg({ type: "err", text: result.error || "Error al enviar código" });
+    if (newPassword !== confirmPassword) {
+      setPassMsg({ type: "err", text: "Las contraseñas no coinciden" });
+      return;
     }
-  };
-
-  const handleConfirmPassword = async () => {
-    setPassMsg(null);
-    const result = await confirmPasswordReset(code, newPassword);
+    const result = await updateOwnPassword(newPassword);
     if (result.success) {
       setPassMsg({ type: "ok", text: "Contraseña actualizada" });
-      setCodeRequested(false);
-      setCode("");
       setNewPassword("");
+      setConfirmPassword("");
     } else {
       setPassMsg({ type: "err", text: result.error || "Error al actualizar contraseña" });
     }
@@ -107,7 +96,7 @@ export function ProfileDialog({
       <DialogContent className="max-w-lg bg-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <User className="w-5 h-5 text-[#2196F3]" />
+            <User className="w-5 h-5 text-primary" />
             Mi Perfil
           </DialogTitle>
           <DialogDescription>
@@ -124,7 +113,7 @@ export function ProfileDialog({
               <Button
                 onClick={handleSaveName}
                 disabled={!name.trim() || name === currentUser.name}
-                className="bg-[#2196F3] hover:bg-[#1976D2] text-white shrink-0"
+                className="shrink-0"
               >
                 <Save className="w-4 h-4" />
               </Button>
@@ -158,7 +147,7 @@ export function ProfileDialog({
               <Button
                 onClick={handleRequestEmail}
                 disabled={!newEmail.trim()}
-                className="bg-[#2196F3] hover:bg-[#1976D2] text-white shrink-0"
+                className="shrink-0"
               >
                 Enviar
               </Button>
@@ -186,50 +175,43 @@ export function ProfileDialog({
               Cambiar Contraseña
             </Label>
 
-            {!codeRequested ? (
+            <div className="space-y-2">
+              <div className="relative">
+                <Input
+                  type={showPass ? "text" : "password"}
+                  placeholder="Nueva contraseña"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(!showPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPass ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              <Input
+                type={showPass ? "text" : "password"}
+                placeholder="Confirmar contraseña"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
               <Button
-                onClick={handleRequestCode}
-                variant="outline"
+                onClick={handleUpdatePassword}
+                disabled={
+                  newPassword.length < 6 || newPassword !== confirmPassword
+                }
                 className="w-full"
               >
-                Enviar código a mi correo
+                Actualizar Contraseña
               </Button>
-            ) : (
-              <div className="space-y-2">
-                <Input
-                  placeholder="Código de 6 dígitos"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                />
-                <div className="relative">
-                  <Input
-                    type={showPass ? "text" : "password"}
-                    placeholder="Nueva contraseña"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass(!showPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPass ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-                <Button
-                  onClick={handleConfirmPassword}
-                  disabled={!code.trim() || newPassword.length < 6}
-                  className="w-full bg-[#2196F3] hover:bg-[#1976D2] text-white"
-                >
-                  Confirmar Nueva Contraseña
-                </Button>
-              </div>
-            )}
+            </div>
 
             {passMsg && (
               <p

@@ -72,7 +72,7 @@ function LoginDialog({
       <DialogContent className="max-w-sm bg-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <LogIn className="w-5 h-5 text-[#2196F3]" />
+            <LogIn className="w-5 h-5 text-primary" />
             Iniciar Sesión
           </DialogTitle>
           <DialogDescription>
@@ -124,7 +124,7 @@ function LoginDialog({
 
           <Button
             onClick={handleSubmit}
-            className="w-full bg-[#2196F3] hover:bg-[#1976D2] text-white"
+            className="w-full"
           >
             Entrar
           </Button>
@@ -195,7 +195,7 @@ function UserManagementDialog({
       <DialogContent className="max-w-lg bg-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-[#2196F3]" />
+            <Users className="w-5 h-5 text-primary" />
             Gestión de Usuarios
           </DialogTitle>
           <DialogDescription>
@@ -209,7 +209,7 @@ function UserManagementDialog({
             onClick={() => setTab("list")}
             className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
               tab === "list"
-                ? "bg-white text-[#2196F3] shadow-sm"
+                ? "bg-white text-primary shadow-sm"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -219,7 +219,7 @@ function UserManagementDialog({
             onClick={() => setTab("create")}
             className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
               tab === "create"
-                ? "bg-white text-[#2196F3] shadow-sm"
+                ? "bg-white text-primary shadow-sm"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -239,7 +239,7 @@ function UserManagementDialog({
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                       u.role === "admin"
-                        ? "bg-blue-100 text-[#2196F3]"
+                        ? "bg-blue-100 text-primary"
                         : "bg-green-100 text-green-700"
                     }`}
                   >
@@ -396,7 +396,7 @@ function UserManagementDialog({
 
             <Button
               onClick={handleCreate}
-              className="w-full bg-[#2196F3] hover:bg-[#1976D2] text-white"
+              className="w-full"
             >
               <Plus className="w-4 h-4 mr-2" />
               Crear Usuario
@@ -443,11 +443,11 @@ export function InventoryHeader() {
             <div className="flex items-center gap-6 justify-between md:justify-start w-full md:w-auto">
               {/* Logo */}
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-[#2196F3] rounded-lg flex items-center justify-center">
+                <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
                   <Package className="w-4 h-4 text-white" strokeWidth={1.5} />
                 </div>
                 <div>
-                  <h1 className="text-[#1A1A1A] tracking-tight text-base font-semibold leading-none">
+                  <h1 className="text-gray-900 tracking-tight text-base font-semibold leading-none">
                     Inventario
                   </h1>
                   <p className="text-xs text-gray-400 font-light mt-0.5">
@@ -463,7 +463,7 @@ export function InventoryHeader() {
                     to="/"
                     className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                       isDashboard
-                        ? "bg-white text-[#2196F3] shadow-sm"
+                        ? "bg-white text-primary shadow-sm"
                         : "text-gray-500 hover:text-gray-900"
                     }`}
                   >
@@ -475,7 +475,7 @@ export function InventoryHeader() {
                   to="/search"
                   className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                     isSearch
-                      ? "bg-white text-[#2196F3] shadow-sm"
+                      ? "bg-white text-primary shadow-sm"
                       : "text-gray-500 hover:text-gray-900"
                   }`}
                 >
@@ -486,7 +486,7 @@ export function InventoryHeader() {
                   to="/total"
                   className={`relative flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                     isTotal
-                      ? "bg-white text-[#2196F3] shadow-sm"
+                      ? "bg-white text-primary shadow-sm"
                       : "text-gray-500 hover:text-gray-900"
                   }`}
                 >
@@ -500,7 +500,7 @@ export function InventoryHeader() {
                   </span>
                   Total
                   {totalAmount > 0 && (
-                    <span className="ml-2 text-xs font-semibold text-[#2196F3]">
+                    <span className="ml-2 text-xs font-semibold text-primary">
                       {formatPrice(totalAmount)}
                     </span>
                   )}
@@ -509,7 +509,7 @@ export function InventoryHeader() {
                   to="/history"
                   className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                     isHistory
-                      ? "bg-white text-[#2196F3] shadow-sm"
+                      ? "bg-white text-primary shadow-sm"
                       : "text-gray-500 hover:text-gray-900"
                   }`}
                 >
@@ -521,7 +521,7 @@ export function InventoryHeader() {
                     to="/reports"
                     className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                       isReports
-                        ? "bg-white text-[#2196F3] shadow-sm"
+                        ? "bg-white text-primary shadow-sm"
                         : "text-gray-500 hover:text-gray-900"
                     }`}
                   >
@@ -539,7 +539,7 @@ export function InventoryHeader() {
                 value={currency}
                 onValueChange={(val: any) => setCurrency(val)}
               >
-                <SelectTrigger className="w-[90px] md:w-[100px] border-gray-300 rounded-lg h-8 text-xs md:text-sm">
+                <SelectTrigger className="w-[90px] md:w-[100px] h-8 text-xs md:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -556,7 +556,7 @@ export function InventoryHeader() {
                     onClick={() => setShowUserMenu(!showUserMenu)}
                     className="flex items-center gap-2 h-8 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-sm"
                   >
-                    <div className="w-5 h-5 rounded-full bg-[#2196F3] flex items-center justify-center flex-shrink-0">
+                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                       <User className="w-3 h-3 text-white" />
                     </div>
                     <span className="hidden sm:block text-gray-700 font-medium max-w-[100px] truncate">
@@ -625,7 +625,7 @@ export function InventoryHeader() {
               ) : (
                 <button
                   onClick={() => setShowLogin(true)}
-                  className="flex items-center gap-2 h-8 px-3 rounded-lg bg-[#2196F3] hover:bg-[#1976D2] text-white text-sm font-medium transition-colors"
+                  className="flex items-center gap-2 h-8 px-3 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-colors"
                 >
                   <LogIn className="w-4 h-4" />
                   <span className="hidden sm:block">Iniciar Sesión</span>
@@ -643,7 +643,7 @@ export function InventoryHeader() {
             <Link
               to="/"
               className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-                isDashboard ? "text-[#2196F3]" : "text-gray-500"
+                isDashboard ? "text-primary" : "text-gray-500"
               }`}
             >
               <LayoutGrid className="w-4 h-4" />
@@ -653,7 +653,7 @@ export function InventoryHeader() {
           <Link
             to="/search"
             className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-              isSearch ? "text-[#2196F3]" : "text-gray-500"
+              isSearch ? "text-primary" : "text-gray-500"
             }`}
           >
             <Search className="w-4 h-4" />
@@ -662,7 +662,7 @@ export function InventoryHeader() {
           <Link
             to="/total"
             className={`relative flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-              isTotal ? "text-[#2196F3]" : "text-gray-500"
+              isTotal ? "text-primary" : "text-gray-500"
             }`}
           >
             <span className="relative">
@@ -680,7 +680,7 @@ export function InventoryHeader() {
           <Link
             to="/history"
             className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-              isHistory ? "text-[#2196F3]" : "text-gray-500"
+              isHistory ? "text-primary" : "text-gray-500"
             }`}
           >
             <History className="w-4 h-4" />
@@ -690,7 +690,7 @@ export function InventoryHeader() {
             <Link
               to="/reports"
               className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-                isReports ? "text-[#2196F3]" : "text-gray-500"
+                isReports ? "text-primary" : "text-gray-500"
               }`}
             >
               <BarChart2 className="w-4 h-4" />

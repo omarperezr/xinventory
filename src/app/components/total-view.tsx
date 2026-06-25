@@ -212,13 +212,13 @@ export function TotalView({ onCheckout }: TotalViewProps) {
         {/* ── Main cart ── */}
         <div className="flex-1 space-y-4">
           {/* Header */}
-          <div className="bg-white p-4 md:p-6 rounded-lg border border-gray-200 shadow-sm space-y-3">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm md:text-lg font-medium text-gray-900 flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-[#2196F3]" />
+                <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                 Lista Actual
                 {cartItems.length > 0 && (
-                  <span className="text-xs bg-[#2196F3] text-white rounded-full px-2 py-0.5">
+                  <span className="text-xs bg-primary text-white rounded-full px-2 py-0.5">
                     {cartItems.length}
                   </span>
                 )}
@@ -236,7 +236,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                 <Button
                   onClick={saveCart}
                   disabled={cartItems.length === 0}
-                  className="bg-[#2196F3] hover:bg-[#1976D2] text-white h-8 px-2 md:px-3 text-xs"
+                  className="h-8 px-2 md:px-3 text-xs"
                 >
                   <Save className="w-3.5 h-3.5 md:mr-1.5" />
                   <span className="hidden md:inline">Guardar</span>
@@ -257,7 +257,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
           </div>
 
           {/* Cart items */}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
             {cartItems.length === 0 ? (
               <div className="p-10 text-center">
                 <ShoppingCart className="w-10 h-10 text-gray-300 mx-auto mb-2" />
@@ -294,7 +294,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         return (
                           <tr key={item.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
-                              <div className="font-medium text-[#1A1A1A]">
+                              <div className="font-medium text-gray-900">
                                 {item.name}
                               </div>
                               <div className="text-xs text-gray-500 font-mono">
@@ -374,7 +374,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                 </button>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-right font-medium text-[#1A1A1A]">
+                            <td className="px-6 py-4 text-right font-medium text-gray-900">
                               {item.applyDiscount && item.discount > 0 ? (
                                 <div className="flex flex-col items-end">
                                   <span className="text-xs text-gray-400 line-through">
@@ -451,7 +451,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                           {isOverpaid ? "Cambio Pendiente:" : "Total a Pagar:"}
                         </td>
                         <td
-                          className={`px-6 py-4 text-right text-xl font-bold ${isOverpaid ? "text-red-600" : "text-[#2196F3]"}`}
+                          className={`px-6 py-4 text-right text-xl font-bold ${isOverpaid ? "text-red-600" : "text-primary"}`}
                         >
                           {formatPrice(Math.abs(remainingDue))}
                         </td>
@@ -473,7 +473,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         <div key={item.id} className="p-3">
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-[#1A1A1A] truncate">
+                              <p className="text-sm font-medium text-gray-900 truncate">
                                 {item.name}
                               </p>
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -526,7 +526,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                     </p>
                                   </>
                                 ) : (
-                                  <p className="text-sm font-semibold text-[#1A1A1A]">
+                                  <p className="text-sm font-semibold text-gray-900">
                                     {formatPrice(
                                       finalPrice * item.cartQuantity,
                                     )}
@@ -603,7 +603,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                       </div>
                     ))}
                     <div
-                      className={`flex justify-between text-base font-bold pt-1.5 border-t border-gray-200 ${isOverpaid ? "text-red-600" : "text-[#2196F3]"}`}
+                      className={`flex justify-between text-base font-bold pt-1.5 border-t border-gray-200 ${isOverpaid ? "text-red-600" : "text-primary"}`}
                     >
                       <span>{isOverpaid ? "Cambio" : "Total"}</span>
                       <span>{formatPrice(Math.abs(remainingDue))}</span>
@@ -630,7 +630,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
 
         {/* ── Saved carts sidebar ── */}
         <div className="w-full md:w-72 space-y-3">
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
             <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2 text-sm">
               <RotateCcw className="w-4 h-4 text-gray-500" />
               Listas Guardadas
@@ -644,7 +644,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                 {savedCarts.map((cart) => (
                   <div
                     key={cart.id}
-                    className="p-3 rounded-lg border border-gray-200 hover:border-[#2196F3] hover:bg-blue-50 transition-all cursor-pointer group relative"
+                    className="p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-blue-50 transition-all cursor-pointer group relative"
                     onClick={() => loadCart(cart)}
                   >
                     <div className="font-medium text-xs text-gray-900 mb-1 pr-5 truncate">
@@ -690,7 +690,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                 {isOverpaid ? "Cambio:" : "Total:"}
               </p>
               <p
-                className={`text-lg font-bold ${isOverpaid ? "text-red-600" : "text-[#2196F3]"}`}
+                className={`text-lg font-bold ${isOverpaid ? "text-red-600" : "text-primary"}`}
               >
                 {formatPrice(Math.abs(remainingDue))}
               </p>
@@ -708,12 +708,12 @@ export function TotalView({ onCheckout }: TotalViewProps) {
 
       {/* ── Payment modal ── */}
       <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
-        <DialogContent className="sm:max-w-md bg-white w-[calc(100vw-2rem)] rounded-xl">
+        <DialogContent className="sm:max-w-md bg-white w-[calc(100vw-2rem)]">
           <DialogHeader>
             <DialogTitle>Procesar Pago</DialogTitle>
             <DialogDescription>
               Restante:{" "}
-              <span className="font-bold text-[#2196F3]">
+              <span className="font-bold text-primary">
                 {formatPrice(remainingDue)}
               </span>
             </DialogDescription>
@@ -772,7 +772,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
             <Button
               onClick={handleAddPayment}
               disabled={processing}
-              className="bg-[#2196F3] hover:bg-[#1976D2] w-full sm:w-auto disabled:opacity-60"
+              className="w-full sm:w-auto disabled:opacity-60"
             >
               {processing ? (
                 <span className="flex items-center gap-2">
@@ -794,7 +794,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
           if (!o) handleCompleteTransaction(pendingPayments);
         }}
       >
-        <DialogContent className="sm:max-w-md bg-white border-red-100 w-[calc(100vw-2rem)] rounded-xl">
+        <DialogContent className="sm:max-w-md bg-white border-red-100 w-[calc(100vw-2rem)]">
           <DialogHeader>
             <DialogTitle className="text-red-600 flex items-center gap-2">
               <Banknote className="w-6 h-6" />

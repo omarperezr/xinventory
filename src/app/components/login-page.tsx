@@ -34,10 +34,10 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo / Brand */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 bg-[#2196F3] rounded-xl flex items-center justify-center shadow-lg mb-4">
+          <div className="w-14 h-14 bg-primary rounded-xl flex items-center justify-center shadow-lg mb-4">
             <Package className="w-7 h-7 text-white" strokeWidth={1.5} />
           </div>
-          <h1 className="text-2xl font-semibold text-[#1A1A1A] tracking-tight">
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
             Inventario
           </h1>
           <p className="text-sm text-gray-500 font-light mt-1">
@@ -46,9 +46,9 @@ export function LoginPage() {
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8">
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-[#1A1A1A]">
+            <h2 className="text-lg font-semibold text-gray-900">
               Iniciar sesión
             </h2>
             <p className="text-sm text-gray-500 mt-1">
@@ -60,7 +60,6 @@ export function LoginPage() {
             <div className="space-y-1.5">
               <Label
                 htmlFor="email"
-                className="text-sm font-medium text-gray-700"
               >
                 Correo electrónico
               </Label>
@@ -70,7 +69,7 @@ export function LoginPage() {
                 placeholder="correo@ejemplo.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-10 border-gray-300 focus:border-[#2196F3] focus:ring-[#2196F3]"
+                className="h-10"
                 autoComplete="email"
                 required
               />
@@ -79,7 +78,6 @@ export function LoginPage() {
             <div className="space-y-1.5">
               <Label
                 htmlFor="password"
-                className="text-sm font-medium text-gray-700"
               >
                 Contraseña
               </Label>
@@ -90,7 +88,7 @@ export function LoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-10 border-gray-300 focus:border-[#2196F3] focus:ring-[#2196F3] pr-10"
+                  className="h-10 pr-10"
                   autoComplete="current-password"
                   required
                 />
@@ -117,7 +115,7 @@ export function LoginPage() {
             <Button
               type="submit"
               disabled={loading || !email || !password}
-              className="w-full h-10 bg-[#2196F3] hover:bg-[#1976D2] text-white font-medium mt-2 disabled:opacity-50"
+              className="w-full h-10 mt-2"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

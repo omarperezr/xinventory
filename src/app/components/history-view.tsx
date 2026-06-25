@@ -115,9 +115,9 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
   return (
     <div className="space-y-4 md:space-y-6 pb-6">
       {/* ── Header / Search ── */}
-      <div className="bg-white p-4 md:p-6 rounded-lg border border-gray-200 shadow-sm space-y-3">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3">
         <h2 className="text-base md:text-lg font-medium text-gray-900 flex items-center gap-2">
-          <History className="w-5 h-5 text-[#2196F3]" />
+          <History className="w-5 h-5 text-primary" />
           Historial de Transacciones
         </h2>
         <div className="relative">
@@ -139,12 +139,12 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
           {isAdmin && (
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-              <input
+              <Input
                 list="history-sellers"
                 placeholder="Filtrar por vendedor…"
                 value={userFilter}
                 onChange={(e) => setUserFilter(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 text-sm rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30"
+                className="pl-9 pr-3 h-9 text-sm"
               />
               <datalist id="history-sellers">
                 {sellers.map((s) => (
@@ -155,24 +155,24 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
           )}
           <div className="relative">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            <input
+            <Input
               type="date"
               aria-label="Desde"
               value={dateFrom}
               max={dateTo || undefined}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full h-9 pl-9 pr-2 text-sm rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30"
+              className="pl-9 pr-2 h-9 text-sm"
             />
           </div>
           <div className="relative">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            <input
+            <Input
               type="date"
               aria-label="Hasta"
               value={dateTo}
               min={dateFrom || undefined}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full h-9 pl-9 pr-2 text-sm rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30"
+              className="pl-9 pr-2 h-9 text-sm"
             />
           </div>
         </div>
@@ -185,7 +185,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
             </p>
             <button
               onClick={clearFilters}
-              className="text-xs text-[#2196F3] hover:underline flex items-center gap-1"
+              className="text-xs text-primary hover:underline flex items-center gap-1"
             >
               <X className="w-3 h-3" />
               Limpiar filtros
@@ -196,12 +196,12 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
 
       {/* ── List ── */}
       {visibleTransactions.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <Receipt className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">No hay transacciones aún</p>
         </div>
       ) : filteredTransactions.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">
             Ninguna transacción coincide con los filtros
@@ -210,7 +210,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
       ) : (
         <>
           {/* Desktop table – hidden on mobile */}
-          <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -263,7 +263,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                           ({t.items.reduce((a, i) => a + i.cartQuantity, 0)} u)
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right font-medium text-[#1A1A1A]">
+                      <td className="px-6 py-4 text-right font-medium text-gray-900">
                         {formatPrice(t.total)}
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -281,7 +281,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
             {filteredTransactions.map((t) => (
               <button
                 key={t.id}
-                className="w-full bg-white rounded-lg border border-gray-200 shadow-sm p-4 text-left active:bg-gray-50 transition-colors"
+                className="w-full bg-white rounded-xl border border-gray-200 shadow-sm p-4 text-left active:bg-gray-50 transition-colors"
                 onClick={() => setSelectedId(t.id)}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -317,7 +317,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                     </p>
                   </div>
                   <div className="flex flex-col items-end flex-shrink-0 gap-1">
-                    <span className="text-base font-bold text-[#2196F3]">
+                    <span className="text-base font-bold text-primary">
                       {formatPrice(t.total)}
                     </span>
                     <ChevronRight className="w-4 h-4 text-gray-300" />
@@ -334,7 +334,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
         open={!!selectedTransaction}
         onOpenChange={(open) => !open && setSelectedId(null)}
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-white w-[calc(100vw-2rem)] md:w-full rounded-xl flex flex-col p-4 md:p-5">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-white w-[calc(100vw-2rem)] md:w-full flex flex-col p-4 md:p-5">
           <DialogHeader className="gap-1">
             <DialogTitle className="text-sm md:text-base">
               Detalles de Transacción
@@ -408,7 +408,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                       >
                         Total Pagado:
                       </td>
-                      <td className="px-3 py-1.5 text-right font-bold text-[#2196F3]">
+                      <td className="px-3 py-1.5 text-right font-bold text-primary">
                         {formatPrice(selectedTransaction.total)}
                       </td>
                       <td />
@@ -440,7 +440,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                       <span>Impuestos (10%)</span>
                       <span>{formatPrice(selectedTransaction.tax)}</span>
                     </div>
-                    <div className="flex justify-between text-sm font-bold text-[#2196F3] pt-1 border-t border-gray-200">
+                    <div className="flex justify-between text-sm font-bold text-primary pt-1 border-t border-gray-200">
                       <span>Total Pagado</span>
                       <span>{formatPrice(selectedTransaction.total)}</span>
                     </div>
@@ -451,7 +451,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
               {/* Payment details */}
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2">
                 <h3 className="font-medium text-gray-900 flex items-center gap-2 text-xs">
-                  <CreditCard className="w-3.5 h-3.5 text-[#2196F3]" />
+                  <CreditCard className="w-3.5 h-3.5 text-primary" />
                   Detalles del Pago
                 </h3>
                 <div className="grid gap-1">
@@ -502,7 +502,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
               {/* Images */}
               <div className="space-y-2">
                 <h3 className="font-medium text-gray-900 flex items-center gap-2 text-xs">
-                  <ImageIcon className="w-3.5 h-3.5 text-[#2196F3]" />
+                  <ImageIcon className="w-3.5 h-3.5 text-primary" />
                   Adjuntos (Facturas/Recibos)
                 </h3>
                 <div className="grid grid-cols-5 md:grid-cols-8 gap-2">

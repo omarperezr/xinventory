@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { Package } from "lucide-react";
 import { InventoryHeader } from "./components/inventory-header";
 import { LoginPage } from "./components/login-page";
+import { OfflineSync } from "./components/offline-sync";
 
 const AdminView = lazy(() =>
   import("./components/admin-view").then((m) => ({ default: m.AdminView })),
@@ -157,6 +158,7 @@ function AppContent() {
       />
 
       <InventoryHeader />
+      <OfflineSync />
 
       <main className="max-w-7xl mx-auto px-4 md:px-8 py-4 md:py-8">
         <Suspense

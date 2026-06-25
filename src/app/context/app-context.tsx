@@ -7,6 +7,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { supabase } from "../services/supabase";
+import * as offlineStore from "../utils/offlineStore";
 
 export type UnitType = "units" | "kg" | "liters";
 
@@ -61,6 +62,7 @@ export interface SavedCart {
 interface AppContextType {
   // Inventory
   items: InventoryItem[];
+  refreshData: () => Promise<void>;
   addItem: (item: Omit<InventoryItem, "id" | "history">, user: string) => Promise<void>;
   updateItem: (
     item: InventoryItem,
@@ -69,6 +71,11 @@ interface AppContextType {
     silent?: boolean,
   ) => Promise<void>;
   deleteItem: (id: string, user: string) => Promise<void>;
+  deleteItems: (ids: string[], user: string) => Promise<void>;
+  importItems: (
+    rows: Omit<InventoryItem, "id" | "history" | "images" | "currency">[],
+    user: string,
+  ) => Promise<{ created: number; updated: number }>;
 
   // Currency — prices are stored in USD; rates convert USD -> BS/EUR for display
   currency: "BS" | "USD" | "EUR";
@@ -160,6 +167,29 @@ function mapRow(row: any, historyRows: any[]): InventoryItem {
   };
 }
 
+const ACTIVE_CART_KEY = "xinventory-active-cart";
+
+interface PersistedActiveCart {
+  cartItems: CartItem[];
+  currentPayments: PaymentRecord[];
+  transactionNotes: string;
+}
+
+function loadActiveCart(): PersistedActiveCart {
+  try {
+    const raw = localStorage.getItem(ACTIVE_CART_KEY);
+    if (!raw) return { cartItems: [], currentPayments: [], transactionNotes: "" };
+    const parsed = JSON.parse(raw);
+    return {
+      cartItems: parsed.cartItems || [],
+      currentPayments: parsed.currentPayments || [],
+      transactionNotes: parsed.transactionNotes || "",
+    };
+  } catch {
+    return { cartItems: [], currentPayments: [], transactionNotes: "" };
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   // Inventory State
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -168,24 +198,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currency, setCurrency] = useState<"BS" | "USD" | "EUR">("USD");
   const [rates, setRates] = useState({ USD: 36.5, EUR: 39.2 });
 
-  // Cart State
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  // Cart State — the in-progress cart is restored from localStorage so a
+  // refresh or offline reload doesn't lose it (savedCarts below are
+  // explicitly-saved separate lists).
+  const initialActiveCart = loadActiveCart();
+  const [cartItems, setCartItems] = useState<CartItem[]>(initialActiveCart.cartItems);
   const [savedCarts, setSavedCarts] = useState<SavedCart[]>([]);
-  const [currentPayments, setCurrentPayments] = useState<PaymentRecord[]>([]);
-  const [transactionNotes, setTransactionNotes] = useState("");
+  const [currentPayments, setCurrentPayments] = useState<PaymentRecord[]>(
+    initialActiveCart.currentPayments,
+  );
+  const [transactionNotes, setTransactionNotes] = useState(initialActiveCart.transactionNotes);
 
   // --- PERSISTENCE & INITIALIZATION ---
+  // Network-first with an IndexedDB fallback, so the inventory and cart stay
+  // usable offline; see utils/offlineStore.ts for the cache/outbox logic.
   const refreshData = async () => {
     try {
-      const [{ data: itemRows, error: itemsErr }, { data: historyRows, error: histErr }] =
-        await Promise.all([
-          supabase.from("items").select("*").order("created_at", { ascending: false }),
-          supabase.from("item_history").select("*").order("date", { ascending: false }),
-        ]);
-      if (itemsErr) throw itemsErr;
-      if (histErr) throw histErr;
-
-      setItems((itemRows || []).map((row) => mapRow(row, historyRows || [])));
+      const { itemRows, historyRows, offline } = await offlineStore.fetchInventory();
+      setItems(itemRows.map((row) => mapRow(row, historyRows)));
+      if (offline) return;
 
       const { data: settingsRow } = await supabase
         .from("settings")
@@ -213,24 +244,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") refreshData();
     });
-    return () => sub.subscription.unsubscribe();
+
+    // Flush any queued offline writes as soon as connectivity returns.
+    const handleOnline = () => {
+      offlineStore.flushOutbox().then(refreshData);
+    };
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      sub.subscription.unsubscribe();
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
   useEffect(() => {
     localStorage.setItem("savedCarts", JSON.stringify(savedCarts));
   }, [savedCarts]);
 
+  useEffect(() => {
+    const active: PersistedActiveCart = { cartItems, currentPayments, transactionNotes };
+    localStorage.setItem(ACTIVE_CART_KEY, JSON.stringify(active));
+  }, [cartItems, currentPayments, transactionNotes]);
+
   // --- INVENTORY ACTIONS ---
+  // Each action below writes through utils/offlineStore.ts, which attempts
+  // the Supabase call immediately and transparently queues it (replayed once
+  // back online) if the network is unavailable.
   const addItem = async (
     rawItemData: Omit<InventoryItem, "id" | "history">,
     user: string,
   ) => {
     const newItemData = normalizeItemText(rawItemData);
+    const id = crypto.randomUUID();
 
     try {
-      const { data: inserted, error } = await supabase
-        .from("items")
-        .insert({
+      const { queued } = await offlineStore.createItem(
+        {
+          id,
           name: newItemData.name,
           barcode: newItemData.barcode,
           buying_price_usd: newItemData.buyingPrice,
@@ -243,21 +293,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           type: newItemData.type || "UNASSIGNED",
           brand: newItemData.brand || "GENERIC",
           notes: newItemData.notes || "",
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
-
-      await supabase.from("item_history").insert({
-        item_id: inserted.id,
-        action: "create",
-        details: "Producto creado inicialmente",
-        user_name: user,
-        new_stock: newItemData.quantity,
-      });
+        },
+        {
+          item_id: id,
+          action: "create",
+          details: "Producto creado inicialmente",
+          user_name: user,
+          new_stock: newItemData.quantity,
+        },
+      );
 
       await refreshData();
-      toast.success("Producto agregado exitosamente");
+      toast.success(
+        queued ? "Producto guardado localmente (sin conexión)" : "Producto agregado exitosamente",
+      );
     } catch (e) {
       console.error(e);
       toast.error("Error al guardar en Supabase");
@@ -273,10 +322,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const updatedItem = normalizeItemText(rawUpdatedItem);
     const oldItem = items.find((i) => i.id === updatedItem.id);
 
+    const historyRow =
+      oldItem && oldItem.quantity !== updatedItem.quantity
+        ? {
+            item_id: updatedItem.id,
+            action: "update" as const,
+            details: `Stock modificado: ${oldItem.quantity} -> ${updatedItem.quantity}. ${notes ? `Notas: ${notes}` : ""}`,
+            user_name: user,
+            previous_stock: oldItem.quantity,
+            new_stock: updatedItem.quantity,
+          }
+        : notes
+          ? {
+              item_id: updatedItem.id,
+              action: "update" as const,
+              details: `Actualización: ${notes}`,
+              user_name: user,
+            }
+          : undefined;
+
     try {
-      const { error } = await supabase
-        .from("items")
-        .update({
+      const { queued } = await offlineStore.updateItem(
+        updatedItem.id,
+        {
           name: updatedItem.name,
           barcode: updatedItem.barcode,
           buying_price_usd: updatedItem.buyingPrice,
@@ -290,30 +358,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           brand: updatedItem.brand || "GENERIC",
           notes: updatedItem.notes || "",
           updated_at: new Date().toISOString(),
-        })
-        .eq("id", updatedItem.id);
-      if (error) throw error;
-
-      if (oldItem && oldItem.quantity !== updatedItem.quantity) {
-        await supabase.from("item_history").insert({
-          item_id: updatedItem.id,
-          action: "update",
-          details: `Stock modificado: ${oldItem.quantity} -> ${updatedItem.quantity}. ${notes ? `Notas: ${notes}` : ""}`,
-          user_name: user,
-          previous_stock: oldItem.quantity,
-          new_stock: updatedItem.quantity,
-        });
-      } else if (notes) {
-        await supabase.from("item_history").insert({
-          item_id: updatedItem.id,
-          action: "update",
-          details: `Actualización: ${notes}`,
-          user_name: user,
-        });
-      }
+        },
+        historyRow,
+      );
 
       await refreshData();
-      if (!silent) toast.success("Producto actualizado");
+      if (!silent)
+        toast.success(queued ? "Cambios guardados localmente (sin conexión)" : "Producto actualizado");
     } catch (e) {
       console.error(e);
       toast.error("Error al actualizar");
@@ -322,13 +373,123 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteItem = async (id: string, _user: string) => {
     try {
-      const { error } = await supabase.from("items").delete().eq("id", id);
-      if (error) throw error;
+      const { queued } = await offlineStore.deleteItem(id);
       await refreshData();
-      toast.success("Producto eliminado");
+      toast.success(queued ? "Eliminación guardada localmente (sin conexión)" : "Producto eliminado");
     } catch (e) {
       console.error(e);
       toast.error("Error al eliminar");
+    }
+  };
+
+  const deleteItems = async (ids: string[], user: string) => {
+    if (ids.length === 0) return;
+    try {
+      const historyRows = ids.map((id) => ({
+        item_id: id,
+        action: "delete" as const,
+        details: "Eliminación masiva",
+        user_name: user,
+      }));
+      const { queued } = await offlineStore.bulkDeleteItems(ids, historyRows);
+      // Avoid a full refetch of the (potentially large) items + history
+      // tables just to reflect a delete we already know the result of.
+      const idSet = new Set(ids);
+      setItems((prev) => prev.filter((i) => !idSet.has(i.id)));
+      toast.success(
+        queued
+          ? `${ids.length} producto(s) eliminados localmente (sin conexión)`
+          : `${ids.length} producto(s) eliminados`,
+      );
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al eliminar productos");
+    }
+  };
+
+  // Bulk import from Excel: matches each row against the currently loaded
+  // items by normalized barcode — updates matches in place, inserts the
+  // rest. Requires connectivity (unlike single-item writes, this isn't
+  // queued offline since it's a deliberate one-off batch operation).
+  const importItems = async (
+    rows: Omit<InventoryItem, "id" | "history" | "images" | "currency">[],
+    user: string,
+  ) => {
+    const byBarcode = new Map(items.map((i) => [i.barcode, i]));
+    const toInsert: ReturnType<typeof normalizeItemText>[] = [];
+    const toUpdate: { id: string; data: ReturnType<typeof normalizeItemText> }[] = [];
+
+    for (const raw of rows) {
+      const normalized = normalizeItemText({ ...raw, images: [] as string[] });
+      const existing = byBarcode.get(normalized.barcode);
+      if (existing) {
+        toUpdate.push({ id: existing.id, data: normalized });
+      } else {
+        toInsert.push(normalized);
+      }
+    }
+
+    try {
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from("items").insert(
+          toInsert.map((d) => ({
+            name: d.name,
+            barcode: d.barcode,
+            buying_price_usd: d.buyingPrice,
+            selling_price_usd: d.sellingPrice,
+            quantity: d.quantity,
+            unit: d.unit,
+            includes_taxes: d.includesTaxes,
+            discount: d.discount || 0,
+            images: [],
+            type: d.type || "UNASSIGNED",
+            brand: d.brand || "GENERIC",
+            notes: d.notes || "",
+          })),
+        );
+        if (error) throw error;
+      }
+
+      // Batched as a single upsert keyed on id (the PK), instead of one
+      // UPDATE round-trip per row — N sequential requests would otherwise
+      // make large imports painfully slow.
+      if (toUpdate.length > 0) {
+        const { error } = await supabase.from("items").upsert(
+          toUpdate.map(({ id, data }) => ({
+            id,
+            name: data.name,
+            buying_price_usd: data.buyingPrice,
+            selling_price_usd: data.sellingPrice,
+            quantity: data.quantity,
+            unit: data.unit,
+            includes_taxes: data.includesTaxes,
+            discount: data.discount || 0,
+            type: data.type || "UNASSIGNED",
+            brand: data.brand || "GENERIC",
+            notes: data.notes || "",
+            updated_at: new Date().toISOString(),
+          })),
+        );
+        if (error) throw error;
+      }
+
+      if (toUpdate.length > 0) {
+        await supabase.from("item_history").insert(
+          toUpdate.map(({ id }) => ({
+            item_id: id,
+            action: "update" as const,
+            details: "Actualización vía importación de Excel",
+            user_name: user,
+          })),
+        );
+      }
+
+      await refreshData();
+      return { created: toInsert.length, updated: toUpdate.length };
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al importar productos");
+      throw e;
     }
   };
 
@@ -336,12 +497,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateRates = async (usd: number, eur: number) => {
     try {
       const ratesObj = { USD: usd, EUR: eur };
-      const { error } = await supabase
-        .from("settings")
-        .upsert({ key: "rates", value: ratesObj });
-      if (error) throw error;
+      const { queued } = await offlineStore.updateRates(ratesObj);
       setRates(ratesObj);
-      toast.success("Tasas de cambio actualizadas");
+      toast.success(queued ? "Tasas guardadas localmente (sin conexión)" : "Tasas de cambio actualizadas");
     } catch (e) {
       console.error(e);
       toast.error("Error al guardar tasas");
@@ -530,9 +688,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider
       value={{
         items,
+        refreshData,
         addItem,
         updateItem,
         deleteItem,
+        deleteItems,
+        importItems,
         currency,
         setCurrency,
         rates,

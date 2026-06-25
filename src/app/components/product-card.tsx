@@ -142,7 +142,7 @@ export function ProductCard({ item, onAddToCart }: ProductCardProps) {
 
   return (
     <>
-      <div className="group flex flex-col bg-white rounded-2xl border border-gray-200 overflow-hidden transition-shadow hover:shadow-lg">
+      <div className="group flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden transition-shadow hover:shadow-lg">
         <button
           type="button"
           onClick={openDetail}
@@ -216,7 +216,7 @@ export function ProductCard({ item, onAddToCart }: ProductCardProps) {
                 size="sm"
                 onClick={() => onAddToCart(item, qty)}
                 disabled={item.quantity === 0}
-                className="flex-1 bg-gray-900 hover:bg-gray-700 text-white h-8 text-xs rounded-lg"
+                className="flex-1 h-8 text-xs"
               >
                 <Plus className="w-3.5 h-3.5 mr-1" />
                 Agregar
@@ -321,7 +321,7 @@ export function ProductCard({ item, onAddToCart }: ProductCardProps) {
                   setDetailOpen(false);
                 }}
                 disabled={item.quantity === 0}
-                className="flex-1 bg-gray-900 hover:bg-gray-700 text-white h-9 text-sm rounded-lg"
+                className="flex-1 h-9 text-sm"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Agregar al Total
