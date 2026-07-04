@@ -8,10 +8,11 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
-import { fetchVenezuelaConversionRates } from "../services/exchange-rates";
+import { fetchVenezuelaConversionRates, fetchUsdtRate } from "../services/exchange-rates";
 import {
   DollarSign,
   Euro,
+  Coins,
   History,
   ArrowRight,
   Search,
@@ -153,26 +154,41 @@ export function AdminView({
   // clicked, so typing/clearing a field doesn't fire a request per keystroke.
   const [usdInput, setUsdInput] = useState("");
   const [eurInput, setEurInput] = useState("");
+  const [usdtInput, setUsdtInput] = useState("");
   const [fetchingRates, setFetchingRates] = useState(false);
 
   useEffect(() => {
     setUsdInput(rates.USD.toString());
     setEurInput(rates.EUR.toString());
-  }, [rates.USD, rates.EUR]);
+    setUsdtInput(rates.USDT.toString());
+  }, [rates.USD, rates.EUR, rates.USDT]);
 
-  // Pulls today's Bs/USD and Bs/EUR rates from the Alcambio API and fills the
-  // inputs with them. Does not persist anything — "Guardar Tasas" does that.
+  // Pulls today's Bs/USD and Bs/EUR rates from Alcambio and the Bs/USDT
+  // liquidation rate from Binance P2P, and fills the inputs with them.
+  // Does not persist anything — "Guardar Tasas" does that.
   const handleFetchRates = async () => {
     setFetchingRates(true);
     try {
-      const fetched = await fetchVenezuelaConversionRates();
-      if (!fetched) {
-        toast.error("No se encontraron tasas para hoy");
-        return;
+      const [bcv, usdt] = await Promise.allSettled([
+        fetchVenezuelaConversionRates(),
+        fetchUsdtRate(),
+      ]);
+
+      let anyOk = false;
+      if (bcv.status === "fulfilled" && bcv.value) {
+        setUsdInput(bcv.value.usd.toString());
+        setEurInput(bcv.value.eur.toString());
+        anyOk = true;
+      } else {
+        toast.error("No se pudieron obtener las tasas USD/EUR");
       }
-      setUsdInput(fetched.usd.toString());
-      setEurInput(fetched.eur.toString());
-      toast.success("Tasas actualizadas desde Alcambio");
+      if (usdt.status === "fulfilled" && usdt.value) {
+        setUsdtInput(usdt.value.toString());
+        anyOk = true;
+      } else {
+        toast.error("No se pudo obtener la tasa USDT (Binance P2P)");
+      }
+      if (anyOk) toast.success("Tasas actualizadas");
     } catch (e) {
       console.error(e);
       toast.error("Error al obtener tasas");
@@ -184,15 +200,18 @@ export function AdminView({
   const handleSaveRates = () => {
     const usd = parseFloat(usdInput);
     const eur = parseFloat(eurInput);
-    if (isNaN(usd) || usd <= 0 || isNaN(eur) || eur <= 0) {
+    const usdt = parseFloat(usdtInput);
+    if (isNaN(usd) || usd <= 0 || isNaN(eur) || eur <= 0 || isNaN(usdt) || usdt <= 0) {
       toast.error("Ingrese tasas válidas mayores a cero");
       return;
     }
-    updateRates(usd, eur);
+    updateRates(usd, eur, usdt);
   };
 
   const ratesChanged =
-    usdInput !== rates.USD.toString() || eurInput !== rates.EUR.toString();
+    usdInput !== rates.USD.toString() ||
+    eurInput !== rates.EUR.toString() ||
+    usdtInput !== rates.USDT.toString();
 
   useEffect(() => {
     if (currentUser?.role !== "admin") {
@@ -370,10 +389,10 @@ export function AdminView({
         <h3 className="text-lg font-medium text-gray-900 mb-4">
           Tasas de Cambio (Hoy)
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
             <Label>
-              Precio USD Hoy (Bs/USD)
+              USD (BCV) — Bs/USD
             </Label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -391,7 +410,7 @@ export function AdminView({
           </div>
           <div className="space-y-2">
             <Label>
-              Precio EUR Hoy (Bs/EUR)
+              EUR (BCV) — Bs/EUR
             </Label>
             <div className="relative">
               <Euro className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -406,6 +425,27 @@ export function AdminView({
                 className="pl-9"
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>
+              USDT (Binance) — Bs/USDT
+            </Label>
+            <div className="relative">
+              <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={usdtInput}
+                onChange={(e) => setUsdtInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveRates()}
+                placeholder="0.00"
+                className="pl-9"
+              />
+            </div>
+            <p className="text-[11px] text-gray-400 leading-tight">
+              Binance P2P (liquidación)
+            </p>
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-4">

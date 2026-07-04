@@ -11,6 +11,13 @@ import * as offlineStore from "../utils/offlineStore";
 
 export type UnitType = "units" | "kg" | "liters";
 
+export type DisplayCurrency = "BS" | "USD" | "EUR" | "USDT";
+export interface Rates {
+  USD: number;
+  EUR: number;
+  USDT: number;
+}
+
 export interface ItemHistoryRecord {
   date: string;
   action: "create" | "update" | "delete" | "sale" | "return";
@@ -77,11 +84,11 @@ interface AppContextType {
     user: string,
   ) => Promise<{ created: number; updated: number }>;
 
-  // Currency — prices are stored in USD; rates convert USD -> BS/EUR for display
-  currency: "BS" | "USD" | "EUR";
-  setCurrency: (c: "BS" | "USD" | "EUR") => void;
-  rates: { USD: number; EUR: number }; // Bs per 1 USD, Bs per 1 EUR
-  updateRates: (usd: number, eur: number) => void;
+  // Currency — prices are stored in USD; rates convert USD -> BS/EUR/USDT for display
+  currency: DisplayCurrency;
+  setCurrency: (c: DisplayCurrency) => void;
+  rates: Rates; // Bs per 1 USD, Bs per 1 EUR, Bs per 1 USDT
+  updateRates: (usd: number, eur: number, usdt: number) => void;
   convertPrice: (priceInUsd: number) => number;
   convertToUsd: (priceInDisplay: number) => number;
   formatPrice: (priceInUsd: number) => string;
@@ -195,8 +202,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
 
   // Currency State
-  const [currency, setCurrency] = useState<"BS" | "USD" | "EUR">("USD");
-  const [rates, setRates] = useState({ USD: 36.5, EUR: 39.2 });
+  const [currency, setCurrency] = useState<DisplayCurrency>("USD");
+  const [rates, setRates] = useState<Rates>({ USD: 36.5, EUR: 39.2, USDT: 36.5 });
 
   // Cart State — the in-progress cart is restored from localStorage so a
   // refresh or offline reload doesn't lose it (savedCarts below are
@@ -224,7 +231,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .eq("key", "rates")
         .maybeSingle();
       if (settingsRow?.value) {
-        setRates(settingsRow.value as { USD: number; EUR: number });
+        const stored = settingsRow.value as Partial<Rates>;
+        // Older settings rows predate USDT — fall back to the USD rate.
+        setRates({
+          USD: stored.USD ?? 36.5,
+          EUR: stored.EUR ?? 39.2,
+          USDT: stored.USDT ?? stored.USD ?? 36.5,
+        });
       }
     } catch (e) {
       console.error("Error refreshing data from Supabase", e);
@@ -494,9 +507,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // --- CURRENCY ACTIONS ---
-  const updateRates = async (usd: number, eur: number) => {
+  const updateRates = async (usd: number, eur: number, usdt: number) => {
     try {
-      const ratesObj = { USD: usd, EUR: eur };
+      const ratesObj = { USD: usd, EUR: eur, USDT: usdt };
       const { queued } = await offlineStore.updateRates(ratesObj);
       setRates(ratesObj);
       toast.success(queued ? "Tasas guardadas localmente (sin conexión)" : "Tasas de cambio actualizadas");
@@ -506,11 +519,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Base price is always USD. BS/EUR are derived display-only conversions.
+  // Base price is always USD. The three non-USD selections each show a Bs
+  // value = the USD price multiplied by the chosen rate:
+  //   BS   -> "USD (BCV)":     Bs/USD rate (Alcambio / BCV)
+  //   EUR  -> "EUR (BCV)":     Bs/EUR rate (Alcambio / BCV)
+  //   USDT -> "USDT (Binance)": Bs/USDT liquidation rate (Binance P2P)
   const convertPrice = (priceInUsd: number) => {
     if (currency === "USD") return priceInUsd;
     if (currency === "BS") return priceInUsd * rates.USD;
-    if (currency === "EUR") return (priceInUsd * rates.USD) / rates.EUR;
+    if (currency === "EUR") return priceInUsd * rates.EUR;
+    if (currency === "USDT") return priceInUsd * rates.USDT;
     return priceInUsd;
   };
 
@@ -518,14 +536,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // currency and returns the canonical USD value to store.
   const convertToUsd = (priceInDisplay: number) => {
     if (currency === "USD") return priceInDisplay;
-    if (currency === "BS") return priceInDisplay / rates.USD;
-    if (currency === "EUR") return (priceInDisplay * rates.EUR) / rates.USD;
+    // A bolívar amount's "real" USD value uses the USDT (Binance/parallel)
+    // rate, not the BCV rate — that's the true dollar the bolívares represent.
+    if (currency === "BS") return priceInDisplay / rates.USDT;
+    if (currency === "EUR") return priceInDisplay / rates.EUR;
+    if (currency === "USDT") return priceInDisplay / rates.USDT;
     return priceInDisplay;
   };
 
   const formatPrice = (priceInUsd: number) => {
     const converted = convertPrice(priceInUsd);
-    const symbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
+    // USD shows "$"; the BCV/Binance selections all resolve to a Bs amount.
+    const symbol = currency === "USD" ? "$" : "Bs";
     return `${symbol} ${converted.toFixed(2)}`;
   };
 

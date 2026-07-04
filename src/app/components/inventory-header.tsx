@@ -539,13 +539,14 @@ export function InventoryHeader() {
                 value={currency}
                 onValueChange={(val: any) => setCurrency(val)}
               >
-                <SelectTrigger className="w-[90px] md:w-[100px] h-8 text-xs md:text-sm">
+                <SelectTrigger className="w-[120px] md:w-[140px] h-8 text-xs md:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="BS">Bs (VES)</SelectItem>
                   <SelectItem value="USD">USD ($)</SelectItem>
-                  <SelectItem value="EUR">EUR (€)</SelectItem>
+                  <SelectItem value="BS">USD (BCV)</SelectItem>
+                  <SelectItem value="EUR">EUR (BCV)</SelectItem>
+                  <SelectItem value="USDT">USDT (Binance)</SelectItem>
                 </SelectContent>
               </Select>
 

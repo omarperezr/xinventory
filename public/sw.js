@@ -36,6 +36,9 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   const sameOrigin = url.origin === self.location.origin;
 
+  // Same-origin API routes (e.g. /api/usdt-rate): always network, never cached.
+  if (sameOrigin && url.pathname.startsWith("/api/")) return;
+
   // 1) App shell / navigations: network-first so new features appear without a
   //    manual refresh; fall back to the cached shell when offline.
   if (req.mode === "navigate") {

@@ -315,6 +315,161 @@ function MobileSearchCard({
   );
 }
 
+// ── Mobile card for the admin view (buying price, margin, edit/delete/history) ──
+function MobileAdminCard({
+  item,
+  onEdit,
+  onDelete,
+  onViewHistory,
+  showBuyingPrice,
+  selectMode,
+  selected,
+  onToggleSelect,
+}: {
+  item: InventoryItem;
+  onEdit: (item: InventoryItem) => void;
+  onDelete: (id: string) => void | Promise<void>;
+  onViewHistory?: (item: InventoryItem) => void;
+  showBuyingPrice?: boolean;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
+}) {
+  const { formatPrice } = useApp();
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await onDelete(item.id);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const unitLabel = { units: "u", kg: "kg", liters: "L" }[item.unit || "units"];
+
+  const stockColor =
+    item.quantity === 0
+      ? "text-red-600"
+      : item.quantity < 10
+        ? "text-yellow-600"
+        : "text-green-600";
+
+  const margin =
+    item.sellingPrice > 0
+      ? ((item.sellingPrice - item.buyingPrice) / item.sellingPrice) * 100
+      : 0;
+  const marginColor =
+    margin <= 0
+      ? "text-red-600"
+      : margin < 15
+        ? "text-yellow-600"
+        : "text-green-600";
+
+  return (
+    <div className="p-3 border-b border-gray-100 last:border-0">
+      <div className="flex items-start gap-2">
+        {selectMode && (
+          <Checkbox
+            checked={!!selected}
+            onCheckedChange={() => onToggleSelect?.(item.id)}
+            className="mt-0.5 flex-shrink-0"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-gray-900 leading-tight">
+            {item.name}
+          </p>
+          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+            {item.includesTaxes && (
+              <span className="text-[9px] uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+                +IVA
+              </span>
+            )}
+            <span className="text-[9px] uppercase bg-gray-100 text-gray-600 px-1 py-0.5 rounded truncate max-w-[100px]">
+              {item.brand}
+            </span>
+          </div>
+          <p className="text-[10px] text-gray-400 font-mono mt-0.5 truncate">
+            {item.barcode}
+          </p>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className="text-sm font-semibold text-gray-900">
+            {formatPrice(item.sellingPrice)}
+          </p>
+          {item.discount > 0 && (
+            <p className="text-[10px] text-orange-600">-{item.discount}%</p>
+          )}
+          <p className={`text-xs font-medium ${stockColor}`}>
+            {item.quantity} {unitLabel}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-50">
+        <div className="flex items-center gap-3 text-xs min-w-0">
+          {showBuyingPrice && (
+            <span className="text-gray-500 truncate">
+              P. Compra:{" "}
+              <span className="font-medium text-gray-700">
+                {formatPrice(item.buyingPrice)}
+              </span>
+            </span>
+          )}
+          {showBuyingPrice && (
+            <span className="text-gray-500 flex-shrink-0">
+              Margen:{" "}
+              <span className={`font-medium ${marginColor}`}>
+                {margin.toFixed(0)}%
+              </span>
+            </span>
+          )}
+        </div>
+
+        {!selectMode && onViewHistory && (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onViewHistory(item)}
+              className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 h-8 w-8 p-0"
+              title="Ver Historial"
+            >
+              <Clock className="w-4 h-4" strokeWidth={1.5} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onEdit(item)}
+              className="text-primary hover:text-primary hover:bg-blue-50 h-8 w-8 p-0"
+              title="Editar"
+            >
+              <Edit2 className="w-4 h-4" strokeWidth={1.5} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0 disabled:opacity-60"
+              title="Eliminar"
+            >
+              {deleting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function InventoryTable({
   items,
   onEdit,
@@ -350,23 +505,33 @@ export function InventoryTable({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      {/* ── Mobile card list (search mode only) ── */}
-      {isSearchMode && (
-        <div className="md:hidden">
-          {items.map((item) => (
+      {/* ── Mobile card list — no horizontal scroll on phones ── */}
+      <div className="md:hidden">
+        {items.map((item) =>
+          isSearchMode ? (
             <MobileSearchCard
               key={item.id}
               item={item}
               onAddToCart={onAddToCart!}
             />
-          ))}
-        </div>
-      )}
+          ) : (
+            <MobileAdminCard
+              key={item.id}
+              item={item}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onViewHistory={onViewHistory}
+              showBuyingPrice={showBuyingPrice}
+              selectMode={selectMode}
+              selected={selectedIds?.has(item.id)}
+              onToggleSelect={onToggleSelect}
+            />
+          ),
+        )}
+      </div>
 
-      {/* ── Desktop table (always) / mobile table for admin view ── */}
-      <div
-        className={`${isSearchMode ? "hidden md:block" : "block"} overflow-x-auto`}
-      >
+      {/* ── Desktop table ── */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">

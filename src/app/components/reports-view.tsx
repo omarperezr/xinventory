@@ -33,11 +33,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { format } from "date-fns";
-import {
-  exportReportPdf,
-  exportReportExcel,
-  ReportData,
-} from "../services/report-export";
+import type { ReportData } from "../services/report-export";
+
+// jspdf + xlsx are heavy; load them only when an export button is clicked.
+const exportReportPdf = async (data: ReportData) =>
+  (await import("../services/report-export")).exportReportPdf(data);
+const exportReportExcel = async (data: ReportData) =>
+  (await import("../services/report-export")).exportReportExcel(data);
 
 const CHART_COLORS = [
   "#2196F3",

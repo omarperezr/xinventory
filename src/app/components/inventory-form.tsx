@@ -33,10 +33,11 @@ interface InventoryFormProps {
   ) => void | Promise<void>;
   editItem?: InventoryItem;
   onCancelEdit?: () => void;
-  rates: { USD: number; EUR: number };
+  rates: { USD: number; EUR: number; USDT: number };
 }
 
-type InputCurrency = "BS" | "USD" | "EUR";
+// Prices for a product can only be entered in USD or bolívares.
+type InputCurrency = "USD" | "BS";
 
 export function InventoryForm({
   onSubmit,
@@ -112,36 +113,31 @@ export function InventoryForm({
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Helper to convert any input currency to USD — the canonical, non-fluctuating
-  // price. BS/EUR change daily so they're never stored, only USD is.
+  // Converts the entered price back to the canonical USD base. Prices can only
+  // be entered in USD or bolívares; bolívares divide by the USDT rate.
   const toUSD = (amount: number, currency: InputCurrency): number => {
-    if (currency === "USD") return amount;
-    if (currency === "BS") return amount / rates.USD;
-    if (currency === "EUR") return (amount * rates.EUR) / rates.USD;
-    return amount;
+    // Bolívares -> real USD uses the USDT (Binance/parallel) rate.
+    if (currency === "BS") return amount / rates.USDT;
+    return amount; // USD
   };
 
-  // Helper to display conversions
+  // Preview: the entered amount shown both in USD and its bolívar equivalent
+  // (at the USDT rate, so it matches how the price is stored).
   const getConversions = (amountStr: string, currency: InputCurrency) => {
     const amount = parseFloat(amountStr);
     if (isNaN(amount)) return null;
 
     const inUSD = toUSD(amount, currency);
-    const inBS = inUSD * rates.USD;
-    const inEUR = (inUSD * rates.USD) / rates.EUR;
+    const inBS = inUSD * rates.USDT;
 
     return (
-      <div className="text-xs text-gray-500 mt-1 flex gap-2">
-        <span className={currency === "BS" ? "font-bold text-primary" : ""}>
-          Bs {inBS.toFixed(2)}
-        </span>
-        <span className="text-gray-300">|</span>
+      <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
         <span className={currency === "USD" ? "font-bold text-primary" : ""}>
           $ {inUSD.toFixed(2)}
         </span>
         <span className="text-gray-300">|</span>
-        <span className={currency === "EUR" ? "font-bold text-primary" : ""}>
-          € {inEUR.toFixed(2)}
+        <span className={currency === "BS" ? "font-bold text-primary" : ""}>
+          Bs {inBS.toFixed(2)}
         </span>
       </div>
     );
@@ -261,13 +257,12 @@ export function InventoryForm({
                 value={buyingCurrency}
                 onValueChange={(v: InputCurrency) => setBuyingCurrency(v)}
               >
-                <SelectTrigger className="w-[80px]">
+                <SelectTrigger className="w-[90px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="BS">Bs</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
                 </SelectContent>
               </Select>
               <Input
@@ -296,13 +291,12 @@ export function InventoryForm({
                 value={sellingCurrency}
                 onValueChange={(v: InputCurrency) => setSellingCurrency(v)}
               >
-                <SelectTrigger className="w-[80px]">
+                <SelectTrigger className="w-[90px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="BS">Bs</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
                 </SelectContent>
               </Select>
               <Input

@@ -1,3 +1,11 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+/* Safety net: never let the page scroll sideways on mobile. Wide content
+   (desktop tables) still scrolls inside its own overflow-x-auto container. */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+}

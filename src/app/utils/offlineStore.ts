@@ -40,7 +40,7 @@ type OutboxOp =
   | { kind: "item.update"; id: string; row: Partial<ItemRow>; historyRow?: HistoryRow }
   | { kind: "item.delete"; id: string }
   | { kind: "item.bulkDelete"; ids: string[]; historyRows: HistoryRow[] }
-  | { kind: "rates.update"; value: { USD: number; EUR: number } };
+  | { kind: "rates.update"; value: { USD: number; EUR: number; USDT: number } };
 
 export function isOnline(): boolean {
   return typeof navigator === "undefined" || navigator.onLine;
@@ -179,7 +179,7 @@ export async function bulkDeleteItems(
   return { queued: true };
 }
 
-export async function updateRates(value: { USD: number; EUR: number }): Promise<{ queued: boolean }> {
+export async function updateRates(value: { USD: number; EUR: number; USDT: number }): Promise<{ queued: boolean }> {
   if (isOnline()) {
     const { error } = await supabase.from("settings").upsert({ key: "rates", value });
     if (!error) return { queued: false };
