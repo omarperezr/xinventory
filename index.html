@@ -7,6 +7,15 @@
     <meta name="theme-color" content="#2196F3" />
     <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
     <link rel="dns-prefetch" href="%VITE_SUPABASE_URL%" />
+
+    <!-- Installable on sellers' phones: without a manifest the app only ever
+         opens in a browser tab with a URL bar. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="XInventory" />
     <title>XInventory</title>
   </head>
 

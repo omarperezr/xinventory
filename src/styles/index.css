@@ -9,3 +9,39 @@ body {
   overflow-x: hidden;
   max-width: 100%;
 }
+
+/* iOS Safari zooms the whole viewport when a focused field is under 16px.
+   Many call sites pass an unprefixed `text-sm`, which tailwind-merge lets
+   override the base component's responsive `text-base md:text-sm`. Enforcing
+   the floor here fixes every field at once instead of per call site. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Respect users who ask the OS to reduce motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible keyboard focus. The default ring is easy to lose against the
+   light surfaces used throughout the app. */
+:focus-visible {
+  outline: 2px solid var(--color-primary, #2196f3);
+  outline-offset: 2px;
+}
+
+/* Bottom-anchored bars must clear the iOS home indicator. */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

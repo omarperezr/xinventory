@@ -34,55 +34,28 @@ import {
 } from "./ui/select";
 import { Label } from "./ui/label";
 import { toast } from "sonner";
-import { useApp, CartItem, PaymentRecord } from "../context/app-context";
+import {
+  useApp,
+  CartItem,
+  PaymentRecord,
+  isReferenceLens,
+} from "../context/app-context";
 import { useAuth } from "../context/auth-context";
+import { MoneyInput } from "./money-input";
+import { QuantityStepper } from "./quantity-stepper";
 
-// Inline editable unit price for a cart line. Shows the price in the active
-// display currency and commits the change (converted back to USD) on blur or
-// Enter, so a seller can close a sale at a price different from the default.
+// Inline editable unit price for a cart line, so a seller can close a sale at
+// a price different from the default. Entry is always USD or honest-rate
+// bolívares — never the display lens, which may be a reference rate.
 function EditablePrice({ item }: { item: CartItem }) {
-  const { convertPrice, convertToUsd, currency, updateCartItemPrice } = useApp();
-  const symbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
-  const [value, setValue] = useState(convertPrice(item.sellingPrice).toFixed(2));
-
-  // Keep the field in sync when the underlying price or currency changes
-  // from elsewhere (currency switch, cart reload) and we're not editing.
-  useEffect(() => {
-    setValue(convertPrice(item.sellingPrice).toFixed(2));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.sellingPrice, currency]);
-
-  const commit = () => {
-    const parsed = parseFloat(value);
-    if (isNaN(parsed) || parsed < 0) {
-      setValue(convertPrice(item.sellingPrice).toFixed(2));
-      return;
-    }
-    updateCartItemPrice(item.id, convertToUsd(parsed));
-  };
-
+  const { updateCartItemPrice } = useApp();
   return (
-    <div className="relative w-24">
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
-        {symbol}
-      </span>
-      <Input
-        type="number"
-        step="0.01"
-        min="0"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            (e.target as HTMLInputElement).blur();
-          }
-        }}
-        className="h-8 pl-7 pr-1 text-sm"
-        title="Editar precio de venta"
-      />
-    </div>
+    <MoneyInput
+      label="Precio de venta"
+      valueUsd={item.sellingPrice}
+      onCommitUsd={(usd) => updateCartItemPrice(item.id, usd)}
+      className="w-32"
+    />
   );
 }
 
@@ -127,18 +100,28 @@ export function TotalView({ onCheckout }: TotalViewProps) {
     clearPayments,
     amountPaid,
     remainingDue,
+    currencySymbol,
     currency,
-    convertToUsd,
+    bsToUsd,
+    usdToBs,
   } = useApp();
   const { currentUser } = useAuth();
+  // Reference lenses (BCV/EUR/Binance) restate prices at a rate we do not
+  // treat as the real worth of a bolívar, so editing money while one is
+  // active would book the amount at the wrong value.
+  const referenceLens = isReferenceLens(currency);
   const canEditPrice =
-    currentUser?.role === "admin" || currentUser?.canEditPrice === true;
-  const currencySymbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
+    (currentUser?.role === "admin" || currentUser?.canEditPrice === true) &&
+    !referenceLens;
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState("Efectivo");
   const [paymentAmount, setPaymentAmount] = useState("");
+  // Payments are entered explicitly in USD or honest-rate bolívares, never
+  // through the display lens (which may be a reference rate the money is not
+  // actually worth).
+  const [paymentEntry, setPaymentEntry] = useState<"USD" | "BS">("USD");
   const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
   const [processing, setProcessing] = useState(false);
@@ -162,9 +145,14 @@ export function TotalView({ onCheckout }: TotalViewProps) {
       toast.error("Por favor ingrese un monto válido");
       return;
     }
-    // The field is in the active display currency; payments are always
-    // stored in the canonical USD basis used by totalAmount/remainingDue.
-    const amount = convertToUsd(enteredAmount);
+    // Payments are stored in the canonical USD basis used by
+    // totalAmount/remainingDue. Bolívares convert at the honest rate.
+    const amount =
+      paymentEntry === "USD" ? enteredAmount : bsToUsd(enteredAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Monto inválido — verifica las tasas de cambio");
+      return;
+    }
     const newPayments: PaymentRecord[] = [
       ...currentPayments,
       { method: selectedMethod, amount, timestamp: new Date().toISOString() },
@@ -199,6 +187,13 @@ export function TotalView({ onCheckout }: TotalViewProps) {
       setPendingPayments(undefined);
       setIsChangeModalOpen(false);
       setIsPaymentModalOpen(false);
+    } catch (err) {
+      // The cart is deliberately left intact so the sale can be retried
+      // rather than silently lost.
+      console.error("Error al completar la venta", err);
+      toast.error(
+        "No se pudo completar la venta. El carrito se mantuvo; intenta de nuevo.",
+      );
     } finally {
       setProcessing(false);
     }
@@ -337,41 +332,15 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="flex items-center justify-center gap-2">
-                                <button
-                                  onClick={() =>
-                                    updateCartItemQuantity(
-                                      item.id,
-                                      item.cartQuantity - 1,
-                                    )
-                                  }
-                                  className="p-1 rounded hover:bg-gray-200 text-gray-600"
-                                >
-                                  <Minus className="w-4 h-4" />
-                                </button>
-                                <Input
-                                  type="number"
-                                  min="1"
+                              <div className="flex items-center justify-center">
+                                <QuantityStepper
+                                  label={`Cantidad de ${item.name}`}
                                   value={item.cartQuantity}
-                                  onChange={(e) =>
-                                    updateCartItemQuantity(
-                                      item.id,
-                                      parseInt(e.target.value) || 0,
-                                    )
+                                  max={item.quantity}
+                                  onChange={(q) =>
+                                    updateCartItemQuantity(item.id, q)
                                   }
-                                  className="w-16 text-center h-8"
                                 />
-                                <button
-                                  onClick={() =>
-                                    updateCartItemQuantity(
-                                      item.id,
-                                      item.cartQuantity + 1,
-                                    )
-                                  }
-                                  className="p-1 rounded hover:bg-gray-200 text-gray-600"
-                                >
-                                  <Plus className="w-4 h-4" />
-                                </button>
                               </div>
                             </td>
                             <td className="px-6 py-4 text-right font-medium text-gray-900">
@@ -535,41 +504,23 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                               </div>
                               <button
                                 onClick={() => removeFromCart(item.id)}
-                                className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                                aria-label={`Quitar ${item.name} del carrito`}
+                                className="h-11 w-11 min-w-11 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 transition-colors"
                               >
-                                <X className="w-4 h-4" />
+                                <X className="w-4 h-4" aria-hidden="true" />
                               </button>
                             </div>
                           </div>
                           {/* Quantity controls */}
                           <div className="flex items-center gap-2">
-                            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-                              <button
-                                onClick={() =>
-                                  updateCartItemQuantity(
-                                    item.id,
-                                    item.cartQuantity - 1,
-                                  )
-                                }
-                                className="px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors"
-                              >
-                                <Minus className="w-3 h-3" />
-                              </button>
-                              <span className="px-3 py-1.5 text-sm font-medium min-w-[2.5rem] text-center">
-                                {item.cartQuantity}
-                              </span>
-                              <button
-                                onClick={() =>
-                                  updateCartItemQuantity(
-                                    item.id,
-                                    item.cartQuantity + 1,
-                                  )
-                                }
-                                className="px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </button>
-                            </div>
+                            <QuantityStepper
+                              label={`Cantidad de ${item.name}`}
+                              value={item.cartQuantity}
+                              max={item.quantity}
+                              onChange={(q) =>
+                                updateCartItemQuantity(item.id, q)
+                              }
+                            />
                             <span className="text-xs text-gray-400">
                               {item.unit === "units"
                                 ? "unid."
@@ -735,15 +686,51 @@ export function TotalView({ onCheckout }: TotalViewProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Monto ({currencySymbol})</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="payment-amount">Monto a recibir</Label>
+                {/* Explicit basis: the amount owed is restated in whichever
+                    unit the seller is about to type, so what they read on
+                    screen is exactly what settles the sale. */}
+                <div className="flex rounded-md border border-input overflow-hidden">
+                  {(["USD", "BS"] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-pressed={paymentEntry === c}
+                      onClick={() => setPaymentEntry(c)}
+                      className={`h-11 px-3 text-xs font-medium ${
+                        paymentEntry === c
+                          ? "bg-primary text-white"
+                          : "bg-input-background text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {c === "USD" ? "$ USD" : "Bs"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-gray-500" aria-live="polite">
+                Pendiente:{" "}
+                <span className="font-medium text-gray-700">
+                  {paymentEntry === "USD"
+                    ? `$ ${remainingDue.toFixed(2)}`
+                    : `Bs ${usdToBs(remainingDue).toFixed(2)}`}
+                </span>
+              </p>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-                  {currencySymbol}
+                <span
+                  aria-hidden="true"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"
+                >
+                  {paymentEntry === "USD" ? "$" : "Bs"}
                 </span>
                 <Input
+                  id="payment-amount"
                   type="number"
+                  inputMode="decimal"
+                  enterKeyHint="done"
                   placeholder="0.00"
-                  className="pl-9"
+                  className="pl-9 h-11"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   autoFocus
@@ -788,13 +775,15 @@ export function TotalView({ onCheckout }: TotalViewProps) {
       </Dialog>
 
       {/* ── Change modal ── */}
-      <Dialog
-        open={isChangeModalOpen}
-        onOpenChange={(o) => {
-          if (!o) handleCompleteTransaction(pendingPayments);
-        }}
-      >
-        <DialogContent className="sm:max-w-md bg-white border-red-100 w-[calc(100vw-2rem)]">
+      {/* Completing the sale is an explicit action, never a side effect of the
+          dialog closing — Escape and backdrop clicks must not finalize money. */}
+      <Dialog open={isChangeModalOpen} onOpenChange={setIsChangeModalOpen}>
+        <DialogContent
+          className="sm:max-w-md bg-white border-red-100 w-[calc(100vw-2rem)]"
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="text-red-600 flex items-center gap-2">
               <Banknote className="w-6 h-6" />

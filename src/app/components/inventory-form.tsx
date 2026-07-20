@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { InventoryItem, UnitType } from "../context/app-context";
+import { InventoryItem, UnitType, useApp } from "../context/app-context";
 import { uploadImages } from "../services/image-utils";
 import { toast } from "sonner";
 
@@ -33,7 +33,6 @@ interface InventoryFormProps {
   ) => void | Promise<void>;
   editItem?: InventoryItem;
   onCancelEdit?: () => void;
-  rates: { USD: number; EUR: number; USDT: number };
 }
 
 // Prices for a product can only be entered in USD or bolívares.
@@ -43,8 +42,8 @@ export function InventoryForm({
   onSubmit,
   editItem,
   onCancelEdit,
-  rates,
 }: InventoryFormProps) {
+  const { bsToUsd, usdToBs } = useApp();
   const [name, setName] = useState("");
   const [barcode, setBarcode] = useState("");
 
@@ -114,21 +113,22 @@ export function InventoryForm({
   };
 
   // Converts the entered price back to the canonical USD base. Prices can only
-  // be entered in USD or bolívares; bolívares divide by the USDT rate.
+  // be entered in USD or bolívares; bolívares convert at the honest rate
+  // (configurable in the admin panel), which is what those bolívares are
+  // really worth regardless of the rate the supplier quoted at.
   const toUSD = (amount: number, currency: InputCurrency): number => {
-    // Bolívares -> real USD uses the USDT (Binance/parallel) rate.
-    if (currency === "BS") return amount / rates.USDT;
+    if (currency === "BS") return bsToUsd(amount);
     return amount; // USD
   };
 
-  // Preview: the entered amount shown both in USD and its bolívar equivalent
-  // (at the USDT rate, so it matches how the price is stored).
+  // Preview: the entered amount shown both in USD and its bolívar equivalent,
+  // at the same honest rate used for storage.
   const getConversions = (amountStr: string, currency: InputCurrency) => {
     const amount = parseFloat(amountStr);
     if (isNaN(amount)) return null;
 
     const inUSD = toUSD(amount, currency);
-    const inBS = inUSD * rates.USDT;
+    const inBS = usdToBs(inUSD);
 
     return (
       <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
@@ -151,14 +151,27 @@ export function InventoryForm({
     // Convert inputs to USD for storage — the canonical base price.
     // Allow more than two decimals on input but round to cents for storage.
     const round2 = (n: number) => Math.round(n * 100) / 100;
-    const finalBuyingPrice = round2(
-      toUSD(parseFloat(buyingPrice), buyingCurrency),
-    );
-    const finalSellingPrice = round2(
-      toUSD(parseFloat(sellingPrice), sellingCurrency),
-    );
+    const rawBuying = toUSD(parseFloat(buyingPrice), buyingCurrency);
+    const rawSelling = toUSD(parseFloat(sellingPrice), sellingCurrency);
+
+    // A non-numeric entry, or a zero/absent exchange rate, would otherwise
+    // store NaN/Infinity as the canonical price.
+    if (!Number.isFinite(rawBuying) || !Number.isFinite(rawSelling)) {
+      toast.error(
+        "Precio inválido. Verifica los montos y las tasas de cambio.",
+      );
+      return;
+    }
+    if (rawBuying < 0 || rawSelling < 0) {
+      toast.error("Los precios no pueden ser negativos");
+      return;
+    }
+
+    const finalBuyingPrice = round2(rawBuying);
+    const finalSellingPrice = round2(rawSelling);
 
     setSubmitting(true);
+    let succeeded = false;
     try {
       await onSubmit(
         {
@@ -178,9 +191,18 @@ export function InventoryForm({
         },
         notes,
       );
+      succeeded = true;
+    } catch (err) {
+      // Without this the rejection was swallowed and the seller was told
+      // nothing — on flaky mobile data that is the common path.
+      console.error("Error al guardar el producto", err);
+      toast.error("No se pudo guardar el producto. Intenta de nuevo.");
     } finally {
       setSubmitting(false);
     }
+
+    // Keep the entered values on failure so nothing has to be retyped.
+    if (!succeeded) return;
 
     // Reset form
     if (!editItem) {

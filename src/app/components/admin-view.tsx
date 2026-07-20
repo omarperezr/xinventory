@@ -1,8 +1,8 @@
-import { useEffect, useState, ChangeEvent } from "react";
+import { useEffect, useRef, useState, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { InventoryForm } from "./inventory-form";
 import { InventoryTable } from "./inventory-table";
-import { useApp, InventoryItem } from "../context/app-context";
+import { useApp, InventoryItem, RateKey } from "../context/app-context";
 import { useAuth } from "../context/auth-context";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -77,6 +77,7 @@ export function AdminView({
     deleteItems,
     importItems,
     rates,
+    honestRateKey,
     updateRates,
     formatPrice,
   } = useApp();
@@ -155,13 +156,19 @@ export function AdminView({
   const [usdInput, setUsdInput] = useState("");
   const [eurInput, setEurInput] = useState("");
   const [usdtInput, setUsdtInput] = useState("");
+  const [honestInput, setHonestInput] = useState<RateKey>(honestRateKey);
   const [fetchingRates, setFetchingRates] = useState(false);
+  // Set while the admin is editing, so a background refresh (another admin
+  // saving rates) can't wipe their unsaved drafts mid-edit.
+  const editingRates = useRef(false);
 
   useEffect(() => {
+    if (editingRates.current) return;
     setUsdInput(rates.USD.toString());
     setEurInput(rates.EUR.toString());
     setUsdtInput(rates.USDT.toString());
-  }, [rates.USD, rates.EUR, rates.USDT]);
+    setHonestInput(honestRateKey);
+  }, [rates.USD, rates.EUR, rates.USDT, honestRateKey]);
 
   // Pulls today's Bs/USD and Bs/EUR rates from Alcambio and the Bs/USDT
   // liquidation rate from Binance P2P, and fills the inputs with them.
@@ -205,19 +212,21 @@ export function AdminView({
       toast.error("Ingrese tasas válidas mayores a cero");
       return;
     }
-    updateRates(usd, eur, usdt);
+    editingRates.current = false;
+    updateRates(usd, eur, usdt, honestInput);
   };
 
   const ratesChanged =
     usdInput !== rates.USD.toString() ||
     eurInput !== rates.EUR.toString() ||
-    usdtInput !== rates.USDT.toString();
+    usdtInput !== rates.USDT.toString() ||
+    honestInput !== honestRateKey;
+
+  const isAdmin = currentUser?.role === "admin";
 
   useEffect(() => {
-    if (currentUser?.role !== "admin") {
-      navigate("/search");
-    }
-  }, [currentUser, navigate]);
+    if (!isAdmin) navigate("/search", { replace: true });
+  }, [isAdmin, navigate]);
 
   const handleAddItem = (
     item: Omit<InventoryItem, "id" | "history">,
@@ -322,6 +331,10 @@ export function AdminView({
         ) / items.length
       : 0;
 
+  // Render nothing for non-admins. The redirect above runs after paint, so
+  // without this gate a seller sees costs and margins flash on screen first.
+  if (!isAdmin) return null;
+
   return (
     <div className="space-y-8">
       {/* Inventory Overview Stats */}
@@ -391,56 +404,74 @@ export function AdminView({
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <Label>
-              USD (BCV) — Bs/USD
-            </Label>
+            <Label htmlFor="rate-usd">USD (BCV) — Bs/USD</Label>
             <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <DollarSign
+                aria-hidden="true"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+              />
               <Input
+                id="rate-usd"
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 value={usdInput}
-                onChange={(e) => setUsdInput(e.target.value)}
+                onChange={(e) => {
+                  editingRates.current = true;
+                  setUsdInput(e.target.value);
+                }}
                 onKeyDown={(e) => e.key === "Enter" && handleSaveRates()}
                 placeholder="0.00"
-                className="pl-9"
+                className="pl-9 h-11"
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label>
-              EUR (BCV) — Bs/EUR
-            </Label>
+            <Label htmlFor="rate-eur">EUR (BCV) — Bs/EUR</Label>
             <div className="relative">
-              <Euro className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <Euro
+                aria-hidden="true"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+              />
               <Input
+                id="rate-eur"
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 value={eurInput}
-                onChange={(e) => setEurInput(e.target.value)}
+                onChange={(e) => {
+                  editingRates.current = true;
+                  setEurInput(e.target.value);
+                }}
                 onKeyDown={(e) => e.key === "Enter" && handleSaveRates()}
                 placeholder="0.00"
-                className="pl-9"
+                className="pl-9 h-11"
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label>
-              USDT (Binance) — Bs/USDT
-            </Label>
+            <Label htmlFor="rate-usdt">USDT (Binance) — Bs/USDT</Label>
             <div className="relative">
-              <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <Coins
+                aria-hidden="true"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+              />
               <Input
+                id="rate-usdt"
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 value={usdtInput}
-                onChange={(e) => setUsdtInput(e.target.value)}
+                onChange={(e) => {
+                  editingRates.current = true;
+                  setUsdtInput(e.target.value);
+                }}
                 onKeyDown={(e) => e.key === "Enter" && handleSaveRates()}
                 placeholder="0.00"
-                className="pl-9"
+                className="pl-9 h-11"
               />
             </div>
             <p className="text-[11px] text-gray-400 leading-tight">
@@ -448,6 +479,46 @@ export function AdminView({
             </p>
           </div>
         </div>
+
+        {/* Which rate defines what a bolívar is really worth. Everything the
+            business books — costs, sales, payments — converts at this rate. */}
+        <fieldset className="mt-6 border-t border-gray-100 pt-4">
+          <legend className="text-sm font-medium text-gray-900">
+            Tasa honesta del bolívar
+          </legend>
+          <p className="text-xs text-gray-500 mt-1 mb-3">
+            Define el valor real de los bolívares. Se usa para registrar
+            compras, ventas y pagos. Las demás tasas quedan solo como
+            referencia visual.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                { key: "USDT", label: "USDT (Binance)" },
+                { key: "USD", label: "USD (BCV)" },
+                { key: "EUR", label: "EUR (BCV)" },
+              ] as { key: RateKey; label: string }[]
+            ).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={honestInput === key}
+                onClick={() => {
+                  editingRates.current = true;
+                  setHonestInput(key);
+                }}
+                className={`h-11 px-4 rounded-lg border text-sm font-medium transition-colors ${
+                  honestInput === key
+                    ? "border-primary bg-primary text-white"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <div className="flex justify-end gap-3 mt-4">
           <Button
             type="button"
@@ -528,7 +599,6 @@ export function AdminView({
             }}
             editItem={editingItem}
             onCancelEdit={() => handleFormOpenChange(false)}
-            rates={rates}
           />
         </DialogContent>
       </Dialog>

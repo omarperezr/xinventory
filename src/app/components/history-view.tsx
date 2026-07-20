@@ -19,8 +19,9 @@ import {
   useHistory,
   TransactionItem,
 } from "../context/history-context";
-import { useApp } from "../context/app-context";
+import { useApp, isReferenceLens } from "../context/app-context";
 import { useAuth } from "../context/auth-context";
+import { MoneyInput } from "./money-input";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
@@ -38,11 +39,12 @@ interface HistoryViewProps {
 }
 
 export function HistoryView({ onReturnInventory }: HistoryViewProps) {
-  const { transactions, returnItem, updateTransactionItemPrice, addImageToTransaction } =
-    useHistory();
-  const { formatPrice } = useApp();
+  const { transactions, returnItem, addImageToTransaction } = useHistory();
+  const { formatPrice, currency } = useApp();
   const { currentUser } = useAuth();
-  const isAdmin = currentUser?.role === "admin";
+  // Editing a past sale's price is admin-only, and never through a reference
+  // lens (the amount would be rebooked at a rate we don't consider real).
+  const isAdmin = currentUser?.role === "admin" && !isReferenceLens(currency);
   const [searchTerm, setSearchTerm] = useState("");
   const [userFilter, setUserFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -555,49 +557,16 @@ function EditableHistoryPrice({
   item: TransactionItem;
   transactionId: string;
 }) {
-  const { convertPrice, convertToUsd, currency } = useApp();
   const { updateTransactionItemPrice } = useHistory();
-  const symbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
-  const [value, setValue] = useState(convertPrice(item.sellingPrice).toFixed(2));
-
-  useEffect(() => {
-    setValue(convertPrice(item.sellingPrice).toFixed(2));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.sellingPrice, currency]);
-
-  const commit = () => {
-    const parsed = parseFloat(value);
-    if (isNaN(parsed) || parsed < 0) {
-      setValue(convertPrice(item.sellingPrice).toFixed(2));
-      return;
-    }
-    const usd = convertToUsd(parsed);
-    if (Math.abs(usd - item.sellingPrice) < 0.0001) return;
-    updateTransactionItemPrice(transactionId, item.id, usd);
-  };
-
   return (
-    <div className="relative w-24 ml-auto">
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
-        {symbol}
-      </span>
-      <Input
-        type="number"
-        step="0.01"
-        min="0"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            (e.target as HTMLInputElement).blur();
-          }
-        }}
-        className="h-8 pl-7 pr-1 text-sm text-right"
-        title="Editar precio de venta"
-      />
-    </div>
+    <MoneyInput
+      label={`Precio de venta de ${item.name}`}
+      valueUsd={item.sellingPrice}
+      onCommitUsd={(usd) =>
+        updateTransactionItemPrice(transactionId, item.id, usd)
+      }
+      className="w-32 ml-auto"
+    />
   );
 }
 

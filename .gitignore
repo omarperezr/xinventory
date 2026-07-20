@@ -37,3 +37,10 @@ next-env.d.ts
 dist
 
 *.patch
+
+graphify-out/*
+
+# database dumps
+*.dump
+*.sql.gz
+xinventory-backup-*

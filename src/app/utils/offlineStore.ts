@@ -40,7 +40,15 @@ type OutboxOp =
   | { kind: "item.update"; id: string; row: Partial<ItemRow>; historyRow?: HistoryRow }
   | { kind: "item.delete"; id: string }
   | { kind: "item.bulkDelete"; ids: string[]; historyRows: HistoryRow[] }
-  | { kind: "rates.update"; value: { USD: number; EUR: number; USDT: number } };
+  | { kind: "rates.update"; value: RatesValue };
+
+// `honest` records which rate the business treats as the real bolívar worth.
+export interface RatesValue {
+  USD: number;
+  EUR: number;
+  USDT: number;
+  honest: "USD" | "EUR" | "USDT";
+}
 
 export function isOnline(): boolean {
   return typeof navigator === "undefined" || navigator.onLine;
@@ -179,7 +187,7 @@ export async function bulkDeleteItems(
   return { queued: true };
 }
 
-export async function updateRates(value: { USD: number; EUR: number; USDT: number }): Promise<{ queued: boolean }> {
+export async function updateRates(value: RatesValue): Promise<{ queued: boolean }> {
   if (isOnline()) {
     const { error } = await supabase.from("settings").upsert({ key: "rates", value });
     if (!error) return { queued: false };
@@ -189,10 +197,24 @@ export async function updateRates(value: { USD: number; EUR: number; USDT: numbe
   return { queued: true };
 }
 
+// Guards against concurrent replays. Three independent callers can trigger a
+// flush (the `online` event, the 5s poll in OfflineSync, and app-context), and
+// without this they interleave and can apply the same queued op twice.
+let flushing = false;
+
 // Replays queued ops in order against Supabase. Stops at the first network
 // error (so it can be retried later); drops ops the server actively rejects.
 export async function flushOutbox(): Promise<void> {
-  if (!isOnline()) return;
+  if (!isOnline() || flushing) return;
+  flushing = true;
+  try {
+    await drainOutbox();
+  } finally {
+    flushing = false;
+  }
+}
+
+async function drainOutbox(): Promise<void> {
   let ops = await getOutbox();
 
   while (ops.length > 0) {

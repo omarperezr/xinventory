@@ -26,7 +26,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { useApp } from "../context/app-context";
+import {
+  useApp,
+  DisplayCurrency,
+  isReferenceLens,
+} from "../context/app-context";
 import { useAuth, UserRole } from "../context/auth-context";
 import { ProfileDialog } from "./profile-dialog";
 import { Input } from "./ui/input";
@@ -537,16 +541,22 @@ export function InventoryHeader() {
               {/* Currency Selector */}
               <Select
                 value={currency}
-                onValueChange={(val: any) => setCurrency(val)}
+                onValueChange={(val) => setCurrency(val as DisplayCurrency)}
               >
                 <SelectTrigger className="w-[120px] md:w-[140px] h-8 text-xs md:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="USD">USD ($)</SelectItem>
-                  <SelectItem value="BS">USD (BCV)</SelectItem>
-                  <SelectItem value="EUR">EUR (BCV)</SelectItem>
-                  <SelectItem value="USDT">USDT (Binance)</SelectItem>
+                  <SelectItem value="BS">Bs (real)</SelectItem>
+                  {/* Reference lenses: they restate the price at a rate we do
+                      not treat as the real worth of a bolívar, so money cannot
+                      be entered while one of these is selected. */}
+                  <SelectItem value="BCV">Bs (BCV) · referencia</SelectItem>
+                  <SelectItem value="EUR">Bs (EUR BCV) · referencia</SelectItem>
+                  <SelectItem value="USDT">
+                    Bs (Binance) · referencia
+                  </SelectItem>
                 </SelectContent>
               </Select>
 
@@ -636,6 +646,18 @@ export function InventoryHeader() {
           </div>
         </div>
       </header>
+
+      {/* Reference lenses are view-only: prices are shown at a rate we do not
+          treat as the real worth of a bolívar, so money entry is disabled. */}
+      {isReferenceLens(currency) && (
+        <div
+          role="status"
+          className="bg-amber-50 border-b border-amber-200 text-amber-900 text-xs px-4 py-2 text-center"
+        >
+          Viendo precios de <strong>referencia</strong>. Para cobrar o editar
+          precios, cambia a <strong>USD ($)</strong> o <strong>Bs (real)</strong>.
+        </div>
+      )}
 
       {/* Mobile Bottom Navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-safe">

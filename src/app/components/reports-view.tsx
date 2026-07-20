@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useHistory } from "../context/history-context";
 import { useApp } from "../context/app-context";
 import {
@@ -90,16 +91,20 @@ const CustomAreaTooltip = ({ active, payload, label, formatPrice }: any) => {
 
 export function ReportsView() {
   const { transactions } = useHistory();
-  const { formatPrice, items, convertPrice, currency } = useApp();
-  const currencySymbol = currency === "BS" ? "Bs" : currency === "USD" ? "$" : "€";
+  const { formatPrice, items, convertPrice, currencySymbol } = useApp();
 
   // ── Aggregations ──────────────────────────────────────────────────────
+  // Memoized: this walks every transaction and every line item, and without
+  // it the whole pipeline (plus several sorts) re-ran on every render.
+  const aggregates = useMemo(() => {
   const itemSales: Record<
     string,
     { name: string; quantity: number; total: number; cost: number }
   > = {};
   const userSales: Record<string, { total: number; count: number }> = {};
-  const dailySales: Record<string, number> = {};
+  // Keyed by sortable ISO day so the trend can be ordered chronologically;
+  // `label` is the human-readable form shown on the axis.
+  const dailySales: Record<string, { label: string; total: number }> = {};
   const paymentMethodTotals: Record<string, number> = {};
 
   const buyingPriceById = new Map(items.map((i) => [i.id, i.buyingPrice]));
@@ -109,8 +114,14 @@ export function ReportsView() {
     userSales[t.userId].total += t.total;
     userSales[t.userId].count += 1;
 
-    const day = format(new Date(t.date), "dd/MM");
-    dailySales[day] = (dailySales[day] || 0) + t.total;
+    // A malformed date must not take down the entire reports screen.
+    const parsedDate = new Date(t.date);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      const key = format(parsedDate, "yyyy-MM-dd");
+      const label = format(parsedDate, "dd/MM");
+      if (!dailySales[key]) dailySales[key] = { label, total: 0 };
+      dailySales[key].total += t.total;
+    }
 
     t.items.forEach((item) => {
       // Net of returns so reports reflect what was actually kept/sold.
@@ -193,9 +204,16 @@ export function ReportsView() {
     units: item.quantity,
   }));
 
-  const dailySalesData = Object.entries(dailySales)
+  // Sort chronologically BEFORE taking the last 10. Transactions arrive
+  // newest-first, so slicing insertion order returned the OLDEST ten days
+  // while the chart claimed to show the recent trend.
+  const dailySalesData = Object.keys(dailySales)
+    .sort()
     .slice(-10)
-    .map(([day, total]) => ({ day, total: parseFloat(total.toFixed(2)) }));
+    .map((key) => ({
+      day: dailySales[key].label,
+      total: parseFloat(dailySales[key].total.toFixed(2)),
+    }));
 
   const userSalesData = sortedUsers.map(([userId, data], i) => ({
     name: userId.split(" ")[0],
@@ -205,6 +223,67 @@ export function ReportsView() {
     fill: CHART_COLORS[i % CHART_COLORS.length],
   }));
 
+  // Computed once and reused instead of re-sorting itemSales at each use site.
+  const itemSalesByRevenue = Object.values(itemSales).sort(
+    (a, b) => b.total - a.total,
+  );
+  const maxItemTotal = itemSalesByRevenue[0]?.total ?? 0;
+
+    return {
+      itemSales,
+      sortedItems,
+      sortedUsers,
+      sortedByProfit,
+      itemSalesByRevenue,
+      maxItemTotal,
+      mostSoldItem,
+      leastSoldItem,
+      bestSeller,
+      worstSeller,
+      totalRevenue,
+      totalCost,
+      totalProfit,
+      profitMargin,
+      totalTransactions,
+      avgTicket,
+      inventoryCost,
+      lowStockItems,
+      outOfStockItems,
+      paymentMethodData,
+      topRevenueData,
+      topUnitsData,
+      dailySalesData,
+      userSalesData,
+    };
+  }, [transactions, items]);
+
+  const {
+    itemSales,
+    sortedItems,
+    sortedUsers,
+    sortedByProfit,
+    itemSalesByRevenue,
+    maxItemTotal,
+    mostSoldItem,
+    leastSoldItem,
+    bestSeller,
+    worstSeller,
+    totalRevenue,
+    totalCost,
+    totalProfit,
+    profitMargin,
+    totalTransactions,
+    avgTicket,
+    inventoryCost,
+    lowStockItems,
+    outOfStockItems,
+    paymentMethodData,
+    topRevenueData,
+    topUnitsData,
+    dailySalesData,
+    userSalesData,
+  } = aggregates;
+
   // ── Empty state ────────────────────────────────────────────────────────
   const hasData = transactions.length > 0;
 
@@ -213,7 +292,7 @@ export function ReportsView() {
     transactions,
     symbol: currencySymbol,
     convert: convertPrice,
-    itemSales: Object.values(itemSales).sort((a, b) => b.total - a.total),
+    itemSales: itemSalesByRevenue,
     userSales: sortedUsers.map(([user, d]) => ({
       user,
       total: d.total,
@@ -835,14 +914,12 @@ export function ReportsView() {
             Ranking de Productos por Ingresos
           </h3>
           <div className="space-y-3">
-            {Object.values(itemSales)
-              .sort((a, b) => b.total - a.total)
-              .slice(0, 5)
-              .map((item, idx) => {
-                const maxTotal = Object.values(itemSales)[0]?.total || 1;
-                const pct = Math.round((item.total / maxTotal) * 100);
+            {itemSalesByRevenue.slice(0, 5).map((item, idx) => {
+                const pct = Math.round(
+                  (item.total / (maxItemTotal || 1)) * 100,
+                );
                 return (
-                  <div key={idx}>
+                  <div key={item.name}>
                     <div className="flex items-center justify-between mb-1 gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-xs font-mono text-gray-400 flex-shrink-0 w-5">
@@ -892,7 +969,7 @@ export function ReportsView() {
                 Math.round((item.profit / maxProfit) * 100),
               );
               return (
-                <div key={idx}>
+                <div key={item.name}>
                   <div className="flex items-center justify-between mb-1 gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-mono text-gray-400 flex-shrink-0 w-5">

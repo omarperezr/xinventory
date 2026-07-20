@@ -11,11 +11,31 @@ import * as offlineStore from "../utils/offlineStore";
 
 export type UnitType = "units" | "kg" | "liters";
 
-export type DisplayCurrency = "BS" | "USD" | "EUR" | "USDT";
+// Which stored rate is treated as the "honest" bolívar rate — the one that
+// says what a bolívar amount is really worth in dollars. In Venezuela that is
+// normally the Binance P2P (parallel) rate, but it is configurable because the
+// answer is a business decision, not a technical one.
+export type RateKey = "USD" | "EUR" | "USDT";
+
+// Display lenses. USD is the canonical price; every other option renders a
+// BOLÍVAR amount, differing only in which rate produced it:
+//   BS   -> honest rate (configurable, default USDT) — the real charge
+//   BCV  -> official government rate — reference only
+//   EUR  -> official EUR rate        — reference only
+//   USDT -> Binance parallel rate    — reference only
+export type DisplayCurrency = "USD" | "BS" | "BCV" | "EUR" | "USDT";
+
 export interface Rates {
   USD: number;
   EUR: number;
   USDT: number;
+}
+
+// Lenses other than USD and BS are reference views: they show what a price
+// looks like at a rate we do NOT consider honest, so money must never be
+// entered through them (the value would be booked at the wrong worth).
+export function isReferenceLens(c: DisplayCurrency): boolean {
+  return c !== "USD" && c !== "BS";
 }
 
 export interface ItemHistoryRecord {
@@ -84,14 +104,34 @@ interface AppContextType {
     user: string,
   ) => Promise<{ created: number; updated: number }>;
 
-  // Currency — prices are stored in USD; rates convert USD -> BS/EUR/USDT for display
+  // Currency — prices are stored in USD; rates convert USD -> Bs for display
   currency: DisplayCurrency;
   setCurrency: (c: DisplayCurrency) => void;
   rates: Rates; // Bs per 1 USD, Bs per 1 EUR, Bs per 1 USDT
-  updateRates: (usd: number, eur: number, usdt: number) => void;
+  honestRateKey: RateKey;
+  honestRate: number; // Bs per 1 USD of real worth
+  updateRates: (
+    usd: number,
+    eur: number,
+    usdt: number,
+    honest?: RateKey,
+  ) => void;
+
+  // DISPLAY ONLY. Never feed the result of this back into a write — see
+  // bsToUsd below for why these two are deliberately not inverses.
   convertPrice: (priceInUsd: number) => number;
-  convertToUsd: (priceInDisplay: number) => number;
+  currencySymbol: string;
   formatPrice: (priceInUsd: number) => string;
+  // Reference figure shown alongside the honest price for clients who want to
+  // see the official rate. Null when the official rate is the honest one.
+  formatReferencePrice: (priceInUsd: number) => string | null;
+
+  // MONEY ENTRY. A bolívar amount is worth what the HONEST rate says it is,
+  // regardless of which rate was used to arrive at that figure — buying at the
+  // BCV rate genuinely is a cheaper purchase in real terms. These are exact
+  // inverses of each other, so a display/edit round trip cannot drift.
+  bsToUsd: (amountInBs: number) => number;
+  usdToBs: (amountInUsd: number) => number;
 
   // Cart
   cartItems: CartItem[];
@@ -204,6 +244,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Currency State
   const [currency, setCurrency] = useState<DisplayCurrency>("USD");
   const [rates, setRates] = useState<Rates>({ USD: 36.5, EUR: 39.2, USDT: 36.5 });
+  // Which rate defines the real worth of a bolívar. Configurable per business;
+  // Binance P2P (USDT) is the usual answer in Venezuela.
+  const [honestRateKey, setHonestRateKey] = useState<RateKey>("USDT");
+  // Guard against a zero/NaN rate silently producing Infinity prices.
+  const rawHonestRate = rates[honestRateKey];
+  const honestRate =
+    Number.isFinite(rawHonestRate) && rawHonestRate > 0 ? rawHonestRate : 1;
 
   // Cart State — the in-progress cart is restored from localStorage so a
   // refresh or offline reload doesn't lose it (savedCarts below are
@@ -231,13 +278,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .eq("key", "rates")
         .maybeSingle();
       if (settingsRow?.value) {
-        const stored = settingsRow.value as Partial<Rates>;
+        const stored = settingsRow.value as Partial<Rates> & { honest?: RateKey };
         // Older settings rows predate USDT — fall back to the USD rate.
         setRates({
           USD: stored.USD ?? 36.5,
           EUR: stored.EUR ?? 39.2,
           USDT: stored.USDT ?? stored.USD ?? 36.5,
         });
+        // Rows written before the honest-rate setting existed default to USDT,
+        // which is the behaviour those rows were already assuming.
+        if (stored.honest === "USD" || stored.honest === "EUR" || stored.honest === "USDT") {
+          setHonestRateKey(stored.honest);
+        }
       }
     } catch (e) {
       console.error("Error refreshing data from Supabase", e);
@@ -428,9 +480,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     rows: Omit<InventoryItem, "id" | "history" | "images" | "currency">[],
     user: string,
   ) => {
+    type ImportRow = Omit<InventoryItem, "id" | "history" | "currency">;
     const byBarcode = new Map(items.map((i) => [i.barcode, i]));
-    const toInsert: ReturnType<typeof normalizeItemText>[] = [];
-    const toUpdate: { id: string; data: ReturnType<typeof normalizeItemText> }[] = [];
+    const toInsert: ImportRow[] = [];
+    const toUpdate: { id: string; data: ImportRow }[] = [];
 
     for (const raw of rows) {
       const normalized = normalizeItemText({ ...raw, images: [] as string[] });
@@ -507,11 +560,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // --- CURRENCY ACTIONS ---
-  const updateRates = async (usd: number, eur: number, usdt: number) => {
+  const updateRates = async (
+    usd: number,
+    eur: number,
+    usdt: number,
+    honest: RateKey = honestRateKey,
+  ) => {
     try {
       const ratesObj = { USD: usd, EUR: eur, USDT: usdt };
-      const { queued } = await offlineStore.updateRates(ratesObj);
+      const { queued } = await offlineStore.updateRates({ ...ratesObj, honest });
       setRates(ratesObj);
+      setHonestRateKey(honest);
       toast.success(queued ? "Tasas guardadas localmente (sin conexión)" : "Tasas de cambio actualizadas");
     } catch (e) {
       console.error(e);
@@ -519,36 +578,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Base price is always USD. The three non-USD selections each show a Bs
-  // value = the USD price multiplied by the chosen rate:
-  //   BS   -> "USD (BCV)":     Bs/USD rate (Alcambio / BCV)
-  //   EUR  -> "EUR (BCV)":     Bs/EUR rate (Alcambio / BCV)
-  //   USDT -> "USDT (Binance)": Bs/USDT liquidation rate (Binance P2P)
+  // --- MONEY ENTRY (exact inverses — safe to round-trip) ---
+  // A bolívar figure is worth whatever the honest rate says, no matter which
+  // rate produced it. Provider A quoting at BCV and provider B quoting at the
+  // parallel rate are not different conversions; A is simply a cheaper deal.
+  const bsToUsd = (amountInBs: number) => amountInBs / honestRate;
+  const usdToBs = (amountInUsd: number) => amountInUsd * honestRate;
+
+  // --- DISPLAY LENS (read-only — NOT the inverse of bsToUsd) ---
+  // Every non-USD lens renders bolívares; they differ only in which rate was
+  // applied. Feeding this back through bsToUsd would rebook the price at a
+  // different worth, so reference lenses are read-only in the UI.
   const convertPrice = (priceInUsd: number) => {
-    if (currency === "USD") return priceInUsd;
-    if (currency === "BS") return priceInUsd * rates.USD;
-    if (currency === "EUR") return priceInUsd * rates.EUR;
-    if (currency === "USDT") return priceInUsd * rates.USDT;
-    return priceInUsd;
+    switch (currency) {
+      case "USD":
+        return priceInUsd;
+      case "BS":
+        return usdToBs(priceInUsd);
+      case "BCV":
+        return priceInUsd * rates.USD;
+      case "EUR":
+        return priceInUsd * rates.EUR;
+      case "USDT":
+        return priceInUsd * rates.USDT;
+      default:
+        return priceInUsd;
+    }
   };
 
-  // Inverse of convertPrice: takes an amount entered in the active display
-  // currency and returns the canonical USD value to store.
-  const convertToUsd = (priceInDisplay: number) => {
-    if (currency === "USD") return priceInDisplay;
-    // A bolívar amount's "real" USD value uses the USDT (Binance/parallel)
-    // rate, not the BCV rate — that's the true dollar the bolívares represent.
-    if (currency === "BS") return priceInDisplay / rates.USDT;
-    if (currency === "EUR") return priceInDisplay / rates.EUR;
-    if (currency === "USDT") return priceInDisplay / rates.USDT;
-    return priceInDisplay;
-  };
+  const currencySymbol = currency === "USD" ? "$" : "Bs";
 
-  const formatPrice = (priceInUsd: number) => {
-    const converted = convertPrice(priceInUsd);
-    // USD shows "$"; the BCV/Binance selections all resolve to a Bs amount.
-    const symbol = currency === "USD" ? "$" : "Bs";
-    return `${symbol} ${converted.toFixed(2)}`;
+  const formatPrice = (priceInUsd: number) =>
+    `${currencySymbol} ${convertPrice(priceInUsd).toFixed(2)}`;
+
+  // Clients often want to see the official (BCV) figure next to the real one.
+  // Suppressed when BCV already is the honest rate, or when showing USD.
+  const formatReferencePrice = (priceInUsd: number) => {
+    if (currency !== "BS" || honestRateKey === "USD") return null;
+    return `Bs ${(priceInUsd * rates.USD).toFixed(2)} (BCV)`;
   };
 
   // --- CART ACTIONS ---
@@ -719,10 +786,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currency,
         setCurrency,
         rates,
+        honestRateKey,
+        honestRate,
         updateRates,
         convertPrice,
-        convertToUsd,
+        currencySymbol,
         formatPrice,
+        formatReferencePrice,
+        bsToUsd,
+        usdToBs,
         cartItems,
         addToCart,
         removeFromCart,
