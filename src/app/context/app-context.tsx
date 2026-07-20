@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "../services/supabase";
 import * as offlineStore from "../utils/offlineStore";
+import type { ItemRow } from "../utils/offlineStore";
 import {
   fetchVenezuelaConversionRates,
   fetchUsdtRate,
@@ -55,6 +56,17 @@ export class InsufficientStockError extends Error {
 // entered through them (the value would be booked at the wrong worth).
 export function isReferenceLens(c: DisplayCurrency): boolean {
   return c !== "USD" && c !== "BS";
+}
+
+const DISPLAY_CURRENCIES = ["USD", "BS", "BCV", "EUR", "USDT"] as const;
+
+/**
+ * Which lens is showing decides whether an amount on screen is the real
+ * charge or a reference figure, so the value picked in the selector is
+ * checked rather than asserted on its way into state.
+ */
+export function isDisplayCurrency(value: string): value is DisplayCurrency {
+  return (DISPLAY_CURRENCIES as readonly string[]).includes(value);
 }
 
 export interface ItemHistoryRecord {
@@ -220,9 +232,30 @@ function normalizeItemText<T extends { name: string; barcode: string; type: stri
   };
 }
 
+/**
+ * The stored rates row is untyped JSON. These read one field at a time and
+ * reject anything that is not usable as a rate, so a malformed row falls back
+ * to the defaults instead of poisoning every price in the app.
+ */
+function readRate(value: unknown, key: RateKey): number | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const rate = (value as Partial<Record<RateKey, unknown>>)[key];
+  return typeof rate === "number" && Number.isFinite(rate) && rate > 0
+    ? rate
+    : undefined;
+}
+
+function readHonestKey(value: unknown): RateKey | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const honest = (value as { honest?: unknown }).honest;
+  return honest === "USD" || honest === "EUR" || honest === "USDT"
+    ? honest
+    : undefined;
+}
+
 // Maps a database row to the shape the UI uses. History is not included: it
 // is loaded per item, on demand, by loadItemHistory.
-function mapRow(row: any): InventoryItem {
+function mapRow(row: ItemRow): InventoryItem {
   return {
     id: row.id,
     name: row.name,
@@ -314,18 +347,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .eq("key", "rates")
         .maybeSingle();
       if (settingsRow?.value) {
-        const stored = settingsRow.value as Partial<Rates> & { honest?: RateKey };
+        const storedUsd = readRate(settingsRow.value, "USD");
         // Older settings rows predate USDT - fall back to the USD rate.
         setRates({
-          USD: stored.USD ?? 36.5,
-          EUR: stored.EUR ?? 39.2,
-          USDT: stored.USDT ?? stored.USD ?? 36.5,
+          USD: storedUsd ?? 36.5,
+          EUR: readRate(settingsRow.value, "EUR") ?? 39.2,
+          USDT: readRate(settingsRow.value, "USDT") ?? storedUsd ?? 36.5,
         });
         // Rows written before the honest-rate setting existed default to USDT,
         // which is the behaviour those rows were already assuming.
-        if (stored.honest === "USD" || stored.honest === "EUR" || stored.honest === "USDT") {
-          setHonestRateKey(stored.honest);
-        }
+        const honest = readHonestKey(settingsRow.value);
+        if (honest) setHonestRateKey(honest);
       }
     } catch (e) {
       console.error("Error refreshing data from Supabase", e);
@@ -409,16 +441,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       );
 
       // Insert into local state rather than refetching the whole catalog.
-      setItems((prev) => [
-        {
-          ...newItemData,
-          id,
-          currency: "USD",
-          updatedAt: new Date().toISOString(),
-          history: [],
-        } as InventoryItem,
-        ...prev,
-      ]);
+      const created: InventoryItem = {
+        ...newItemData,
+        id,
+        currency: "USD",
+        updatedAt: new Date().toISOString(),
+        history: [],
+      };
+      setItems((prev) => [created, ...prev]);
       toast.success(
         queued ? "Producto guardado localmente (sin conexión)" : "Producto agregado exitosamente",
       );
@@ -534,8 +564,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadItemHistory = useCallback(
     async (itemId: string): Promise<ItemHistoryRecord[]> => {
       const rows = await offlineStore.fetchItemHistory(itemId);
-      return rows.map((h: any) => ({
-        date: h.date,
+      return rows.map((h) => ({
+        date: h.date ?? "",
         action: h.action,
         details: h.details,
         user: h.user_name,

@@ -191,7 +191,7 @@ export function buildLines(
     if (Number.isNaN(date.getTime())) continue;
     for (const item of t.items) {
       const cat = catalog.get(item.id);
-      const netQty = item.cartQuantity - (item.quantityReturned || 0);
+      const netQty = item.cartQuantity - (item.quantityReturned ?? 0);
       const unitPrice = effectiveUnitPrice(item);
       // Prefer the cost snapshotted at sale time; sales predating that column
       // carry 0, so fall back to the catalogue rather than reporting a false
@@ -211,7 +211,7 @@ export function buildLines(
         listPrice,
         unitCost,
         soldQty: item.cartQuantity,
-        returnedQty: item.quantityReturned || 0,
+        returnedQty: item.quantityReturned ?? 0,
         netQty,
         revenue: unitPrice * netQty,
         cost: unitCost * netQty,
@@ -1302,7 +1302,7 @@ export function buildReport(
     if (Number.isNaN(d.getTime())) continue;
     if (!oldestLoaded || d < oldestLoaded) oldestLoaded = d;
     for (const item of t.items) {
-      if (item.cartQuantity - (item.quantityReturned || 0) <= 0) continue;
+      if (item.cartQuantity - (item.quantityReturned ?? 0) <= 0) continue;
       const prev = lastSoldById.get(item.id);
       if (!prev || d > prev) lastSoldById.set(item.id, d);
     }

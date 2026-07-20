@@ -275,7 +275,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
                   cursor={{ fill: "rgba(0,0,0,0.03)" }}
                   content={
                     <ChartTooltip
-                      format={(v: number, key: string) =>
+                      format={(v, key) =>
                         key === "Unidades" ? `${v} u` : v.toFixed(2)
                       }
                     />

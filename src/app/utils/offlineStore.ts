@@ -3,6 +3,7 @@
 // through here - queued operations are replayed by calling the Supabase
 // SDK directly once connectivity returns.
 import { supabase } from "../services/supabase";
+import type { ItemHistoryRecord, UnitType } from "../context/app-context";
 import { idbGet, idbSet } from "./localdb";
 
 const ITEMS_KEY = "items";
@@ -16,7 +17,7 @@ export interface ItemRow {
   buying_price_usd: number;
   selling_price_usd: number;
   quantity: number;
-  unit: string;
+  unit: UnitType;
   includes_taxes: boolean;
   discount: number;
   images: string[];
@@ -24,12 +25,15 @@ export interface ItemRow {
   brand: string;
   notes: string;
   updated_at?: string;
+  created_at?: string;
 }
 
 export interface HistoryRow {
   id?: string;
   item_id: string;
-  action: "create" | "update" | "delete" | "sale" | "return";
+  date?: string;
+  // The set of actions is defined once, on the record the UI consumes.
+  action: ItemHistoryRecord["action"];
   details: string;
   user_name: string;
   previous_stock?: number;
@@ -74,8 +78,10 @@ export function isOnline(): boolean {
 // stay queued and be retried), as opposed to errors the server actively
 // returned (a real rejection - e.g. constraint violation - which should be
 // dropped rather than retried forever).
-function isNetworkError(error: any): boolean {
-  return !!error && !error.code;
+function isNetworkError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  // A `code` means the server answered and rejected the operation.
+  return !("code" in error) || !(error as { code?: unknown }).code;
 }
 
 async function getOutbox(): Promise<OutboxOp[]> {
@@ -339,7 +345,7 @@ async function drainOutbox(): Promise<void> {
 
   while (ops.length > 0) {
     const op = ops[0];
-    let error: any = null;
+    let error: unknown = null;
 
     try {
       switch (op.kind) {

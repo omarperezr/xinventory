@@ -54,6 +54,14 @@ function change(current: number, previous: number): string {
   return `${d >= 0 ? "+" : ""}${d.toFixed(1)}%`;
 }
 
+// jspdf-autotable hangs this off the document once it has drawn a table; the
+// types shipped with the plugin do not describe it.
+declare module "jspdf" {
+  interface jsPDF {
+    lastAutoTable: { finalY: number };
+  }
+}
+
 const ALERT_LABEL: Record<Alert["level"], string> = {
   critical: "Crítico",
   warning: "Atención",
@@ -66,7 +74,7 @@ export function exportReportPdf(data: ReportData) {
   const money_ = (usd: number) => money(symbol, convert, usd);
   const doc = new jsPDF();
   const generatedAt = format(new Date(), "PPP p");
-  const next = () => (doc as any).lastAutoTable.finalY + 8;
+  const next = () => doc.lastAutoTable.finalY + 8;
 
   doc.setFontSize(18);
   doc.text("Reporte de gestión", 14, 18);
@@ -472,7 +480,7 @@ export function exportReportExcel(data: ReportData) {
       t.id,
       t.userId || "",
       t.items.length,
-      t.items.reduce((s, i) => s + (i.cartQuantity - (i.quantityReturned || 0)), 0),
+      t.items.reduce((s, i) => s + (i.cartQuantity - (i.quantityReturned ?? 0)), 0),
       c(t.subtotal),
       c(t.tax),
       c(t.total),

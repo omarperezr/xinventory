@@ -493,23 +493,46 @@ export function DataTable<T>({
 // Chart tooltip
 // ---------------------------------------------------------------------------
 
+/** One series entry as Recharts hands it to a custom tooltip. */
+interface TooltipEntry {
+  name?: string;
+  // Every series in these reports plots a number.
+  value: number;
+  dataKey?: string | number;
+  color?: string;
+  fill?: string;
+  payload?: Record<string, unknown>;
+}
+
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  label?: string | number;
+  format?: (value: number, dataKey?: TooltipEntry["dataKey"]) => string;
+  nameKey?: string;
+}
+
 export function ChartTooltip({
   active,
   payload,
   label,
   format,
   nameKey,
-}: any) {
+}: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
-  const heading = payload[0]?.payload?.[nameKey] ?? label;
+  // The row a tooltip describes is an untyped chart datum, so the heading is
+  // only used when it turns out to be something printable.
+  const named = nameKey ? payload[0]?.payload?.[nameKey] : undefined;
+  const heading =
+    typeof named === "string" || typeof named === "number" ? named : label;
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 shadow-lg text-[11px] max-w-[220px]">
+    <div className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 shadow-lg text-meta max-w-[220px]">
       {heading != null && (
         <p className="font-medium text-gray-800 mb-1 truncate">{heading}</p>
       )}
-      {payload.map((entry: any, i: number) => (
+      {payload.map((entry, i) => (
         <p key={i} className="flex items-center gap-1.5 text-gray-600">
-          <Swatch color={entry.color || entry.fill || SERIES[0]} />
+          <Swatch color={entry.color ?? entry.fill ?? SERIES[0]} />
           <span>{entry.name}</span>
           <span className="ml-auto font-medium text-gray-900 tabular-nums">
             {format ? format(entry.value, entry.dataKey) : entry.value}

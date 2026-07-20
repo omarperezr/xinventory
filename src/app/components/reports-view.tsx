@@ -77,6 +77,19 @@ const TABS: { key: TabKey; label: string; icon: typeof BarChart2; hint: string }
   { key: "proyeccion", label: "Proyección", icon: Sparkles, hint: "Qué viene y qué comprar" },
 ];
 
+/**
+ * The `report_summary` RPC answers with an untyped JSON document. Reach for
+ * the one number we need through checks rather than asserting a shape onto
+ * the whole payload.
+ */
+function readTransactionTotal(data: unknown): number | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const totals = (data as { totals?: unknown }).totals;
+  if (!totals || typeof totals !== "object") return undefined;
+  const value = (totals as { transactions?: unknown }).transactions;
+  return typeof value === "number" ? value : undefined;
+}
+
 export function ReportsView() {
   const { transactions, hasMore, loadingMore, loadMore } = useHistory();
   const { formatPrice, items, convertPrice, currencySymbol } = useApp();
@@ -109,8 +122,8 @@ export function ReportsView() {
       })
       .then(({ data, error }) => {
         if (cancelled) return;
-        const total = (data as any)?.totals?.transactions;
-        setServerCount(!error && typeof total === "number" ? total : null);
+        const total = readTransactionTotal(data);
+        setServerCount(!error && total !== undefined ? total : null);
       });
     return () => {
       cancelled = true;

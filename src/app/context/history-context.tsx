@@ -14,6 +14,32 @@ export interface TransactionItem extends CartItem {
   quantityReturned: number;
 }
 
+/** The `transactions` row as stored. */
+interface TransactionRow {
+  id: string;
+  date: string;
+  subtotal_usd: number | null;
+  tax_usd: number | null;
+  total_usd: number | null;
+  payments: PaymentRecord[] | null;
+  images: string[] | null;
+  notes?: string;
+  user_id: string;
+}
+
+/** The `transaction_items` row as stored. */
+interface TransactionItemRow {
+  transaction_id: string;
+  item_id: string;
+  name: string;
+  price_usd: number | null;
+  quantity: number;
+  quantity_returned: number | null;
+  discount_applied: boolean;
+  discount_value: number | null;
+  buying_price_usd: number | null;
+}
+
 export interface Transaction {
   id: string;
   date: string;
@@ -93,8 +119,8 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
       const page = (txRows || []).slice(0, limit);
       setHasMore((txRows || []).length > limit);
 
-      const txIds = page.map((t: any) => t.id);
-      let itemRows: any[] = [];
+      const txIds = page.map((t) => t.id);
+      let itemRows: TransactionItemRow[] = [];
       if (txIds.length > 0) {
         const { data, error: itemErr } = await supabase
           .from("transaction_items")
@@ -107,21 +133,21 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
       // Group line items by transaction once (O(n+m)) instead of re-scanning
       // the full item list for every transaction (O(n*m)), which would not
       // scale as the history grows.
-      const itemsByTx = new Map<string, any[]>();
+      const itemsByTx = new Map<string, TransactionItemRow[]>();
       for (const i of itemRows || []) {
         const bucket = itemsByTx.get(i.transaction_id);
         if (bucket) bucket.push(i);
         else itemsByTx.set(i.transaction_id, [i]);
       }
 
-      const mapped: Transaction[] = page.map((tx: any) => {
+      const mapped: Transaction[] = page.map((tx: TransactionRow) => {
         const items: TransactionItem[] = (itemsByTx.get(tx.id) || []).map(
-          (i: any) => ({
+          (i) => ({
             id: i.item_id,
             name: i.name,
             sellingPrice: Number(i.price_usd) || 0,
             cartQuantity: i.quantity,
-            quantityReturned: i.quantity_returned || 0,
+            quantityReturned: i.quantity_returned ?? 0,
             applyDiscount: i.discount_applied,
             discount: Number(i.discount_value) || 0,
             barcode: "",
@@ -161,8 +187,8 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
           tax: netTax,
           total: netSubtotal + netTax,
           originalTotal: Number(tx.total_usd) || 0,
-          payments: tx.payments || [],
-          images: tx.images || [],
+          payments: tx.payments ?? [],
+          images: tx.images ?? [],
           notes: tx.notes,
           userId: tx.user_id,
           items,
@@ -222,11 +248,11 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         // Cost snapshotted at sale time. Reading the live buying price later
         // reports 0 for deleted products (a false 100% margin) and silently
         // restates past margins whenever a cost is edited.
-        buying_price_usd: item.buyingPrice || 0,
+        buying_price_usd: item.buyingPrice ?? 0,
         quantity: item.cartQuantity,
         quantity_returned: 0,
         discount_applied: item.applyDiscount,
-        discount_value: item.discount || 0,
+        discount_value: item.discount ?? 0,
       }));
       const { error: itemsErr } = await supabase
         .from("transaction_items")

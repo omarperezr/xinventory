@@ -1,13 +1,18 @@
+import { UnitType } from "../context/app-context";
+
 // Parses a product-list .xlsx into rows matching xinventory's InventoryItem
 // fields. No image extraction - xinventory stores image URLs uploaded
 // separately through the admin form, not embedded spreadsheet pictures.
+/** One cell as SheetJS hands it over, before we narrow it. */
+type Cell = string | number | boolean | Date | null | undefined;
+
 export interface ExcelItem {
   name: string;
   barcode: string;
   buyingPrice: number;
   sellingPrice: number;
   quantity: number;
-  unit: "units" | "kg" | "liters";
+  unit: UnitType;
   brand: string;
   type: string;
   includesTaxes: boolean;
@@ -56,7 +61,7 @@ interface ColumnMap {
   notes?: number;
 }
 
-function normalize(s: any): string {
+function normalize(s: unknown): string {
   return String(s ?? "")
     .trim()
     .toLowerCase()
@@ -64,22 +69,22 @@ function normalize(s: any): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-function isEmptyCell(v: any): boolean {
+function isEmptyCell(v: unknown): boolean {
   return v === undefined || v === null || String(v).trim() === "";
 }
 
-function parseNumber(v: any): number {
+function parseNumber(v: unknown): number {
   if (typeof v === "number") return v;
   const n = parseFloat(String(v ?? "").replace(",", "."));
   return isNaN(n) ? 0 : n;
 }
 
-function parseBoolean(v: any): boolean {
+function parseBoolean(v: unknown): boolean {
   const s = normalize(v);
   return s === "si" || s === "sí" || s === "true" || s === "1" || s === "x";
 }
 
-function parseUnit(v: any): "units" | "kg" | "liters" {
+function parseUnit(v: unknown): UnitType {
   const s = normalize(v);
   if (s.startsWith("kg") || s.includes("kilo")) return "kg";
   if (s.startsWith("l") || s.includes("litro")) return "liters";
@@ -88,7 +93,7 @@ function parseUnit(v: any): "units" | "kg" | "liters" {
 
 // Finds the header row (within the first 10 rows) by matching column names
 // against HEADER_ALIASES, and returns its column index map.
-function detectHeader(rawRows: any[][]): { headerRow: number; columns: ColumnMap } | null {
+function detectHeader(rawRows: Cell[][]): { headerRow: number; columns: ColumnMap } | null {
   const limit = Math.min(rawRows.length, 10);
   for (let r = 0; r < limit; r++) {
     const row = rawRows[r] || [];
@@ -117,7 +122,10 @@ export async function parseItemsFromExcel(file: File): Promise<ExcelItem[]> {
   const workbook = XLSX.read(data);
   const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
-  const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: "" });
+  const rawRows = XLSX.utils.sheet_to_json<Cell[]>(worksheet, {
+    header: 1,
+    defval: "",
+  });
 
   const detected = detectHeader(rawRows);
   if (!detected) return [];

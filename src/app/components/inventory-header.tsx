@@ -28,7 +28,7 @@ import {
 } from "./ui/select";
 import {
   useApp,
-  DisplayCurrency,
+  isDisplayCurrency,
   isReferenceLens,
 } from "../context/app-context";
 import { useAuth, UserRole } from "../context/auth-context";
@@ -555,7 +555,9 @@ export function InventoryHeader() {
               {/* Currency Selector */}
               <Select
                 value={currency}
-                onValueChange={(val) => setCurrency(val as DisplayCurrency)}
+                onValueChange={(val) => {
+                  if (isDisplayCurrency(val)) setCurrency(val);
+                }}
               >
                 <SelectTrigger
                   aria-label="Moneda mostrada"

@@ -76,7 +76,7 @@ async function callAdminUsers(body: Record<string, unknown>): Promise<Result> {
   });
   if (error) {
     const message =
-      (data as any)?.error || error.message || "Error desconocido";
+      readErrorField(data) ?? error.message ?? "Error desconocido";
     return { success: false, error: rpcErrorMessage(message) };
   }
   if (data?.error) {
@@ -85,7 +85,16 @@ async function callAdminUsers(body: Record<string, unknown>): Promise<Result> {
   return { success: true };
 }
 
-function mapProfile(profile: any): User {
+/** The `profiles` row as it comes back from the database. */
+interface ProfileRow {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  can_edit_price: boolean | null;
+}
+
+function mapProfile(profile: ProfileRow): User {
   return {
     id: profile.id,
     name: profile.name,
@@ -93,6 +102,17 @@ function mapProfile(profile: any): User {
     role: profile.role,
     canEditPrice: !!profile.can_edit_price,
   };
+}
+
+/**
+ * Edge functions answer with a JSON body we do not control, so it arrives
+ * untyped. Read the one field we care about rather than asserting a shape
+ * onto the whole response.
+ */
+function readErrorField(data: unknown): string | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const value = (data as { error?: unknown }).error;
+  return typeof value === "string" ? value : undefined;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

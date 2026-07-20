@@ -44,8 +44,8 @@ async function fetchP2pAverage(
     return null;
   }
 
-  const prices = data.data
-    .map((ad: any) => parseFloat(ad?.adv?.price))
+  const prices: number[] = data.data
+    .map((ad: unknown) => parseFloat(readAdvertisedPrice(ad) ?? ""))
     .filter((p: number) => Number.isFinite(p) && p > 0);
   if (prices.length === 0) return null;
 
@@ -53,7 +53,27 @@ async function fetchP2pAverage(
   return Math.round(avg * 100) / 100;
 }
 
-export default async function handler(req: any, res: any) {
+/** Reads adv.price out of one P2P advert without trusting the payload shape. */
+function readAdvertisedPrice(ad: unknown): string | undefined {
+  if (!ad || typeof ad !== "object") return undefined;
+  const adv = (ad as { adv?: unknown }).adv;
+  if (!adv || typeof adv !== "object") return undefined;
+  const price = (adv as { price?: unknown }).price;
+  return typeof price === "string" || typeof price === "number"
+    ? String(price)
+    : undefined;
+}
+
+/**
+ * Minimal shape of the serverless request/response this endpoint touches, so
+ * the handler is typed without pulling in the platform's type package.
+ */
+interface RateResponse {
+  setHeader(name: string, value: string): void;
+  status(code: number): { json(body: unknown): void };
+}
+
+export default async function handler(_req: unknown, res: RateResponse) {
   res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
   try {
     // tasa_liquidacion: SELL side - used as the USDT price.
@@ -63,7 +83,9 @@ export default async function handler(req: any, res: any) {
       return;
     }
     res.status(200).json({ usdt: rate });
-  } catch (e: any) {
-    res.status(502).json({ error: e?.message || "Error consultando Binance P2P" });
+  } catch (e) {
+    const message =
+      e instanceof Error ? e.message : "Error consultando Binance P2P";
+    res.status(502).json({ error: message });
   }
 }
