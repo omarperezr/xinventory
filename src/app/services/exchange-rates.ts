@@ -1,7 +1,7 @@
 const ALCAMBIO_GRAPHQL_URL = "https://api.alcambio.app/graphql";
 
 // Fetches the average Binance P2P VES/USDT liquidation rate (SELL side) via
-// our serverless proxy — Binance's API can't be called from the browser.
+// our serverless proxy - Binance's API can't be called from the browser.
 export async function fetchUsdtRate(): Promise<number | null> {
   const response = await fetch("/api/usdt-rate");
   if (!response.ok) throw new Error(`USDT rate API error: ${response.status}`);

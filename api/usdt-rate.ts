@@ -1,7 +1,7 @@
 // Vercel serverless function: returns the average Binance P2P VES/USDT rate.
 // The Binance P2P API blocks browser requests (no CORS + Cloudflare), so the
 // frontend calls this endpoint instead. "tasa_liquidacion" = SELL side (ads
-// from people BUYING your USDT for bolívares) — that's the default returned.
+// from people BUYING your USDT for bolivares) - that's the default returned.
 
 const BINANCE_P2P_URL =
   "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search";
@@ -56,7 +56,7 @@ async function fetchP2pAverage(
 export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
   try {
-    // tasa_liquidacion: SELL side — used as the USDT price.
+    // tasa_liquidacion: SELL side - used as the USDT price.
     const rate = await fetchP2pAverage("SELL", 5);
     if (rate === null) {
       res.status(502).json({ error: "No se pudo obtener la tasa de Binance P2P" });

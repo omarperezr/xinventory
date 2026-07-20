@@ -1,5 +1,5 @@
 // Parses a product-list .xlsx into rows matching xinventory's InventoryItem
-// fields. No image extraction — xinventory stores image URLs uploaded
+// fields. No image extraction - xinventory stores image URLs uploaded
 // separately through the admin form, not embedded spreadsheet pictures.
 export interface ExcelItem {
   name: string;

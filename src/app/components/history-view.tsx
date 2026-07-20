@@ -34,11 +34,7 @@ import {
 import { toast } from "sonner";
 import { uploadImage } from "../services/image-utils";
 
-interface HistoryViewProps {
-  onReturnInventory: (itemId: string, quantity: number) => void;
-}
-
-export function HistoryView({ onReturnInventory }: HistoryViewProps) {
+export function HistoryView() {
   const { transactions, returnItem, addImageToTransaction } = useHistory();
   const { formatPrice, currency } = useApp();
   const { currentUser } = useAuth();
@@ -116,7 +112,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
 
   return (
     <div className="space-y-4 md:space-y-6 pb-6">
-      {/* ── Header / Search ── */}
+      {/* Header / Search */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3">
         <h2 className="text-base md:text-lg font-medium text-gray-900 flex items-center gap-2">
           <History className="w-5 h-5 text-primary" />
@@ -196,7 +192,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
         )}
       </div>
 
-      {/* ── List ── */}
+      {/* List */}
       {visibleTransactions.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <Receipt className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -211,7 +207,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
         </div>
       ) : (
         <>
-          {/* Desktop table – hidden on mobile */}
+          {/* Desktop table - hidden on mobile */}
           <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -278,7 +274,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
             </div>
           </div>
 
-          {/* Mobile card list – visible only on mobile */}
+          {/* Mobile card list - visible only on mobile */}
           <div className="md:hidden space-y-2">
             {filteredTransactions.map((t) => (
               <button
@@ -331,7 +327,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
         </>
       )}
 
-      {/* ── Transaction detail dialog ── */}
+      {/* Transaction detail dialog */}
       <Dialog
         open={!!selectedTransaction}
         onOpenChange={(open) => !open && setSelectedId(null)}
@@ -350,7 +346,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
 
           {selectedTransaction && (
             <div className="space-y-3 mt-1 min-h-0 flex-1 overflow-y-auto pr-1">
-              {/* Items – responsive table/cards */}
+              {/* Items - responsive table/cards */}
               <div className="border rounded-lg overflow-hidden">
                 {/* Desktop table */}
                 <table className="hidden md:table w-full text-xs">
@@ -373,7 +369,6 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                         isAdmin={isAdmin}
                         onReturn={(qty) => {
                           returnItem(selectedTransaction.id, item.id, qty);
-                          onReturnInventory(item.id, qty);
                         }}
                       />
                     ))}
@@ -428,7 +423,6 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
                       isAdmin={isAdmin}
                       onReturn={(qty) => {
                         returnItem(selectedTransaction.id, item.id, qty);
-                        onReturnInventory(item.id, qty);
                       }}
                     />
                   ))}
@@ -547,7 +541,7 @@ export function HistoryView({ onReturnInventory }: HistoryViewProps) {
   );
 }
 
-// Inline editable unit price for a history line — admins only. Shows the price
+// Inline editable unit price for a history line - admins only. Shows the price
 // in the active display currency and commits (converted to USD) on blur/Enter,
 // which recomputes the transaction total and all reports.
 function EditableHistoryPrice({
@@ -570,7 +564,7 @@ function EditableHistoryPrice({
   );
 }
 
-// ── Desktop row ────────────────────────────────────────────────────────────────
+// Desktop row
 function TransactionItemRow({
   item,
   transactionId,
@@ -676,7 +670,7 @@ function TransactionItemRow({
   );
 }
 
-// ── Mobile card ────────────────────────────────────────────────────────────────
+// Mobile card
 function MobileItemCard({
   item,
   transactionId,

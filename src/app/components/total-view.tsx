@@ -46,7 +46,7 @@ import { QuantityStepper } from "./quantity-stepper";
 
 // Inline editable unit price for a cart line, so a seller can close a sale at
 // a price different from the default. Entry is always USD or honest-rate
-// bolívares — never the display lens, which may be a reference rate.
+// bolivares - never the display lens, which may be a reference rate.
 function EditablePrice({ item }: { item: CartItem }) {
   const { updateCartItemPrice } = useApp();
   return (
@@ -107,7 +107,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
   } = useApp();
   const { currentUser } = useAuth();
   // Reference lenses (BCV/EUR/Binance) restate prices at a rate we do not
-  // treat as the real worth of a bolívar, so editing money while one is
+  // treat as the real worth of a bolivar, so editing money while one is
   // active would book the amount at the wrong value.
   const referenceLens = isReferenceLens(currency);
   const canEditPrice =
@@ -118,7 +118,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState("Efectivo");
   const [paymentAmount, setPaymentAmount] = useState("");
-  // Payments are entered explicitly in USD or honest-rate bolívares, never
+  // Payments are entered explicitly in USD or honest-rate bolivares, never
   // through the display lens (which may be a reference rate the money is not
   // actually worth).
   const [paymentEntry, setPaymentEntry] = useState<"USD" | "BS">("USD");
@@ -146,7 +146,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
       return;
     }
     // Payments are stored in the canonical USD basis used by
-    // totalAmount/remainingDue. Bolívares convert at the honest rate.
+    // totalAmount/remainingDue. Bolivares convert at the honest rate.
     const amount =
       paymentEntry === "USD" ? enteredAmount : bsToUsd(enteredAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -204,7 +204,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
   return (
     <div className="space-y-4 md:space-y-6 pb-24 md:pb-0">
       <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8">
-        {/* ── Main cart ── */}
+        {/* Main cart */}
         <div className="flex-1 space-y-4">
           {/* Header */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3">
@@ -579,7 +579,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
           </div>
         </div>
 
-        {/* ── Saved carts sidebar ── */}
+        {/* Saved carts sidebar */}
         <div className="w-full md:w-72 space-y-3">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
             <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2 text-sm">
@@ -632,7 +632,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
         </div>
       </div>
 
-      {/* ── Fixed mobile pay bar ── */}
+      {/* Fixed mobile pay bar */}
       {cartItems.length > 0 && (
         <div className="md:hidden fixed bottom-14 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2.5 z-40 shadow-lg">
           <div className="flex items-center justify-between gap-3">
@@ -657,7 +657,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
         </div>
       )}
 
-      {/* ── Payment modal ── */}
+      {/* Payment modal */}
       <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
         <DialogContent className="sm:max-w-md bg-white w-[calc(100vw-2rem)]">
           <DialogHeader>
@@ -774,9 +774,9 @@ export function TotalView({ onCheckout }: TotalViewProps) {
         </DialogContent>
       </Dialog>
 
-      {/* ── Change modal ── */}
+      {/* Change modal */}
       {/* Completing the sale is an explicit action, never a side effect of the
-          dialog closing — Escape and backdrop clicks must not finalize money. */}
+          dialog closing - Escape and backdrop clicks must not finalize money. */}
       <Dialog open={isChangeModalOpen} onOpenChange={setIsChangeModalOpen}>
         <DialogContent
           className="sm:max-w-md bg-white border-red-100 w-[calc(100vw-2rem)]"

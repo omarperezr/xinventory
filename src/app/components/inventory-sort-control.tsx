@@ -17,9 +17,9 @@ interface Props {
 
 /**
  * "Ordenar por" control that supports ordering by several parameters at once.
- * Each chosen field shows its priority (1, 2, 3…) — the order in which it was
- * selected — and its direction can be flipped. Selecting a field's active
- * direction again removes it from the sort.
+ * Each chosen field shows its priority (1, 2, 3, and so on) - the order in
+ * which it was selected - and its direction can be flipped. Selecting a
+ * field's active direction again removes it from the sort.
  */
 export function InventorySortControl({ value, onChange, className }: Props) {
   const indexOfField = (field: SortField) => value.findIndex((o) => fieldOf(o) === field);

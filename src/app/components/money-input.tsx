@@ -22,8 +22,8 @@ interface MoneyInputProps {
  *
  * Deliberately ignores the app's display-currency lens. The lens can be a
  * reference rate (BCV/EUR) that we do NOT consider the real worth of a
- * bolívar, so entering money through it would book the amount at the wrong
- * value. Bolívares here always convert at the honest rate, and because
+ * bolivar, so entering money through it would book the amount at the wrong
+ * value. Bolivares here always convert at the honest rate, and because
  * bsToUsd/usdToBs are exact inverses, focusing and blurring without typing can
  * never alter the stored price.
  */
@@ -40,7 +40,7 @@ export function MoneyInput({
   const [entry, setEntry] = useState<EntryCurrency>("USD");
   const [text, setText] = useState("");
   // Only a real edit may write. Without this, any focus/blur would commit a
-  // recomputed value — historically the source of silent price drift.
+  // recomputed value - historically the source of silent price drift.
   const dirty = useRef(false);
 
   const toDisplay = (usd: number) => (entry === "USD" ? usd : usdToBs(usd));

@@ -45,7 +45,7 @@ import {
   DialogDescription,
 } from "./ui/dialog";
 
-// ─── Login Dialog ─────────────────────────────────────────────────────────────
+// Login Dialog
 function LoginDialog({
   open,
   onOpenChange,
@@ -138,7 +138,7 @@ function LoginDialog({
   );
 }
 
-// ─── User Management Dialog ───────────────────────────────────────────────────
+// User Management Dialog
 function UserManagementDialog({
   open,
   onOpenChange,
@@ -412,7 +412,7 @@ function UserManagementDialog({
   );
 }
 
-// ─── Main Header ──────────────────────────────────────────────────────────────
+// Main Header
 export function InventoryHeader() {
   const location = useLocation();
   const { currency, setCurrency, cartItems, totalAmount, formatPrice } = useApp();
@@ -550,7 +550,7 @@ export function InventoryHeader() {
                   <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="BS">Bs (real)</SelectItem>
                   {/* Reference lenses: they restate the price at a rate we do
-                      not treat as the real worth of a bolívar, so money cannot
+                      not treat as the real worth of a bolivar, so money cannot
                       be entered while one of these is selected. */}
                   <SelectItem value="BCV">Bs (BCV) · referencia</SelectItem>
                   <SelectItem value="EUR">Bs (EUR BCV) · referencia</SelectItem>
@@ -648,7 +648,7 @@ export function InventoryHeader() {
       </header>
 
       {/* Reference lenses are view-only: prices are shown at a rate we do not
-          treat as the real worth of a bolívar, so money entry is disabled. */}
+          treat as the real worth of a bolivar, so money entry is disabled. */}
       {isReferenceLens(currency) && (
         <div
           role="status"

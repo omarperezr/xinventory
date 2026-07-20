@@ -59,7 +59,7 @@ async function compressToBlob(
 }
 
 // Compresses then uploads to the public `product-images` Supabase Storage
-// bucket, returning public URLs — keeps DB rows small (text[] of URLs)
+// bucket, returning public URLs - keeps DB rows small (text[] of URLs)
 // instead of bloating Postgres with base64 image data.
 export async function uploadImage(file: File): Promise<string> {
   const { blob, ext, contentType } = await compressToBlob(file);

@@ -37,8 +37,7 @@ import { Toaster, toast } from "sonner";
 
 function AppContent() {
   const {
-    items,
-    updateItem,
+    adjustStock,
     subtotal,
     taxAmount,
     totalAmount,
@@ -80,7 +79,6 @@ function AppContent() {
     );
   }
 
-  // Show login page if no user is authenticated
   if (!currentUser) {
     return <LoginPage />;
   }
@@ -103,22 +101,44 @@ function AppContent() {
   ) => {
     if (!currentUser) return;
 
-    await Promise.all(
-      cartItems.map((cartItem) => {
-        const originalItem = items.find((i) => i.id === cartItem.id);
-        if (!originalItem) return Promise.resolve();
-        const newQuantity = Math.max(
-          0,
-          originalItem.quantity - cartItem.cartQuantity,
-        );
-        return updateItem(
-          { ...originalItem, quantity: newQuantity },
+    const saleRef = Date.now();
+
+    // Stock moves through an atomic server-side decrement, so two sellers
+    // ringing up the same product can no longer overwrite each other. Applied
+    // sequentially: if one line fails (INSUFFICIENT_STOCK), we stop and roll
+    // back the lines already taken rather than recording a partial sale.
+    const applied: CartItem[] = [];
+    try {
+      for (const cartItem of cartItems) {
+        await adjustStock(
+          cartItem.id,
+          -cartItem.cartQuantity,
           currentUser.name,
-          `Venta realizada (ID Transacción: ${Date.now()})`,
-          true,
+          `Venta realizada (ID Transacción: ${saleRef})`,
         );
-      }),
-    );
+        applied.push(cartItem);
+      }
+    } catch (err) {
+      for (const done of applied) {
+        try {
+          await adjustStock(
+            done.id,
+            done.cartQuantity,
+            currentUser.name,
+            `Reversión de venta incompleta (ID Transacción: ${saleRef})`,
+          );
+        } catch (rollbackErr) {
+          console.error("No se pudo revertir el stock", rollbackErr);
+        }
+      }
+      const message =
+        (err as { message?: string })?.message?.includes("INSUFFICIENT_STOCK")
+          ? "Stock insuficiente: otro vendedor tomó el producto primero."
+          : "No se pudo actualizar el inventario. La venta no fue registrada.";
+      toast.error(message);
+      // Rethrow so TotalView keeps the cart intact for a retry.
+      throw err;
+    }
 
     await addTransaction(
       cartItems,
@@ -131,20 +151,6 @@ function AppContent() {
     );
 
     toast.success("Pago exitoso. Inventario actualizado.");
-  };
-
-  const handleReturnInventory = (itemId: string, quantity: number) => {
-    if (!currentUser) return;
-
-    const originalItem = items.find((i) => i.id === itemId);
-    if (originalItem) {
-      updateItem(
-        { ...originalItem, quantity: originalItem.quantity + quantity },
-        currentUser.name,
-        `Devolución de mercancía`,
-        true,
-      );
-    }
   };
 
   return (
@@ -196,12 +202,9 @@ function AppContent() {
               path="/total"
               element={<TotalView onCheckout={handleCheckout} />}
             />
-            <Route
-              path="/history"
-              element={
-                <HistoryView onReturnInventory={handleReturnInventory} />
-              }
-            />
+            {/* Returns restock the item inside the same server-side
+                transaction that records them, so no separate call here. */}
+            <Route path="/history" element={<HistoryView />} />
             <Route
               path="/reports"
               element={

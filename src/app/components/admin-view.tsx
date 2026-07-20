@@ -151,7 +151,7 @@ export function AdminView({
     }
   };
 
-  // Editable rate drafts — only committed to Supabase when "Guardar Tasas" is
+  // Editable rate drafts - only committed to Supabase when "Guardar Tasas" is
   // clicked, so typing/clearing a field doesn't fire a request per keystroke.
   const [usdInput, setUsdInput] = useState("");
   const [eurInput, setEurInput] = useState("");
@@ -172,7 +172,7 @@ export function AdminView({
 
   // Pulls today's Bs/USD and Bs/EUR rates from Alcambio and the Bs/USDT
   // liquidation rate from Binance P2P, and fills the inputs with them.
-  // Does not persist anything — "Guardar Tasas" does that.
+  // Does not persist anything - "Guardar Tasas" does that.
   const handleFetchRates = async () => {
     setFetchingRates(true);
     try {
@@ -249,7 +249,6 @@ export function AdminView({
     }
   };
 
-  // Filter items based on search term
   const filteredItems = items.filter((item) => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
@@ -480,8 +479,8 @@ export function AdminView({
           </div>
         </div>
 
-        {/* Which rate defines what a bolívar is really worth. Everything the
-            business books — costs, sales, payments — converts at this rate. */}
+        {/* This is the rate that defines what a bolivar is really worth.
+            Every cost, sale, and payment the app records converts at this rate. */}
         <fieldset className="mt-6 border-t border-gray-100 pt-4">
           <legend className="text-sm font-medium text-gray-900">
             Tasa honesta del bolívar

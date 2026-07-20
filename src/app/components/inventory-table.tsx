@@ -230,7 +230,7 @@ function InventoryTableRow({
   );
 }
 
-// ── Mobile card for search view (no edit/delete, just add to cart) ─────────────
+// Mobile card for search view (no edit/delete, just add to cart)
 function MobileSearchCard({
   item,
   onAddToCart,
@@ -315,7 +315,7 @@ function MobileSearchCard({
   );
 }
 
-// ── Mobile card for the admin view (buying price, margin, edit/delete/history) ──
+// Mobile card for the admin view (buying price, margin, edit/delete/history)
 function MobileAdminCard({
   item,
   onEdit,
@@ -505,7 +505,7 @@ export function InventoryTable({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      {/* ── Mobile card list — no horizontal scroll on phones ── */}
+      {/* Mobile card list - no horizontal scroll on phones */}
       <div className="md:hidden">
         {items.map((item) =>
           isSearchMode ? (
@@ -530,7 +530,7 @@ export function InventoryTable({
         )}
       </div>
 
-      {/* ── Desktop table ── */}
+      {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead>

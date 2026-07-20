@@ -1,6 +1,7 @@
-// Offline-aware cache + outbox for the `items`/`item_history`/`settings`
-// tables. Unlike a REST backend, there is no server to proxy through here —
-// queued operations are replayed by calling the Supabase SDK directly.
+// Offline-aware cache and outbox for the `items`/`item_history`/`settings`
+// tables. Unlike a REST backend, there is no server to proxy requests
+// through here - queued operations are replayed by calling the Supabase
+// SDK directly once connectivity returns.
 import { supabase } from "../services/supabase";
 import { idbGet, idbSet } from "./localdb";
 
@@ -40,9 +41,24 @@ type OutboxOp =
   | { kind: "item.update"; id: string; row: Partial<ItemRow>; historyRow?: HistoryRow }
   | { kind: "item.delete"; id: string }
   | { kind: "item.bulkDelete"; ids: string[]; historyRows: HistoryRow[] }
-  | { kind: "rates.update"; value: RatesValue };
+  | { kind: "rates.update"; value: RatesValue }
+  // Stock moves are queued as DELTAS, not absolute quantities. An absolute
+  // snapshot captured while offline would overwrite whatever the server has
+  // by the time it replays, silently discarding other sellers' sales.
+  | {
+      kind: "stock.delta";
+      itemId: string;
+      delta: number;
+      historyRow?: HistoryRow;
+    }
+  | {
+      kind: "txi.return";
+      transactionId: string;
+      itemId: string;
+      qty: number;
+    };
 
-// `honest` records which rate the business treats as the real bolívar worth.
+// `honest` records which rate the business treats as the real bolivar worth.
 export interface RatesValue {
   USD: number;
   EUR: number;
@@ -56,7 +72,7 @@ export function isOnline(): boolean {
 
 // True for errors that mean "couldn't reach the server" (so the op should
 // stay queued and be retried), as opposed to errors the server actively
-// returned (a real rejection — e.g. constraint violation — which should be
+// returned (a real rejection - e.g. constraint violation - which should be
 // dropped rather than retried forever).
 function isNetworkError(error: any): boolean {
   return !!error && !error.code;
@@ -202,6 +218,70 @@ export async function updateRates(value: RatesValue): Promise<{ queued: boolean 
 // without this they interleave and can apply the same queued op twice.
 let flushing = false;
 
+// Applies a stock movement atomically on the server, so two sellers checking
+// out the same product cannot overwrite each other. Falls back to a queued
+// delta when offline.
+// delta < 0 removes stock (a sale), delta > 0 returns it.
+async function callStockRpc(itemId: string, delta: number) {
+  const fn = delta < 0 ? "decrement_stock" : "increment_stock";
+  return supabase.rpc(fn, { p_item_id: itemId, p_qty: Math.abs(delta) });
+}
+
+export async function applyStockDelta(
+  itemId: string,
+  delta: number,
+  historyRow?: HistoryRow,
+): Promise<{ queued: boolean }> {
+  if (delta === 0) return { queued: false };
+
+  // Optimistic local echo so the UI reflects the change immediately.
+  await patchCachedItems((rows) =>
+    rows.map((r) =>
+      r.id === itemId
+        ? { ...r, quantity: Math.max(0, (r.quantity ?? 0) + delta) }
+        : r,
+    ),
+  );
+  if (historyRow) await patchCachedHistory((rows) => [historyRow, ...rows]);
+
+  if (isOnline()) {
+    const { error } = await callStockRpc(itemId, delta);
+    if (!error) {
+      if (historyRow) await supabase.from("item_history").insert(historyRow);
+      return { queued: false };
+    }
+    // INSUFFICIENT_STOCK and friends are real rejections - surface them
+    // rather than queueing an operation the server will never accept.
+    if (!isNetworkError(error)) throw error;
+  }
+  await enqueue({ kind: "stock.delta", itemId, delta, historyRow });
+  return { queued: true };
+}
+
+// Registers a return: bumps quantity_returned and restocks the item in one
+// server-side transaction, bounded by the sold quantity.
+export async function returnTransactionItem(
+  transactionId: string,
+  itemId: string,
+  qty: number,
+): Promise<{ queued: boolean }> {
+  if (isOnline()) {
+    const { error } = await supabase.rpc("return_transaction_item", {
+      p_transaction_id: transactionId,
+      p_item_id: itemId,
+      p_qty: qty,
+    });
+    if (!error) return { queued: false };
+    if (!isNetworkError(error)) throw error;
+  }
+  // Echo the restock locally; the return itself lands on the next sync.
+  await patchCachedItems((rows) =>
+    rows.map((r) => (r.id === itemId ? { ...r, quantity: r.quantity + qty } : r)),
+  );
+  await enqueue({ kind: "txi.return", transactionId, itemId, qty });
+  return { queued: true };
+}
+
 // Replays queued ops in order against Supabase. Stops at the first network
 // error (so it can be retried later); drops ops the server actively rejects.
 export async function flushOutbox(): Promise<void> {
@@ -251,6 +331,22 @@ async function drainOutbox(): Promise<void> {
           const res = await supabase
             .from("settings")
             .upsert({ key: "rates", value: op.value });
+          error = res.error;
+          break;
+        }
+        case "stock.delta": {
+          const res = await callStockRpc(op.itemId, op.delta);
+          error = res.error;
+          if (!error && op.historyRow)
+            await supabase.from("item_history").insert(op.historyRow);
+          break;
+        }
+        case "txi.return": {
+          const res = await supabase.rpc("return_transaction_item", {
+            p_transaction_id: op.transactionId,
+            p_item_id: op.itemId,
+            p_qty: op.qty,
+          });
           error = res.error;
           break;
         }

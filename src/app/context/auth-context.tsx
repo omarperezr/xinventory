@@ -215,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
-  // --- Self-service profile management ---
+  // Self-service profile management
 
   const updateOwnName = async (name: string): Promise<Result> => {
     if (!currentUser) return { success: false, error: "No autenticado" };
@@ -238,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { success: true };
   };
 
-  // Updates the password directly via the active session — no email/OTP
+  // Updates the password directly via the active session - no email/OTP
   // round-trip needed since the session already proves identity.
   const updateOwnPassword = async (newPassword: string): Promise<Result> => {
     if (!currentUser) return { success: false, error: "No autenticado" };

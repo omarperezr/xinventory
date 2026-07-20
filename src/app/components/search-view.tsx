@@ -53,7 +53,7 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
 
   // Smart search: tokenizes the query and matches each token as a LIKE
   // (substring, case-insensitive) against the relevant field(s) instead of
-  // requiring an exact/equal match — every token must match somewhere.
+  // requiring an exact/equal match - every token must match somewhere.
   const filteredItems = useMemo(() => {
     const tokens = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return items.filter((item) => {

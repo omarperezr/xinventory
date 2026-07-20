@@ -11,18 +11,18 @@ import * as offlineStore from "../utils/offlineStore";
 
 export type UnitType = "units" | "kg" | "liters";
 
-// Which stored rate is treated as the "honest" bolívar rate — the one that
-// says what a bolívar amount is really worth in dollars. In Venezuela that is
+// Which stored rate is treated as the "honest" bolivar rate - the one that
+// says what a bolivar amount is really worth in dollars. In Venezuela that is
 // normally the Binance P2P (parallel) rate, but it is configurable because the
 // answer is a business decision, not a technical one.
 export type RateKey = "USD" | "EUR" | "USDT";
 
 // Display lenses. USD is the canonical price; every other option renders a
-// BOLÍVAR amount, differing only in which rate produced it:
-//   BS   -> honest rate (configurable, default USDT) — the real charge
-//   BCV  -> official government rate — reference only
-//   EUR  -> official EUR rate        — reference only
-//   USDT -> Binance parallel rate    — reference only
+// BOLIVAR amount, differing only in which rate produced it:
+//   BS   -> honest rate (configurable, default USDT) - the real charge
+//   BCV  -> official government rate - reference only
+//   EUR  -> official EUR rate        - reference only
+//   USDT -> Binance parallel rate    - reference only
 export type DisplayCurrency = "USD" | "BS" | "BCV" | "EUR" | "USDT";
 
 export interface Rates {
@@ -99,12 +99,19 @@ interface AppContextType {
   ) => Promise<void>;
   deleteItem: (id: string, user: string) => Promise<void>;
   deleteItems: (ids: string[], user: string) => Promise<void>;
+  // Atomic server-side stock movement. delta < 0 sells, delta > 0 restocks.
+  adjustStock: (
+    itemId: string,
+    delta: number,
+    user: string,
+    details: string,
+  ) => Promise<void>;
   importItems: (
     rows: Omit<InventoryItem, "id" | "history" | "images" | "currency">[],
     user: string,
   ) => Promise<{ created: number; updated: number }>;
 
-  // Currency — prices are stored in USD; rates convert USD -> Bs for display
+  // Currency - prices are stored in USD; rates convert USD -> Bs for display
   currency: DisplayCurrency;
   setCurrency: (c: DisplayCurrency) => void;
   rates: Rates; // Bs per 1 USD, Bs per 1 EUR, Bs per 1 USDT
@@ -117,7 +124,7 @@ interface AppContextType {
     honest?: RateKey,
   ) => void;
 
-  // DISPLAY ONLY. Never feed the result of this back into a write — see
+  // DISPLAY ONLY. Never feed the result of this back into a write - see
   // bsToUsd below for why these two are deliberately not inverses.
   convertPrice: (priceInUsd: number) => number;
   currencySymbol: string;
@@ -126,8 +133,8 @@ interface AppContextType {
   // see the official rate. Null when the official rate is the honest one.
   formatReferencePrice: (priceInUsd: number) => string | null;
 
-  // MONEY ENTRY. A bolívar amount is worth what the HONEST rate says it is,
-  // regardless of which rate was used to arrive at that figure — buying at the
+  // MONEY ENTRY. A bolivar amount is worth what the HONEST rate says it is,
+  // regardless of which rate was used to arrive at that figure - buying at the
   // BCV rate genuinely is a cheaper purchase in real terms. These are exact
   // inverses of each other, so a display/edit round trip cannot drift.
   bsToUsd: (amountInBs: number) => number;
@@ -244,7 +251,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Currency State
   const [currency, setCurrency] = useState<DisplayCurrency>("USD");
   const [rates, setRates] = useState<Rates>({ USD: 36.5, EUR: 39.2, USDT: 36.5 });
-  // Which rate defines the real worth of a bolívar. Configurable per business;
+  // Which rate defines the real worth of a bolivar. Configurable per business;
   // Binance P2P (USDT) is the usual answer in Venezuela.
   const [honestRateKey, setHonestRateKey] = useState<RateKey>("USDT");
   // Guard against a zero/NaN rate silently producing Infinity prices.
@@ -252,7 +259,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const honestRate =
     Number.isFinite(rawHonestRate) && rawHonestRate > 0 ? rawHonestRate : 1;
 
-  // Cart State — the in-progress cart is restored from localStorage so a
+  // Cart State - the in-progress cart is restored from localStorage so a
   // refresh or offline reload doesn't lose it (savedCarts below are
   // explicitly-saved separate lists).
   const initialActiveCart = loadActiveCart();
@@ -263,7 +270,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const [transactionNotes, setTransactionNotes] = useState(initialActiveCart.transactionNotes);
 
-  // --- PERSISTENCE & INITIALIZATION ---
+  // Persistence and initialization
   // Network-first with an IndexedDB fallback, so the inventory and cart stay
   // usable offline; see utils/offlineStore.ts for the cache/outbox logic.
   const refreshData = async () => {
@@ -279,7 +286,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       if (settingsRow?.value) {
         const stored = settingsRow.value as Partial<Rates> & { honest?: RateKey };
-        // Older settings rows predate USDT — fall back to the USD rate.
+        // Older settings rows predate USDT - fall back to the USD rate.
         setRates({
           USD: stored.USD ?? 36.5,
           EUR: stored.EUR ?? 39.2,
@@ -304,7 +311,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (loadedSavedCarts) setSavedCarts(JSON.parse(loadedSavedCarts));
 
     // Re-fetch when the user signs in. The initial fetch above runs before
-    // authentication, so RLS returns nothing until a session exists — without
+    // authentication, so RLS returns nothing until a session exists - without
     // this, data only appears after a manual page refresh.
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") refreshData();
@@ -331,7 +338,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(ACTIVE_CART_KEY, JSON.stringify(active));
   }, [cartItems, currentPayments, transactionNotes]);
 
-  // --- INVENTORY ACTIONS ---
+  // Inventory actions
   // Each action below writes through utils/offlineStore.ts, which attempts
   // the Supabase call immediately and transparently queues it (replayed once
   // back online) if the network is unavailable.
@@ -472,8 +479,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Moves stock through the server-side RPC so concurrent sellers cannot
+  // clobber each other's writes. Local state is patched from the delta rather
+  // than refetched, so a multi-line checkout doesn't trigger a fetch per line.
+  const adjustStock = async (
+    itemId: string,
+    delta: number,
+    user: string,
+    details: string,
+  ) => {
+    if (delta === 0) return;
+    const item = items.find((i) => i.id === itemId);
+    const previousStock = item?.quantity;
+
+    await offlineStore.applyStockDelta(itemId, delta, {
+      item_id: itemId,
+      action: delta < 0 ? "sale" : "return",
+      details,
+      user_name: user,
+      previous_stock: previousStock,
+      new_stock:
+        previousStock !== undefined
+          ? Math.max(0, previousStock + delta)
+          : undefined,
+    });
+
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === itemId
+          ? { ...i, quantity: Math.max(0, i.quantity + delta) }
+          : i,
+      ),
+    );
+  };
+
   // Bulk import from Excel: matches each row against the currently loaded
-  // items by normalized barcode — updates matches in place, inserts the
+  // items by normalized barcode - updates matches in place, inserts the
   // rest. Requires connectivity (unlike single-item writes, this isn't
   // queued offline since it's a deliberate one-off batch operation).
   const importItems = async (
@@ -517,7 +558,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       // Batched as a single upsert keyed on id (the PK), instead of one
-      // UPDATE round-trip per row — N sequential requests would otherwise
+      // UPDATE round-trip per row - N sequential requests would otherwise
       // make large imports painfully slow.
       if (toUpdate.length > 0) {
         const { error } = await supabase.from("items").upsert(
@@ -559,7 +600,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // --- CURRENCY ACTIONS ---
+  // Currency actions
   const updateRates = async (
     usd: number,
     eur: number,
@@ -578,15 +619,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // --- MONEY ENTRY (exact inverses — safe to round-trip) ---
-  // A bolívar figure is worth whatever the honest rate says, no matter which
+  // Money entry (exact inverses - safe to round-trip)
+  // A bolivar figure is worth whatever the honest rate says, no matter which
   // rate produced it. Provider A quoting at BCV and provider B quoting at the
   // parallel rate are not different conversions; A is simply a cheaper deal.
   const bsToUsd = (amountInBs: number) => amountInBs / honestRate;
   const usdToBs = (amountInUsd: number) => amountInUsd * honestRate;
 
-  // --- DISPLAY LENS (read-only — NOT the inverse of bsToUsd) ---
-  // Every non-USD lens renders bolívares; they differ only in which rate was
+  // Display lens (read-only - not the inverse of bsToUsd)
+  // Every non-USD lens renders bolivares; they differ only in which rate was
   // applied. Feeding this back through bsToUsd would rebook the price at a
   // different worth, so reference lenses are read-only in the UI.
   const convertPrice = (priceInUsd: number) => {
@@ -618,7 +659,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return `Bs ${(priceInUsd * rates.USD).toFixed(2)} (BCV)`;
   };
 
-  // --- CART ACTIONS ---
+  // Cart actions
   const addToCart = (item: InventoryItem, quantity: number) => {
     if (item.quantity <= 0) {
       toast.error(`No hay suficiente stock de ${item.name} para comprar.`);
@@ -676,7 +717,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Overrides the unit selling price for a single cart line (e.g. the seller
-  // closed the sale at a different price). Only affects this cart entry — the
+  // closed the sale at a different price). Only affects this cart entry - the
   // stored inventory price is untouched.
   const updateCartItemPrice = (itemId: string, sellingPriceUsd: number) => {
     if (isNaN(sellingPriceUsd) || sellingPriceUsd < 0) return;
@@ -699,7 +740,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTransactionNotes("");
   };
 
-  // --- CART CALCULATIONS (USD base) ---
+  // Cart calculations (USD base)
   const subtotal = cartItems.reduce((sum, item) => {
     let price = item.sellingPrice;
     if (item.applyDiscount && item.discount > 0) {
@@ -724,7 +765,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const amountPaid = currentPayments.reduce((sum, p) => sum + p.amount, 0);
   const remainingDue = totalAmount - amountPaid;
 
-  // --- SAVED CARTS ---
+  // Saved carts
   const saveCart = () => {
     if (cartItems.length === 0) {
       toast.error("La lista está vacía");
@@ -782,6 +823,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateItem,
         deleteItem,
         deleteItems,
+        adjustStock,
         importItems,
         currency,
         setCurrency,

@@ -35,7 +35,7 @@ interface InventoryFormProps {
   onCancelEdit?: () => void;
 }
 
-// Prices for a product can only be entered in USD or bolívares.
+// Prices for a product can only be entered in USD or bolivares.
 type InputCurrency = "USD" | "BS";
 
 export function InventoryForm({
@@ -113,15 +113,15 @@ export function InventoryForm({
   };
 
   // Converts the entered price back to the canonical USD base. Prices can only
-  // be entered in USD or bolívares; bolívares convert at the honest rate
-  // (configurable in the admin panel), which is what those bolívares are
+  // be entered in USD or bolivares; bolivares convert at the honest rate
+  // (configurable in the admin panel), which is what those bolivares are
   // really worth regardless of the rate the supplier quoted at.
   const toUSD = (amount: number, currency: InputCurrency): number => {
     if (currency === "BS") return bsToUsd(amount);
     return amount; // USD
   };
 
-  // Preview: the entered amount shown both in USD and its bolívar equivalent,
+  // Preview: the entered amount shown both in USD and its bolivar equivalent,
   // at the same honest rate used for storage.
   const getConversions = (amountStr: string, currency: InputCurrency) => {
     const amount = parseFloat(amountStr);
@@ -148,7 +148,7 @@ export function InventoryForm({
     if (!name || !barcode || !sellingPrice || !buyingPrice) return;
     if (submitting) return;
 
-    // Convert inputs to USD for storage — the canonical base price.
+    // Convert inputs to USD for storage - the canonical base price.
     // Allow more than two decimals on input but round to cents for storage.
     const round2 = (n: number) => Math.round(n * 100) / 100;
     const rawBuying = toUSD(parseFloat(buyingPrice), buyingCurrency);
@@ -194,7 +194,7 @@ export function InventoryForm({
       succeeded = true;
     } catch (err) {
       // Without this the rejection was swallowed and the seller was told
-      // nothing — on flaky mobile data that is the common path.
+      // nothing - on flaky mobile data that is the common path.
       console.error("Error al guardar el producto", err);
       toast.error("No se pudo guardar el producto. Intenta de nuevo.");
     } finally {
@@ -229,7 +229,6 @@ export function InventoryForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-7">
-      {/* Identificación */}
       <FormSection icon={Tag} title="Identificación">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
@@ -265,7 +264,6 @@ export function InventoryForm({
         </div>
       </FormSection>
 
-      {/* Precios */}
       <FormSection icon={() => <span className="text-primary font-semibold text-sm w-4 h-4 flex items-center justify-center">$</span>} title="Precios">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
@@ -376,7 +374,6 @@ export function InventoryForm({
         </div>
       </FormSection>
 
-      {/* Inventario y categorización */}
       <FormSection icon={Boxes} title="Inventario y Categorización">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
@@ -461,7 +458,6 @@ export function InventoryForm({
         </div>
       </FormSection>
 
-      {/* Imágenes */}
       <FormSection icon={ImagePlus} title="Imágenes del Producto">
         <div className="flex flex-wrap gap-3">
           {images.map((img, i) => (
@@ -498,7 +494,6 @@ export function InventoryForm({
         </div>
       </FormSection>
 
-      {/* Notas */}
       <FormSection icon={FileText} title="Notas">
         <div className="space-y-5">
           <div className="space-y-2">

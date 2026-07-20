@@ -43,7 +43,7 @@ export function exportReportPdf(data: ReportData) {
   doc.text(`Generado: ${generatedAt}`, 14, 25);
   doc.setTextColor(0);
 
-  // ── Summary KPIs ──
+  // Summary KPIs
   autoTable(doc, {
     startY: 32,
     head: [["Indicador", "Valor"]],
@@ -60,7 +60,7 @@ export function exportReportPdf(data: ReportData) {
     styles: { fontSize: 9 },
   });
 
-  // ── Sales by seller ──
+  // Sales by seller
   if (data.userSales.length) {
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 8,
@@ -72,7 +72,7 @@ export function exportReportPdf(data: ReportData) {
     });
   }
 
-  // ── Payment methods ──
+  // Payment methods
   if (data.paymentMethodTotals.length) {
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 8,
@@ -84,7 +84,7 @@ export function exportReportPdf(data: ReportData) {
     });
   }
 
-  // ── Products ──
+  // Products
   if (data.itemSales.length) {
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 8,
@@ -102,7 +102,7 @@ export function exportReportPdf(data: ReportData) {
     });
   }
 
-  // ── Transactions detail ──
+  // Transactions detail
   if (data.transactions.length) {
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 8,
@@ -158,7 +158,7 @@ export function exportReportExcel(data: ReportData) {
     "Vendedores",
   );
 
-  // Métodos de pago
+  // Metodos de pago
   const payments = [
     ["Método de Pago", "Total"],
     ...data.paymentMethodTotals.map((p) => [p.method, c(p.total)]),

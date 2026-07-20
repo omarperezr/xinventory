@@ -93,7 +93,7 @@ export function ReportsView() {
   const { transactions } = useHistory();
   const { formatPrice, items, convertPrice, currencySymbol } = useApp();
 
-  // ── Aggregations ──────────────────────────────────────────────────────
+  // Aggregations
   // Memoized: this walks every transaction and every line item, and without
   // it the whole pipeline (plus several sorts) re-ran on every render.
   const aggregates = useMemo(() => {
@@ -136,7 +136,13 @@ export function ReportsView() {
         };
       itemSales[item.id].quantity += netQty;
       itemSales[item.id].total += netQty * item.sellingPrice;
-      const buyingPrice = buyingPriceById.get(item.id) ?? 0;
+      // Prefer the cost snapshotted on the sale line. Sales predating that
+      // column carry 0, so fall back to the current inventory cost for those
+      // rather than reporting a false 100% margin.
+      const buyingPrice =
+        item.buyingPrice > 0
+          ? item.buyingPrice
+          : (buyingPriceById.get(item.id) ?? 0);
       itemSales[item.id].cost += netQty * buyingPrice;
     });
 
@@ -167,7 +173,7 @@ export function ReportsView() {
   const totalTransactions = transactions.length;
   const avgTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
-  // ── Current business situation indicators (live inventory, not sales) ──
+  // Current business situation indicators (live inventory, not sales)
   const inventoryCost = items.reduce(
     (sum, i) => sum + i.buyingPrice * i.quantity,
     0,
@@ -185,7 +191,7 @@ export function ReportsView() {
       fill: CHART_COLORS[i % CHART_COLORS.length],
     }));
 
-  // ── Chart datasets ────────────────────────────────────────────────────
+  // Chart datasets
   const shorten = (name: string, max = 10) =>
     name.length > max ? name.slice(0, max) + "…" : name;
 
@@ -284,10 +290,10 @@ export function ReportsView() {
     userSalesData,
   } = aggregates;
 
-  // ── Empty state ────────────────────────────────────────────────────────
+  // Empty state
   const hasData = transactions.length > 0;
 
-  // ── Downloadable report (PDF / Excel) ──────────────────────────────────
+  // Downloadable report (PDF / Excel)
   const buildReportData = (): ReportData => ({
     transactions,
     symbol: currencySymbol,
@@ -314,7 +320,7 @@ export function ReportsView() {
 
   return (
     <div className="space-y-4 md:space-y-6 pb-6">
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h2 className="text-base md:text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -349,7 +355,7 @@ export function ReportsView() {
         </div>
       </div>
 
-      {/* ── KPI summary cards ── */}
+      {/* KPI summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="shadow-sm">
           <CardContent className="p-3 md:p-5">
@@ -418,7 +424,7 @@ export function ReportsView() {
         </Card>
       </div>
 
-      {/* ── Profitability & business-health KPI cards ── */}
+      {/* Profitability and business health KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="shadow-sm">
           <CardContent className="p-3 md:p-5">
@@ -481,7 +487,7 @@ export function ReportsView() {
         </Card>
       </div>
 
-      {/* ── Low stock alert ── */}
+      {/* Low stock alert */}
       {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
           <h3 className="font-medium text-gray-900 mb-3 text-sm md:text-base flex items-center gap-2">
@@ -520,7 +526,7 @@ export function ReportsView() {
         </div>
       )}
 
-      {/* ── Stat cards (most/least sold + best/worst seller) ── */}
+      {/* Stat cards (most/least sold, best/worst seller) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
@@ -617,7 +623,7 @@ export function ReportsView() {
         </Card>
       </div>
 
-      {/* ── Charts ── */}
+      {/* Charts */}
       {hasData ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           {/* Daily sales trend */}
@@ -857,7 +863,7 @@ export function ReportsView() {
             </div>
           )}
 
-          {/* Pie – revenue share by product */}
+          {/* Pie - revenue share by product */}
           {topRevenueData.length >= 2 && (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
               <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
@@ -907,7 +913,7 @@ export function ReportsView() {
         </div>
       )}
 
-      {/* ── Detailed table ── */}
+      {/* Detailed table */}
       {hasData && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
           <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
@@ -955,7 +961,7 @@ export function ReportsView() {
         </div>
       )}
 
-      {/* ── Profit leaders table ── */}
+      {/* Profit leaders table */}
       {hasData && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
           <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
