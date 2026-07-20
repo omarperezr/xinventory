@@ -4,11 +4,16 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   ReactNode,
 } from "react";
 import { toast } from "sonner";
 import { supabase } from "../services/supabase";
 import * as offlineStore from "../utils/offlineStore";
+import {
+  fetchVenezuelaConversionRates,
+  fetchUsdtRate,
+} from "../services/exchange-rates";
 
 export type UnitType = "units" | "kg" | "liters";
 
@@ -144,6 +149,10 @@ interface AppContextType {
     usdt: number,
     honest?: RateKey,
   ) => void;
+  // Pulls today's rates from the providers and saves them. Runs automatically
+  // on load; `silent` suppresses the toasts for those background runs.
+  syncRatesFromProviders: (options?: { silent?: boolean }) => Promise<void>;
+  syncingRates: boolean;
 
   // DISPLAY ONLY. Never feed the result of this back into a write - see
   // bsToUsd below for why these two are deliberately not inverses.
@@ -267,6 +276,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Which rate defines the real worth of a bolivar. Configurable per business;
   // Binance P2P (USDT) is the usual answer in Venezuela.
   const [honestRateKey, setHonestRateKey] = useState<RateKey>("USDT");
+  const [syncingRates, setSyncingRates] = useState(false);
+  // Read by syncRatesFromProviders, which runs from effects and callbacks that
+  // would otherwise close over stale rate values.
+  const ratesRef = useRef(rates);
+  ratesRef.current = rates;
+  const honestRateKeyRef = useRef(honestRateKey);
+  honestRateKeyRef.current = honestRateKey;
   // Guard against a zero/NaN rate silently producing Infinity prices.
   const rawHonestRate = rates[honestRateKey];
   const honestRate =
@@ -318,7 +334,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    refreshData();
+    // Rate sync runs after the stored settings land, so today's live rates
+    // win over whatever was last saved rather than being overwritten by it.
+    refreshData().then(() => syncRatesFromProviders({ silent: true }));
 
     const loadedSavedCarts = localStorage.getItem("savedCarts");
     if (loadedSavedCarts) setSavedCarts(JSON.parse(loadedSavedCarts));
@@ -327,7 +345,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // authentication, so RLS returns nothing until a session exists - without
     // this, data only appears after a manual page refresh.
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") refreshData();
+      if (event === "SIGNED_IN") {
+        refreshData().then(() => syncRatesFromProviders({ silent: true }));
+      }
     });
 
     // Flush any queued offline writes as soon as connectivity returns.
@@ -666,6 +686,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Fetches today's Bs/USD and Bs/EUR from Alcambio and the Bs/USDT
+  // liquidation rate from Binance P2P, then persists whatever came back.
+  // Providers are polled independently: if one is down, its previous rate is
+  // kept instead of blocking the other. Runs on every load, so the app always
+  // starts on today's numbers without anyone clicking "Actualizar tasas".
+  const syncRatesFromProviders = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      // Offline the providers are unreachable anyway, and persisting would
+      // queue a pointless outbox write of the rates we already have.
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+
+      setSyncingRates(true);
+      try {
+        const [bcv, usdt] = await Promise.allSettled([
+          fetchVenezuelaConversionRates(),
+          fetchUsdtRate(),
+        ]);
+        const bcvRates = bcv.status === "fulfilled" ? bcv.value : null;
+        const usdtRate = usdt.status === "fulfilled" ? usdt.value : null;
+
+        if (!silent) {
+          if (!bcvRates) toast.error("No se pudieron obtener las tasas USD/EUR");
+          if (!usdtRate) toast.error("No se pudo obtener la tasa USDT (Binance P2P)");
+        }
+        if (bcv.status === "rejected") console.error(bcv.reason);
+        if (usdt.status === "rejected") console.error(usdt.reason);
+        if (!bcvRates && !usdtRate) return;
+
+        const current = ratesRef.current;
+        const next: Rates = {
+          USD: bcvRates?.usd ?? current.USD,
+          EUR: bcvRates?.eur ?? current.EUR,
+          USDT: usdtRate ?? current.USDT,
+        };
+        setRates(next);
+
+        const honest = honestRateKeyRef.current;
+        try {
+          await offlineStore.updateRates({ ...next, honest });
+          if (!silent) toast.success("Tasas actualizadas");
+        } catch (e) {
+          // A non-admin has read-only access to settings; their session still
+          // uses the fresh rates, it just can't publish them for everyone.
+          console.error("Error saving fetched rates", e);
+          if (!silent) toast.error("Tasas obtenidas pero no se pudieron guardar");
+        }
+      } finally {
+        setSyncingRates(false);
+      }
+    },
+    [],
+  );
+
   // Money entry (exact inverses - safe to round-trip)
   // A bolivar figure is worth whatever the honest rate says, no matter which
   // rate produced it. Provider A quoting at BCV and provider B quoting at the
@@ -882,6 +955,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         honestRateKey,
         honestRate,
         updateRates,
+        syncRatesFromProviders,
+        syncingRates,
         convertPrice,
         currencySymbol,
         formatPrice,

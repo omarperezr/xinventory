@@ -13,7 +13,6 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
-import { fetchVenezuelaConversionRates, fetchUsdtRate } from "../services/exchange-rates";
 import {
   DollarSign,
   Euro,
@@ -85,6 +84,8 @@ export function AdminView({
     rates,
     honestRateKey,
     updateRates,
+    syncRatesFromProviders,
+    syncingRates,
     formatPrice,
   } = useApp();
   const { currentUser } = useAuth();
@@ -190,7 +191,6 @@ export function AdminView({
   const [eurInput, setEurInput] = useState("");
   const [usdtInput, setUsdtInput] = useState("");
   const [honestInput, setHonestInput] = useState<RateKey>(honestRateKey);
-  const [fetchingRates, setFetchingRates] = useState(false);
   // Set while the admin is editing, so a background refresh (another admin
   // saving rates) can't wipe their unsaved drafts mid-edit.
   const editingRates = useRef(false);
@@ -203,38 +203,13 @@ export function AdminView({
     setHonestInput(honestRateKey);
   }, [rates.USD, rates.EUR, rates.USDT, honestRateKey]);
 
-  // Pulls today's Bs/USD and Bs/EUR rates from Alcambio and the Bs/USDT
-  // liquidation rate from Binance P2P, and fills the inputs with them.
-  // Does not persist anything - "Guardar Tasas" does that.
+  // Pulls today's rates from the providers and saves them straight away - the
+  // fetched numbers are the source of truth, so there is nothing to review
+  // before committing. Dropping the edit flag lets the effect above refill the
+  // inputs from the rates that just landed.
   const handleFetchRates = async () => {
-    setFetchingRates(true);
-    try {
-      const [bcv, usdt] = await Promise.allSettled([
-        fetchVenezuelaConversionRates(),
-        fetchUsdtRate(),
-      ]);
-
-      let anyOk = false;
-      if (bcv.status === "fulfilled" && bcv.value) {
-        setUsdInput(bcv.value.usd.toString());
-        setEurInput(bcv.value.eur.toString());
-        anyOk = true;
-      } else {
-        toast.error("No se pudieron obtener las tasas USD/EUR");
-      }
-      if (usdt.status === "fulfilled" && usdt.value) {
-        setUsdtInput(usdt.value.toString());
-        anyOk = true;
-      } else {
-        toast.error("No se pudo obtener la tasa USDT (Binance P2P)");
-      }
-      if (anyOk) toast.success("Tasas actualizadas");
-    } catch (e) {
-      console.error(e);
-      toast.error("Error al obtener tasas");
-    } finally {
-      setFetchingRates(false);
-    }
+    editingRates.current = false;
+    await syncRatesFromProviders();
   };
 
   const handleSaveRates = () => {
@@ -578,10 +553,10 @@ export function AdminView({
             variant="ghost"
             className="bg-input-background hover:bg-input-background hover:brightness-100 border border-input text-foreground"
             onClick={handleFetchRates}
-            disabled={fetchingRates}
+            disabled={syncingRates}
           >
             <RefreshCw
-              className={`w-4 h-4 mr-2 ${fetchingRates ? "animate-spin" : ""}`}
+              className={`w-4 h-4 mr-2 ${syncingRates ? "animate-spin" : ""}`}
             />
             Actualizar Tasas
           </Button>
