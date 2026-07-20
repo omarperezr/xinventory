@@ -605,7 +605,7 @@ export function AdminView({
       </div>
 
       <Dialog open={formOpen} onOpenChange={handleFormOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle>
               {editingItem ? "Editar Producto" : "Agregar Nuevo Producto"}
@@ -749,7 +749,7 @@ export function AdminView({
         open={!!historyItem}
         onOpenChange={(open) => !open && setHistoryItem(null)}
       >
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-white">
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="w-5 h-5 text-primary" />

@@ -370,7 +370,7 @@ export function HistoryView() {
         open={!!selectedTransaction}
         onOpenChange={(open) => !open && setSelectedId(null)}
       >
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden bg-white w-[calc(100vw-2rem)] md:w-full flex flex-col p-4 md:p-5">
+        <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-hidden bg-white flex flex-col p-4 md:p-5">
           <DialogHeader className="gap-1">
             <DialogTitle className="text-base md:text-lg">
               Detalles de Transacción
@@ -392,14 +392,16 @@ export function HistoryView() {
                     a cell can push the table wider than the dialog. Anything
                     too long clips instead of producing a scrollbar. */}
                 <table className="hidden md:table w-full table-fixed text-sm">
+                  {/* Proportional, not pixel, widths: under table-fixed these
+                      resolve against the table's own width, so the columns can
+                      never add up to more than the dialog. */}
                   <colgroup>
-                    {/* Product name takes whatever is left over. */}
-                    <col />
-                    <col className="w-44" />
-                    <col className="w-24" />
-                    <col className="w-24" />
-                    <col className="w-28" />
-                    <col className="w-48" />
+                    <col className="w-[29%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[20%]" />
                   </colgroup>
                   <thead className="bg-gray-50 text-meta uppercase text-gray-500 font-medium">
                     <tr>

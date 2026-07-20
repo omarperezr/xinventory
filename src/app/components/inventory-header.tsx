@@ -98,7 +98,7 @@ function LoginDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm bg-white">
+      <DialogContent className="sm:max-w-sm bg-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <LogIn className="w-5 h-5 text-primary" />
@@ -225,7 +225,7 @@ function UserManagementDialog({
         if (!v) resetForm();
       }}
     >
-      <DialogContent className="max-w-lg bg-white">
+      <DialogContent className="sm:max-w-lg bg-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="w-5 h-5 text-primary" />

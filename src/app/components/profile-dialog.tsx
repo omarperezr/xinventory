@@ -93,7 +93,7 @@ export function ProfileDialog({
         if (!v) reset();
       }}
     >
-      <DialogContent className="max-w-lg bg-white">
+      <DialogContent className="sm:max-w-lg bg-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="w-5 h-5 text-primary" />
