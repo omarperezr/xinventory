@@ -4,6 +4,7 @@ import { Package } from "lucide-react";
 import { InventoryHeader } from "./components/inventory-header";
 import { LoginPage } from "./components/login-page";
 import { OfflineSync } from "./components/offline-sync";
+import { Spinner } from "./components/ui/spinner";
 
 const AdminView = lazy(() =>
   import("./components/admin-view").then((m) => ({ default: m.AdminView })),
@@ -54,26 +55,12 @@ function AppContent() {
 
   if (!loaded) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center gap-4">
-        <div className="w-12 h-12 bg-[#2196F3] rounded-xl flex items-center justify-center shadow-lg">
+      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg">
           <Package className="w-6 h-6 text-white" strokeWidth={1.5} />
         </div>
         <div className="flex items-center gap-2 text-gray-500 text-sm">
-          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v8H4z"
-            />
-          </svg>
+          <Spinner />
           Cargando...
         </div>
       </div>
@@ -165,7 +152,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
+    <div className="min-h-screen bg-canvas">
       <Toaster
         position="top-center"
         duration={2200}
@@ -180,7 +167,7 @@ function AppContent() {
       <main className="max-w-7xl mx-auto px-4 md:px-8 py-4 md:py-8">
         <Suspense
           fallback={
-            <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
+            <div className="flex items-center justify-center py-20 text-gray-500 text-sm">
               Cargando...
             </div>
           }

@@ -73,7 +73,7 @@ export function InventorySortControl({ value, onChange, className }: Props) {
             </button>
           )}
         </div>
-        <p className="px-2 pb-1.5 text-xs text-gray-400">
+        <p className="px-2 pb-1.5 text-xs text-gray-500">
           El orden de selección define la prioridad.
         </p>
         <div className="space-y-1">
@@ -88,7 +88,7 @@ export function InventorySortControl({ value, onChange, className }: Props) {
               >
                 <span
                   className={`flex items-center justify-center w-5 h-5 rounded-full text-xs font-semibold shrink-0 ${
-                    active ? "bg-primary text-white" : "bg-gray-100 text-gray-400"
+                    active ? "bg-primary text-white" : "bg-gray-100 text-gray-500"
                   }`}
                 >
                   {active ? idx + 1 : "·"}

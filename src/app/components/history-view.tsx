@@ -143,7 +143,7 @@ export function HistoryView() {
           Historial de Transacciones
         </h2>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <Input
             placeholder={
               isAdmin
@@ -160,7 +160,7 @@ export function HistoryView() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {isAdmin && (
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
               <Input
                 list="history-sellers"
                 placeholder="Filtrar por vendedor…"
@@ -176,7 +176,7 @@ export function HistoryView() {
             </div>
           )}
           <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
             <Input
               type="date"
               aria-label="Desde"
@@ -187,7 +187,7 @@ export function HistoryView() {
             />
           </div>
           <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
             <Input
               type="date"
               aria-label="Hasta"
@@ -269,19 +269,19 @@ export function HistoryView() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-sm text-gray-900">
-                          <Calendar className="w-4 h-4 text-gray-400" />
+                          <Calendar className="w-4 h-4 text-gray-500" />
                           {format(new Date(t.date), "MMM dd, yyyy HH:mm")}
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <User className="w-3 h-3 text-gray-400" />
+                          <User className="w-3 h-3 text-gray-500" />
                           {t.userId || "Desconocido"}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {t.items.length} items{" "}
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-gray-500">
                           ({t.items.reduce((a, i) => a + i.cartQuantity, 0)} u)
                         </span>
                       </td>
@@ -289,7 +289,7 @@ export function HistoryView() {
                         {formatPrice(t.total)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <ChevronRight className="w-4 h-4 text-gray-400 inline-block" />
+                        <ChevronRight className="w-4 h-4 text-gray-500 inline-block" />
                       </td>
                     </tr>
                   ))}
@@ -310,7 +310,7 @@ export function HistoryView() {
                   <div className="min-w-0 flex-1">
                     {/* ID + date */}
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="font-mono text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                      <span className="font-mono text-meta text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                         #{t.id.slice(-6)}
                       </span>
                       <span className="text-xs text-gray-500">
@@ -319,7 +319,7 @@ export function HistoryView() {
                     </div>
                     {/* Seller */}
                     <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
-                      <User className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                      <User className="w-3 h-3 text-gray-500 flex-shrink-0" />
                       <span className="truncate">
                         {t.userId || "Desconocido"}
                       </span>
@@ -330,7 +330,7 @@ export function HistoryView() {
                       · {t.items.reduce((a, i) => a + i.cartQuantity, 0)} u
                     </p>
                     {/* First items preview */}
-                    <p className="text-xs text-gray-400 truncate mt-0.5">
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
                       {t.items
                         .slice(0, 2)
                         .map((i) => i.name)
@@ -388,7 +388,7 @@ export function HistoryView() {
               <div className="border rounded-lg overflow-x-auto">
                 {/* Desktop table */}
                 <table className="hidden md:table w-full text-xs">
-                  <thead className="bg-gray-50 text-[10px] uppercase text-gray-500 font-medium">
+                  <thead className="bg-gray-50 text-meta uppercase text-gray-500 font-medium">
                     <tr>
                       <th className="px-3 py-1.5 text-left">Producto</th>
                       <th className="px-3 py-1.5 text-right">Precio</th>
@@ -490,7 +490,7 @@ export function HistoryView() {
                 </h3>
                 <div className="grid gap-1">
                   {selectedTransaction.payments.length === 0 && (
-                    <p className="text-xs text-gray-400 italic">
+                    <p className="text-xs text-gray-500 italic">
                       Sin detalles de pago registrados
                     </p>
                   )}
@@ -550,7 +550,7 @@ export function HistoryView() {
                     >
                       <img
                         src={img}
-                        alt="Receipt"
+                        alt={`Comprobante ${idx + 1} de la transacción`}
                         className="w-full h-full object-cover"
                       />
                     </a>
@@ -564,8 +564,8 @@ export function HistoryView() {
                         handleFileUpload(e, selectedTransaction.id)
                       }
                     />
-                    <Upload className="w-4 h-4 text-gray-400" />
-                    <span className="text-[9px] text-gray-500 text-center px-1">
+                    <Upload className="w-4 h-4 text-gray-500" />
+                    <span className="text-meta text-gray-500 text-center px-1">
                       Subir
                     </span>
                   </div>
@@ -629,7 +629,7 @@ function TransactionItemRow({
     <tr>
       <td className="px-3 py-1.5">
         <div className="font-medium text-gray-900">{item.name}</div>
-        <div className="text-[10px] text-gray-400 font-mono">{item.barcode}</div>
+        <div className="text-meta text-gray-500 font-mono">{item.barcode}</div>
       </td>
       <td className="px-3 py-1.5 text-right text-gray-600">
         {canEditPrice ? (
@@ -645,17 +645,17 @@ function TransactionItemRow({
       <td className="px-3 py-1.5 text-center">{item.cartQuantity}</td>
       <td className="px-3 py-1.5 text-center">
         {item.quantityReturned > 0 ? (
-          <span className="text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded text-[10px]">
+          <span className="text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded text-meta">
             -{item.quantityReturned}
           </span>
         ) : (
-          <span className="text-gray-400">—</span>
+          <span className="text-gray-500">—</span>
         )}
       </td>
       <td className="px-3 py-1.5 text-right font-medium">
         {item.quantityReturned > 0 ? (
           <div className="flex flex-col items-end">
-            <span className="text-xs text-gray-400 line-through">
+            <span className="text-xs text-gray-500 line-through">
               {formatPrice(item.sellingPrice * item.cartQuantity)}
             </span>
             <span>{formatPrice(item.sellingPrice * netQty)}</span>
@@ -670,10 +670,11 @@ function TransactionItemRow({
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs"
+              className="h-9 text-xs"
               onClick={() => setReturnMode(true)}
+              aria-label={`Devolver ${item.name}`}
             >
-              <CornerUpLeft className="w-3 h-3 mr-1" /> Devolver
+              <CornerUpLeft className="w-3.5 h-3.5 mr-1" aria-hidden="true" /> Devolver
             </Button>
           ) : (
             <div className="flex items-center justify-end gap-1.5 bg-gray-50 p-1 rounded border border-gray-200">
@@ -690,11 +691,13 @@ function TransactionItemRow({
                     ),
                   )
                 }
-                className="w-12 h-7 text-xs px-1 text-center"
+                aria-label={`Cantidad a devolver de ${item.name}`}
+                className="w-14 h-9 text-xs px-1 text-center"
               />
               <Button
                 size="sm"
-                className="h-7 px-2 text-xs bg-red-600 hover:bg-red-700 text-white"
+                aria-label={`Confirmar devolución de ${item.name}`}
+                className="h-9 px-3 text-xs bg-red-600 hover:bg-red-700 text-white"
                 onClick={() => {
                   onReturn(returnQty);
                   toast.success(`Devuelto ${returnQty} de ${item.name}`);
@@ -706,9 +709,10 @@ function TransactionItemRow({
               </Button>
               <button
                 onClick={() => setReturnMode(false)}
-                className="p-1 hover:bg-gray-200 rounded"
+                aria-label="Cancelar devolución"
+                className="tap-target inline-flex items-center justify-center h-9 w-9 hover:bg-gray-200 rounded"
               >
-                <X className="w-3 h-3 text-gray-500" />
+                <X className="w-4 h-4 text-gray-500" aria-hidden="true" />
               </button>
             </div>
           ))}
@@ -742,12 +746,12 @@ function MobileItemCard({
           <p className="text-sm font-medium text-gray-900 truncate">
             {item.name}
           </p>
-          <p className="text-[10px] font-mono text-gray-400">{item.barcode}</p>
+          <p className="text-meta font-mono text-gray-500">{item.barcode}</p>
         </div>
         <div className="text-right flex-shrink-0">
           {item.quantityReturned > 0 ? (
             <p className="text-sm font-semibold text-gray-900">
-              <span className="text-xs text-gray-400 line-through mr-1">
+              <span className="text-xs text-gray-500 line-through mr-1">
                 {formatPrice(item.sellingPrice * item.cartQuantity)}
               </span>
               {formatPrice(item.sellingPrice * netQty)}
@@ -765,7 +769,7 @@ function MobileItemCard({
 
       {canEditPrice && (
         <div className="flex items-center justify-end gap-2 mb-2">
-          <span className="text-[10px] text-gray-400">Precio:</span>
+          <span className="text-meta text-gray-500">Precio:</span>
           <EditableHistoryPrice item={item} transactionId={transactionId} />
         </div>
       )}
@@ -785,10 +789,11 @@ function MobileItemCard({
               <Button
                 variant="outline"
                 size="sm"
-                className="h-6 text-[10px] px-2"
+                className="h-9 text-xs px-3"
                 onClick={() => setReturnMode(true)}
+                aria-label={`Devolver ${item.name}`}
               >
-                <CornerUpLeft className="w-3 h-3 mr-1" /> Devolver
+                <CornerUpLeft className="w-3.5 h-3.5 mr-1" aria-hidden="true" /> Devolver
               </Button>
             ) : (
               <div className="flex items-center gap-1">
@@ -805,11 +810,13 @@ function MobileItemCard({
                       ),
                     )
                   }
-                  className="w-12 h-6 text-xs text-center px-1"
+                  aria-label={`Cantidad a devolver de ${item.name}`}
+                  className="w-14 h-9 text-xs text-center px-1"
                 />
                 <Button
                   size="sm"
-                  className="h-6 px-2 text-[10px] bg-red-600 hover:bg-red-700 text-white"
+                  aria-label={`Confirmar devolución de ${item.name}`}
+                  className="h-9 px-3 text-xs bg-red-600 hover:bg-red-700 text-white"
                   onClick={() => {
                     onReturn(returnQty);
                     toast.success(`Devuelto ${returnQty} de ${item.name}`);
@@ -819,8 +826,12 @@ function MobileItemCard({
                 >
                   OK
                 </Button>
-                <button onClick={() => setReturnMode(false)}>
-                  <X className="w-3 h-3 text-gray-400" />
+                <button
+                  onClick={() => setReturnMode(false)}
+                  aria-label="Cancelar devolución"
+                  className="tap-target inline-flex items-center justify-center h-9 w-9 hover:bg-gray-200 rounded"
+                >
+                  <X className="w-4 h-4 text-gray-500" aria-hidden="true" />
                 </button>
               </div>
             )}

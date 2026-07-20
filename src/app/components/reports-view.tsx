@@ -244,7 +244,7 @@ export function ReportsView() {
               />
             </label>
             {!custom.from && (
-              <p className="text-[11px] text-gray-400 pb-1.5">
+              <p className="text-[11px] text-gray-500 pb-1.5">
                 Elige una fecha inicial para aplicar el rango.
               </p>
             )}
@@ -263,7 +263,7 @@ export function ReportsView() {
               <Button
                 variant="outline"
                 size="sm"
-                className="text-[11px] h-7 ml-auto"
+                className="text-meta h-9 ml-auto"
                 disabled={loadingMore}
                 onClick={loadMore}
               >
@@ -299,7 +299,7 @@ export function ReportsView() {
                 >
                   <Icon
                     className={`w-4 h-4 flex-shrink-0 ${
-                      active ? "text-primary" : "text-gray-400"
+                      active ? "text-primary" : "text-gray-500"
                     }`}
                   />
                   <span>
@@ -310,7 +310,7 @@ export function ReportsView() {
                     >
                       {t.label}
                     </span>
-                    <span className="hidden md:block text-[10px] text-gray-400 leading-tight">
+                    <span className="hidden md:block text-meta text-gray-500 leading-tight">
                       {t.hint}
                     </span>
                   </span>
@@ -327,14 +327,14 @@ export function ReportsView() {
           <p className="text-gray-600 text-sm font-medium">
             No hay ventas en el período seleccionado
           </p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-500 mt-1">
             Prueba con un rango más amplio, por ejemplo «Todo».
           </p>
         </div>
       ) : (
         <Suspense
           fallback={
-            <div className="flex items-center justify-center py-16 text-gray-400 text-sm gap-2">
+            <div className="flex items-center justify-center py-16 text-gray-500 text-sm gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
               Calculando…
             </div>

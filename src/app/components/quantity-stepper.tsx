@@ -10,6 +10,13 @@ interface QuantityStepperProps {
   min?: number;
   label: string;
   size?: "sm" | "md";
+  /**
+   * Fill the container instead of sizing to content. The two-up product grid
+   * on a 360px phone leaves ~134px inside a card, which is narrower than the
+   * stepper's natural width; the number field absorbs the difference so the
+   * buttons keep their touch size.
+   */
+  block?: boolean;
 }
 
 /**
@@ -26,6 +33,7 @@ export function QuantityStepper({
   min = 1,
   label,
   size = "md",
+  block = false,
 }: QuantityStepperProps) {
   const [text, setText] = useState(String(value));
   const editing = useRef(false);
@@ -52,11 +60,11 @@ export function QuantityStepper({
   const atMin = value <= min;
   const btn =
     size === "sm"
-      ? "h-9 w-9 min-w-9"
-      : "h-11 w-11 min-w-11";
+      ? "h-9 w-9 min-w-9 flex-shrink-0"
+      : "h-11 w-11 min-w-11 flex-shrink-0";
 
   return (
-    <div className="flex items-center gap-1">
+    <div className={`flex items-center gap-1 ${block ? "w-full" : ""}`}>
       <button
         type="button"
         aria-label={`Disminuir ${label}`}
@@ -85,7 +93,7 @@ export function QuantityStepper({
             (e.target as HTMLInputElement).blur();
           }
         }}
-        className={`w-16 text-center ${size === "sm" ? "h-9" : "h-11"}`}
+        className={`text-center ${block ? "flex-1 min-w-0 px-1" : "w-16"} ${size === "sm" ? "h-9" : "h-11"}`}
       />
       <button
         type="button"

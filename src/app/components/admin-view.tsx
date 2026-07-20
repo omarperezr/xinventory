@@ -370,7 +370,7 @@ export function AdminView({
         <Card className="shadow-sm">
           <CardContent className="p-3 md:p-5">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+              <p className="text-xs text-muted-foreground leading-tight">
                 Costo de Inventario
               </p>
               <Wallet className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
@@ -384,7 +384,7 @@ export function AdminView({
         <Card className="shadow-sm">
           <CardContent className="p-3 md:p-5">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+              <p className="text-xs text-muted-foreground leading-tight">
                 Valor Potencial de Venta
               </p>
               <TrendingUp className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
@@ -398,7 +398,7 @@ export function AdminView({
         <Card className="shadow-sm">
           <CardContent className="p-3 md:p-5">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+              <p className="text-xs text-muted-foreground leading-tight">
                 Bajo / Sin Stock
               </p>
               <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
@@ -413,7 +413,7 @@ export function AdminView({
         <Card className="shadow-sm">
           <CardContent className="p-3 md:p-5">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+              <p className="text-xs text-muted-foreground leading-tight">
                 Margen Promedio
               </p>
               <Package className="w-3.5 h-3.5 text-primary flex-shrink-0" />
@@ -502,7 +502,7 @@ export function AdminView({
                 className="pl-9 h-11"
               />
             </div>
-            <p className="text-[11px] text-gray-400 leading-tight">
+            <p className="text-[11px] text-gray-500 leading-tight">
               Binance P2P (liquidación)
             </p>
           </div>
@@ -636,14 +636,18 @@ export function AdminView({
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           <h3 className="text-base font-medium text-gray-900 whitespace-nowrap">
             Inventario
-            <span className="ml-2 text-sm font-normal text-gray-400">
+            <span className="ml-2 text-sm font-normal text-gray-500">
               ({visibleItems.length} de {items.length} productos)
             </span>
           </h3>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:ml-auto sm:max-w-2xl">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+                aria-hidden="true"
+              />
               <Input
+                aria-label="Buscar en inventario"
                 placeholder="Buscar en inventario..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -778,7 +782,7 @@ export function AdminView({
                   />
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-400 font-mono">
+                    <span className="text-xs text-gray-500 font-mono">
                       {format(new Date(record.date), "PPP p")}
                     </span>
                     <span className="font-medium text-gray-900">

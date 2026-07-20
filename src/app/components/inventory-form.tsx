@@ -9,6 +9,7 @@ import {
   Loader2,
   Tag,
   Boxes,
+  ChevronDown,
 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -277,7 +278,7 @@ export function InventoryForm({
                 value={buyingCurrency}
                 onValueChange={(v: InputCurrency) => setBuyingCurrency(v)}
               >
-                <SelectTrigger className="w-[90px]">
+                <SelectTrigger aria-label="Moneda del precio de compra" className="w-[90px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -311,7 +312,7 @@ export function InventoryForm({
                 value={sellingCurrency}
                 onValueChange={(v: InputCurrency) => setSellingCurrency(v)}
               >
-                <SelectTrigger className="w-[90px]">
+                <SelectTrigger aria-label="Moneda del precio de venta" className="w-[90px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -377,7 +378,7 @@ export function InventoryForm({
       <FormSection icon={Boxes} title="Inventario y Categorización">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
-            <Label>
+            <Label htmlFor="quantity">
               Cantidad en Stock
             </Label>
             <div className="flex items-center gap-3">
@@ -386,11 +387,13 @@ export function InventoryForm({
                 variant="outline"
                 size="icon"
                 onClick={decrementQuantity}
-                className="h-10 w-10 hover:border-primary"
+                aria-label="Disminuir cantidad en stock"
+                className="h-11 w-11 hover:border-primary"
               >
-                <Minus className="h-4 w-4" strokeWidth={1.5} />
+                <Minus className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
               </Button>
               <Input
+                id="quantity"
                 type="number"
                 min="0"
                 value={quantity}
@@ -404,9 +407,10 @@ export function InventoryForm({
                 variant="outline"
                 size="icon"
                 onClick={incrementQuantity}
-                className="h-10 w-10 hover:border-primary"
+                aria-label="Aumentar cantidad en stock"
+                className="h-11 w-11 hover:border-primary"
               >
-                <Plus className="h-4 w-4" strokeWidth={1.5} />
+                <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
               </Button>
             </div>
           </div>
@@ -419,7 +423,7 @@ export function InventoryForm({
               value={unit}
               onValueChange={(val: UnitType) => setUnit(val)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger id="unit" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -458,7 +462,12 @@ export function InventoryForm({
         </div>
       </FormSection>
 
-      <FormSection icon={ImagePlus} title="Imágenes del Producto">
+      <CollapsibleFormSection
+        icon={ImagePlus}
+        title="Imágenes del Producto"
+        summary={images.length > 0 ? `${images.length} foto(s)` : "Ninguna"}
+        defaultOpen={images.length > 0}
+      >
         <div className="flex flex-wrap gap-3">
           {images.map((img, i) => (
             <div
@@ -475,26 +484,33 @@ export function InventoryForm({
               <button
                 type="button"
                 onClick={() => removeImage(i)}
-                className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5"
+                aria-label={`Eliminar imagen ${i + 1}`}
+                className="tap-target absolute top-0.5 right-0.5 inline-flex items-center justify-center h-6 w-6 bg-black/60 text-white rounded-full"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             </div>
           ))}
-          <label className="w-20 h-20 rounded-lg border border-dashed border-gray-300 flex items-center justify-center cursor-pointer text-gray-400 hover:border-primary hover:text-primary">
+          <label className="w-20 h-20 rounded-lg border border-dashed border-gray-300 flex items-center justify-center cursor-pointer text-gray-500 hover:border-primary hover:text-primary">
             <input
               type="file"
               accept="image/*"
               multiple
+              aria-label="Agregar imágenes del producto"
               onChange={handleImageSelect}
               className="hidden"
             />
-            {compressing ? "..." : <Plus className="w-5 h-5" />}
+            {compressing ? "..." : <Plus className="w-5 h-5" aria-hidden="true" />}
           </label>
         </div>
-      </FormSection>
+      </CollapsibleFormSection>
 
-      <FormSection icon={FileText} title="Notas">
+      <CollapsibleFormSection
+        icon={FileText}
+        title="Notas"
+        summary={itemNotes.trim() ? "Con notas" : "Ninguna"}
+        defaultOpen={Boolean(itemNotes.trim())}
+      >
         <div className="space-y-5">
           <div className="space-y-2">
             <Label
@@ -526,7 +542,7 @@ export function InventoryForm({
             />
           </div>
         </div>
-      </FormSection>
+      </CollapsibleFormSection>
 
       <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 -mx-6 px-6 sticky bottom-0 bg-white pb-1">
         {editItem && onCancelEdit && (
@@ -571,10 +587,61 @@ function FormSection({
   return (
     <div className="space-y-4">
       <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-        <Icon className="w-4 h-4 text-primary" />
+        <Icon className="w-4 h-4 text-primary" aria-hidden="true" />
         {title}
       </h3>
       {children}
+    </div>
+  );
+}
+
+/**
+ * A section the seller opens only if they need it.
+ *
+ * Photos and notes are optional on every product, but they used to sit open
+ * below the required fields, so the common case - name, price, stock, save -
+ * meant scrolling past two blocks nobody was filling in. They start open when
+ * the product already has content in them, because then they are not optional
+ * detail any more, they are data the seller came to edit.
+ */
+function CollapsibleFormSection({
+  icon: Icon,
+  title,
+  summary,
+  defaultOpen = false,
+  children,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  summary: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const contentId = `section-${title.replace(/\s+/g, "-").toLowerCase()}`;
+
+  return (
+    <div className="space-y-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls={contentId}
+        className="flex w-full items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700"
+      >
+        <Icon className="w-4 h-4 text-primary" aria-hidden="true" />
+        {title}
+        <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal font-normal text-gray-500">
+          {!open && summary}
+          <ChevronDown
+            className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </span>
+      </button>
+      <div id={contentId} hidden={!open}>
+        {children}
+      </div>
     </div>
   );
 }

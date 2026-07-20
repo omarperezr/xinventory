@@ -45,6 +45,31 @@ import {
   DialogDescription,
 } from "./ui/dialog";
 
+// One definition of the "pill" look shared by the desktop nav and the dialog
+// tab strips. They had drifted apart into three near-identical copies.
+const pillClasses = (active: boolean) =>
+  `flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+    active
+      ? "bg-white text-primary shadow-sm"
+      : "text-gray-600 hover:text-gray-900"
+  }`;
+
+const mobileTabClasses = (active: boolean) =>
+  `flex flex-col items-center justify-center flex-1 h-full gap-0.5 ${
+    active ? "text-primary" : "text-gray-600"
+  }`;
+
+// The count alone reads as a bare number to a screen reader, so the badge
+// carries its own wording and the digits are left to sighted users.
+function CartBadge({ count }: { count: number }) {
+  return (
+    <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-meta font-bold text-white bg-red-600 rounded-full">
+      <span aria-hidden="true">{count}</span>
+      <span className="sr-only">{count} artículos en el total</span>
+    </span>
+  );
+}
+
 // Login Dialog
 function LoginDialog({
   open,
@@ -109,12 +134,16 @@ function LoginDialog({
               <button
                 type="button"
                 onClick={() => setShowPass(!showPass)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label={
+                  showPass ? "Ocultar contraseña" : "Mostrar contraseña"
+                }
+                aria-pressed={showPass}
+                className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
               >
                 {showPass ? (
-                  <EyeOff className="w-4 h-4" />
+                  <EyeOff className="w-4 h-4" aria-hidden="true" />
                 ) : (
-                  <Eye className="w-4 h-4" />
+                  <Eye className="w-4 h-4" aria-hidden="true" />
                 )}
               </button>
             </div>
@@ -208,24 +237,20 @@ function UserManagementDialog({
         </DialogHeader>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg mt-1">
+        <div role="tablist" className="flex gap-1 bg-gray-100 p-1 rounded-lg mt-1">
           <button
+            role="tab"
+            aria-selected={tab === "list"}
             onClick={() => setTab("list")}
-            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
-              tab === "list"
-                ? "bg-white text-primary shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={`flex-1 min-h-11 ${pillClasses(tab === "list")}`}
           >
             Usuarios ({users.length})
           </button>
           <button
+            role="tab"
+            aria-selected={tab === "create"}
             onClick={() => setTab("create")}
-            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
-              tab === "create"
-                ? "bg-white text-primary shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={`flex-1 min-h-11 ${pillClasses(tab === "create")}`}
           >
             Crear Usuario
           </button>
@@ -253,7 +278,7 @@ function UserManagementDialog({
                     <div className="font-medium text-sm text-gray-900 truncate flex items-center gap-1.5">
                       {u.name}
                       {u.id === currentUser?.id && (
-                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                        <span className="text-meta bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
                           Tú
                         </span>
                       )}
@@ -294,10 +319,11 @@ function UserManagementDialog({
                     <Button
                       variant="ghost"
                       size="sm"
+                      aria-label={`Eliminar usuario ${u.name}`}
                       onClick={async () => { await deleteUser(u.id); }}
-                      className="text-red-400 hover:text-red-600 hover:bg-red-50 h-7 w-7 p-0"
+                      className="tap-target text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
                     </Button>
                   )}
                 </div>
@@ -339,12 +365,16 @@ function UserManagementDialog({
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label={
+                    showPass ? "Ocultar contraseña" : "Mostrar contraseña"
+                  }
+                  aria-pressed={showPass}
+                  className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                 >
                   {showPass ? (
-                    <EyeOff className="w-4 h-4" />
+                    <EyeOff className="w-4 h-4" aria-hidden="true" />
                   ) : (
-                    <Eye className="w-4 h-4" />
+                    <Eye className="w-4 h-4" aria-hidden="true" />
                   )}
                 </button>
               </div>
@@ -454,53 +484,43 @@ export function InventoryHeader() {
                   <h1 className="text-gray-900 tracking-tight text-base font-semibold leading-none">
                     Inventario
                   </h1>
-                  <p className="text-xs text-gray-400 font-light mt-0.5">
+                  <p className="text-xs text-gray-500 mt-0.5">
                     Gestión de productos
                   </p>
                 </div>
               </div>
 
               {/* Desktop Nav */}
-              <nav className="hidden md:flex items-center bg-gray-100/80 p-1 rounded-lg">
+              <nav
+                aria-label="Principal"
+                className="hidden md:flex items-center bg-gray-100/80 p-1 rounded-lg"
+              >
                 {isAdmin && (
                   <Link
                     to="/"
-                    className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                      isDashboard
-                        ? "bg-white text-primary shadow-sm"
-                        : "text-gray-500 hover:text-gray-900"
-                    }`}
+                    aria-current={isDashboard ? "page" : undefined}
+                    className={pillClasses(isDashboard)}
                   >
-                    <LayoutGrid className="w-4 h-4 mr-2" />
+                    <LayoutGrid className="w-4 h-4 mr-2" aria-hidden="true" />
                     Admin
                   </Link>
                 )}
                 <Link
                   to="/search"
-                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    isSearch
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
+                  aria-current={isSearch ? "page" : undefined}
+                  className={pillClasses(isSearch)}
                 >
-                  <Search className="w-4 h-4 mr-2" />
+                  <Search className="w-4 h-4 mr-2" aria-hidden="true" />
                   Buscar
                 </Link>
                 <Link
                   to="/total"
-                  className={`relative flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    isTotal
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
+                  aria-current={isTotal ? "page" : undefined}
+                  className={`relative ${pillClasses(isTotal)}`}
                 >
                   <span className="relative mr-2">
-                    <ShoppingCart className="w-4 h-4" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-2 -right-2 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-bold text-white bg-red-600 rounded-full">
-                        {cartCount}
-                      </span>
-                    )}
+                    <ShoppingCart className="w-4 h-4" aria-hidden="true" />
+                    {cartCount > 0 && <CartBadge count={cartCount} />}
                   </span>
                   Total
                   {totalAmount > 0 && (
@@ -511,25 +531,19 @@ export function InventoryHeader() {
                 </Link>
                 <Link
                   to="/history"
-                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    isHistory
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
+                  aria-current={isHistory ? "page" : undefined}
+                  className={pillClasses(isHistory)}
                 >
-                  <History className="w-4 h-4 mr-2" />
+                  <History className="w-4 h-4 mr-2" aria-hidden="true" />
                   Historial
                 </Link>
                 {isAdmin && (
                   <Link
                     to="/reports"
-                    className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                      isReports
-                        ? "bg-white text-primary shadow-sm"
-                        : "text-gray-500 hover:text-gray-900"
-                    }`}
+                    aria-current={isReports ? "page" : undefined}
+                    className={pillClasses(isReports)}
                   >
-                    <BarChart2 className="w-4 h-4 mr-2" />
+                    <BarChart2 className="w-4 h-4 mr-2" aria-hidden="true" />
                     Reportes
                   </Link>
                 )}
@@ -543,7 +557,10 @@ export function InventoryHeader() {
                 value={currency}
                 onValueChange={(val) => setCurrency(val as DisplayCurrency)}
               >
-                <SelectTrigger className="w-[120px] md:w-[140px] h-8 text-xs md:text-sm">
+                <SelectTrigger
+                  aria-label="Moneda mostrada"
+                  className="w-[120px] md:w-[140px] h-9 text-xs md:text-sm"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -565,20 +582,23 @@ export function InventoryHeader() {
                 <div className="relative">
                   <button
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 h-8 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-sm"
+                    aria-haspopup="menu"
+                    aria-expanded={showUserMenu}
+                    aria-label={`Menú de ${currentUser.name}`}
+                    className="flex items-center gap-2 h-9 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-sm"
                   >
                     <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                      <User className="w-3 h-3 text-white" />
+                      <User className="w-3 h-3 text-white" aria-hidden="true" />
                     </div>
                     <span className="hidden sm:block text-gray-700 font-medium max-w-[100px] truncate">
                       {currentUser.name.split(" ")[0]}
                     </span>
                     <span
-                      className={`hidden sm:block text-[10px] px-1.5 py-0.5 rounded-full font-medium ${roleColor}`}
+                      className={`hidden sm:block text-meta px-1.5 py-0.5 rounded-full font-medium ${roleColor}`}
                     >
                       {roleLabel}
                     </span>
-                    <ChevronDown className="w-3 h-3 text-gray-400" />
+                    <ChevronDown className="w-3 h-3 text-gray-500" aria-hidden="true" />
                   </button>
 
                   {/* Dropdown */}
@@ -588,7 +608,10 @@ export function InventoryHeader() {
                         className="fixed inset-0 z-20"
                         onClick={() => setShowUserMenu(false)}
                       />
-                      <div className="absolute right-0 mt-1 w-52 bg-white rounded-lg border border-gray-200 shadow-lg z-30 overflow-hidden">
+                      <div
+                        role="menu"
+                        className="absolute right-0 mt-1 w-52 bg-white rounded-lg border border-gray-200 shadow-lg z-30 overflow-hidden"
+                      >
                         <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
                           <p className="font-medium text-sm text-gray-900 truncate">
                             {currentUser.name}
@@ -598,33 +621,36 @@ export function InventoryHeader() {
                           </p>
                         </div>
                         <button
+                          role="menuitem"
                           onClick={() => {
                             setShowUserMenu(false);
                             setShowProfile(true);
                           }}
-                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                         >
                           <User className="w-4 h-4 text-gray-500" />
                           Mi Perfil
                         </button>
                         {isAdmin && (
                           <button
+                            role="menuitem"
                             onClick={() => {
                               setShowUserMenu(false);
                               setShowUserMgmt(true);
                             }}
-                            className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                           >
                             <Users className="w-4 h-4 text-gray-500" />
                             Gestionar Usuarios
                           </button>
                         )}
                         <button
+                          role="menuitem"
                           onClick={() => {
                             logout();
                             setShowUserMenu(false);
                           }}
-                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-100"
+                          className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-100"
                         >
                           <LogOut className="w-4 h-4" />
                           Cerrar Sesión
@@ -636,9 +662,9 @@ export function InventoryHeader() {
               ) : (
                 <button
                   onClick={() => setShowLogin(true)}
-                  className="flex items-center gap-2 h-8 px-3 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-colors"
+                  className="flex items-center gap-2 h-9 px-3 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-colors"
                 >
-                  <LogIn className="w-4 h-4" />
+                  <LogIn className="w-4 h-4" aria-hidden="true" />
                   <span className="hidden sm:block">Iniciar Sesión</span>
                 </button>
               )}
@@ -660,71 +686,66 @@ export function InventoryHeader() {
       )}
 
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-safe">
+      <nav
+        aria-label="Principal"
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-safe"
+      >
         <div className="flex justify-around items-center h-14 px-1">
           {isAdmin && (
             <Link
               to="/"
-              className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-                isDashboard ? "text-primary" : "text-gray-500"
-              }`}
+              aria-current={isDashboard ? "page" : undefined}
+              className={mobileTabClasses(isDashboard)}
             >
-              <LayoutGrid className="w-4 h-4" />
-              <span className="text-[9px] font-medium">Admin</span>
+              <LayoutGrid className="w-5 h-5" aria-hidden="true" />
+              <span className="text-meta font-medium">Admin</span>
             </Link>
           )}
           <Link
             to="/search"
-            className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-              isSearch ? "text-primary" : "text-gray-500"
-            }`}
+            aria-current={isSearch ? "page" : undefined}
+            className={mobileTabClasses(isSearch)}
           >
-            <Search className="w-4 h-4" />
-            <span className="text-[9px] font-medium">Buscar</span>
+            <Search className="w-5 h-5" aria-hidden="true" />
+            <span className="text-meta font-medium">Buscar</span>
           </Link>
           <Link
             to="/total"
-            className={`relative flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-              isTotal ? "text-primary" : "text-gray-500"
-            }`}
+            aria-current={isTotal ? "page" : undefined}
+            className={`relative ${mobileTabClasses(isTotal)}`}
           >
             <span className="relative">
-              <ShoppingCart className="w-4 h-4" />
-              {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 min-w-[15px] h-[15px] px-1 flex items-center justify-center text-[9px] font-bold text-white bg-red-600 rounded-full">
-                  {cartCount}
-                </span>
-              )}
+              <ShoppingCart className="w-5 h-5" aria-hidden="true" />
+              {cartCount > 0 && <CartBadge count={cartCount} />}
             </span>
-            <span className="text-[9px] font-medium">
+            <span className="text-meta font-medium">
               {totalAmount > 0 ? formatPrice(totalAmount) : "Total"}
             </span>
           </Link>
           <Link
             to="/history"
-            className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-              isHistory ? "text-primary" : "text-gray-500"
-            }`}
+            aria-current={isHistory ? "page" : undefined}
+            className={mobileTabClasses(isHistory)}
           >
-            <History className="w-4 h-4" />
-            <span className="text-[9px] font-medium">Historial</span>
+            <History className="w-5 h-5" aria-hidden="true" />
+            <span className="text-meta font-medium">Historial</span>
           </Link>
           {isAdmin && (
             <Link
               to="/reports"
-              className={`flex flex-col items-center justify-center flex-1 h-full space-y-0.5 ${
-                isReports ? "text-primary" : "text-gray-500"
-              }`}
+              aria-current={isReports ? "page" : undefined}
+              className={mobileTabClasses(isReports)}
             >
-              <BarChart2 className="w-4 h-4" />
-              <span className="text-[9px] font-medium">Reportes</span>
+              <BarChart2 className="w-5 h-5" aria-hidden="true" />
+              <span className="text-meta font-medium">Reportes</span>
             </Link>
           )}
         </div>
-      </div>
+      </nav>
 
-      {/* Spacer for bottom nav on mobile */}
-      <div className="md:hidden h-14" />
+      {/* Spacer for the bottom nav. Must match the bar's height *and* its
+          safe-area padding, or the last row of content sits under it. */}
+      <div className="md:hidden h-nav-safe" />
 
       {/* Dialogs */}
       <LoginDialog open={showLogin} onOpenChange={setShowLogin} />

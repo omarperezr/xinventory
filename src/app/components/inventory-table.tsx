@@ -1,9 +1,10 @@
-import { Edit2, Trash2, Package, Plus, Clock, Minus, Loader2 } from "lucide-react";
+import { Edit2, Trash2, Package, Plus, Clock, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
 import { format } from "date-fns";
 import { useState } from "react";
+import { QuantityStepper } from "./quantity-stepper";
 import { useApp, InventoryItem } from "../context/app-context";
 
 interface InventoryTableProps {
@@ -89,15 +90,15 @@ function InventoryTableRow({
         </div>
         <div className="flex items-center gap-1 mt-0.5 flex-wrap">
           {item.includesTaxes && (
-            <span className="text-[9px] uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+            <span className="text-meta uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
               +IVA
             </span>
           )}
-          <span className="md:hidden text-[9px] uppercase bg-gray-100 text-gray-600 px-1 py-0.5 rounded truncate max-w-[80px]">
+          <span className="md:hidden text-meta uppercase bg-gray-100 text-gray-600 px-1 py-0.5 rounded truncate max-w-[80px]">
             {item.brand}
           </span>
         </div>
-        <div className="md:hidden text-[10px] text-gray-400 font-mono mt-0.5 truncate max-w-[90px]">
+        <div className="md:hidden text-meta text-gray-500 font-mono mt-0.5 truncate max-w-[90px]">
           {item.barcode}
         </div>
       </td>
@@ -111,7 +112,7 @@ function InventoryTableRow({
           <span className="text-xs font-medium text-gray-700 truncate max-w-[110px]">
             {item.brand}
           </span>
-          <span className="text-[10px] text-gray-400 uppercase truncate max-w-[110px]">
+          <span className="text-meta text-gray-500 uppercase truncate max-w-[110px]">
             {item.type}
           </span>
         </div>
@@ -122,7 +123,7 @@ function InventoryTableRow({
           {formatPrice(item.sellingPrice)}
         </div>
         {item.discount > 0 && (
-          <div className="text-[10px] text-orange-600">-{item.discount}%</div>
+          <div className="text-meta text-orange-600">-{item.discount}%</div>
         )}
       </td>
 
@@ -152,7 +153,7 @@ function InventoryTableRow({
 
       <td className="px-3 md:px-6 py-2 md:py-4">
         <span
-          className={`inline-flex items-center px-1.5 md:px-2.5 py-0.5 rounded-full text-[10px] md:text-xs font-medium ${stockColor}`}
+          className={`inline-flex items-center px-1.5 md:px-2.5 py-0.5 rounded-full text-xs font-medium ${stockColor}`}
         >
           {item.quantity}
           <span className="ml-0.5 opacity-70">{unitLabel}</span>
@@ -170,16 +171,18 @@ function InventoryTableRow({
                 onChange={(e) =>
                   setQuantityToAdd(Math.max(1, parseInt(e.target.value) || 1))
                 }
-                className="hidden md:block w-12 h-7 text-xs border-0 focus-visible:ring-0 bg-transparent text-right pr-1"
+                aria-label={`Cantidad de ${item.name} a agregar`}
+                className="hidden md:block w-12 h-9 text-xs border-0 focus-visible:ring-0 bg-transparent text-right pr-1"
               />
               <Button
                 size="sm"
                 onClick={() => onAddToCart(item, quantityToAdd)}
-                className="h-7 w-7 md:h-7 md:w-auto md:px-2 p-0"
+                className="tap-target h-9 w-9 md:w-auto md:px-2 p-0"
                 title="Agregar al Total"
+                aria-label={`Agregar ${item.name} al total`}
                 disabled={item.quantity === 0}
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" aria-hidden="true" />
               </Button>
             </div>
           )}
@@ -189,10 +192,11 @@ function InventoryTableRow({
               variant="ghost"
               size="sm"
               onClick={() => onViewHistory(item)}
-              className="hidden md:flex text-gray-500 hover:text-gray-700 hover:bg-gray-100 h-7 w-7 p-0"
+              className="tap-target hidden md:flex text-gray-500 hover:text-gray-700 hover:bg-gray-100 h-9 w-9 p-0"
               title="Ver Historial"
+              aria-label={`Ver historial de ${item.name}`}
             >
-              <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <Clock className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
             </Button>
           )}
 
@@ -201,10 +205,11 @@ function InventoryTableRow({
               variant="ghost"
               size="sm"
               onClick={() => onEdit(item)}
-              className="text-primary hover:text-primary hover:bg-blue-50 h-7 w-7 p-0"
+              className="tap-target text-primary hover:text-primary hover:bg-blue-50 h-9 w-9 p-0"
               title="Editar"
+              aria-label={`Editar ${item.name}`}
             >
-              <Edit2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <Edit2 className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
             </Button>
           )}
 
@@ -214,13 +219,14 @@ function InventoryTableRow({
               size="sm"
               onClick={handleDelete}
               disabled={deleting}
-              className="hidden md:flex text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0 disabled:opacity-60"
+              className="tap-target hidden md:flex text-red-500 hover:text-red-700 hover:bg-red-50 h-9 w-9 p-0 disabled:opacity-60"
               title="Eliminar"
+              aria-label={`Eliminar ${item.name}`}
             >
               {deleting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               ) : (
-                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <Trash2 className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
               )}
             </Button>
           )}
@@ -257,17 +263,17 @@ function MobileSearchCard({
           <p className="text-sm font-medium text-gray-900 leading-tight">
             {item.name}
           </p>
-          <p className="text-[10px] text-gray-400 font-mono mt-0.5 truncate">
+          <p className="text-meta text-gray-500 font-mono mt-0.5 truncate">
             {item.barcode}
           </p>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             {item.includesTaxes && (
-              <span className="text-[9px] uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+              <span className="text-meta uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
                 +IVA
               </span>
             )}
             {item.discount > 0 && (
-              <span className="text-[9px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded">
+              <span className="text-meta bg-orange-100 text-orange-700 px-1 py-0.5 rounded">
                 -{item.discount}%
               </span>
             )}
@@ -284,30 +290,20 @@ function MobileSearchCard({
       </div>
       {/* Add to cart controls */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-          <button
-            onClick={() => setQty((q) => Math.max(1, q - 1))}
-            className="px-2 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600"
-          >
-            <Minus className="w-3 h-3" />
-          </button>
-          <span className="px-3 py-1 text-sm font-medium min-w-[2rem] text-center">
-            {qty}
-          </span>
-          <button
-            onClick={() => setQty((q) => q + 1)}
-            className="px-2 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600"
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-        </div>
-        <Button
+        <QuantityStepper
+          value={qty}
+          onChange={setQty}
+          min={1}
+          max={item.quantity || undefined}
           size="sm"
+          label={`Cantidad de ${item.name}`}
+        />
+        <Button
           onClick={() => onAddToCart(item, qty)}
           disabled={item.quantity === 0}
-          className="flex-1 h-8 text-xs"
+          className="flex-1 h-10 text-sm"
         >
-          <Plus className="w-3.5 h-3.5 mr-1" />
+          <Plus className="w-4 h-4 mr-1" aria-hidden="true" />
           Agregar al Total
         </Button>
       </div>
@@ -384,15 +380,15 @@ function MobileAdminCard({
           </p>
           <div className="flex items-center gap-1 mt-0.5 flex-wrap">
             {item.includesTaxes && (
-              <span className="text-[9px] uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+              <span className="text-meta uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
                 +IVA
               </span>
             )}
-            <span className="text-[9px] uppercase bg-gray-100 text-gray-600 px-1 py-0.5 rounded truncate max-w-[100px]">
+            <span className="text-meta uppercase bg-gray-100 text-gray-600 px-1 py-0.5 rounded truncate max-w-[100px]">
               {item.brand}
             </span>
           </div>
-          <p className="text-[10px] text-gray-400 font-mono mt-0.5 truncate">
+          <p className="text-meta text-gray-500 font-mono mt-0.5 truncate">
             {item.barcode}
           </p>
         </div>
@@ -401,7 +397,7 @@ function MobileAdminCard({
             {formatPrice(item.sellingPrice)}
           </p>
           {item.discount > 0 && (
-            <p className="text-[10px] text-orange-600">-{item.discount}%</p>
+            <p className="text-meta text-orange-600">-{item.discount}%</p>
           )}
           <p className={`text-xs font-medium ${stockColor}`}>
             {item.quantity} {unitLabel}
@@ -435,32 +431,35 @@ function MobileAdminCard({
               variant="ghost"
               size="sm"
               onClick={() => onViewHistory(item)}
-              className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 h-8 w-8 p-0"
+              className="tap-target text-gray-500 hover:text-gray-700 hover:bg-gray-100 h-10 w-10 p-0"
               title="Ver Historial"
+              aria-label={`Ver historial de ${item.name}`}
             >
-              <Clock className="w-4 h-4" strokeWidth={1.5} />
+              <Clock className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => onEdit(item)}
-              className="text-primary hover:text-primary hover:bg-blue-50 h-8 w-8 p-0"
+              className="tap-target text-primary hover:text-primary hover:bg-blue-50 h-10 w-10 p-0"
               title="Editar"
+              aria-label={`Editar ${item.name}`}
             >
-              <Edit2 className="w-4 h-4" strokeWidth={1.5} />
+              <Edit2 className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleDelete}
               disabled={deleting}
-              className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0 disabled:opacity-60"
+              className="tap-target text-red-500 hover:text-red-700 hover:bg-red-50 h-10 w-10 p-0 disabled:opacity-60"
               title="Eliminar"
+              aria-label={`Eliminar ${item.name}`}
             >
               {deleting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               ) : (
-                <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+                <Trash2 className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
               )}
             </Button>
           </div>
@@ -488,7 +487,7 @@ export function InventoryTable({
       <div className="bg-white rounded-xl border border-gray-200 p-10 md:p-14 text-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-            <Package className="w-6 h-6 text-gray-400" strokeWidth={1.5} />
+            <Package className="w-6 h-6 text-gray-500" strokeWidth={1.5} />
           </div>
           <div>
             <h3 className="text-gray-900 text-sm mb-1">

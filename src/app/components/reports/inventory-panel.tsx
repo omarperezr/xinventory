@@ -29,7 +29,7 @@ import {
 import type { StockRow } from "../../services/report-analytics";
 
 function coverageTone(days: number): string {
-  if (!Number.isFinite(days)) return "text-gray-400";
+  if (!Number.isFinite(days)) return "text-gray-500";
   if (days <= 7) return "text-red-700 font-medium";
   if (days <= 21) return "text-amber-700";
   return "text-gray-900";
@@ -60,7 +60,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
           <span className="font-medium text-gray-900 truncate block max-w-[150px] md:max-w-[220px]">
             {r.name}
           </span>
-          <span className="text-[10px] text-gray-400">{r.type}</span>
+          <span className="text-meta text-gray-500">{r.type}</span>
         </div>
       ),
       sortValue: (r) => r.name,
@@ -242,7 +242,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
                   {h.count}
                 </span>
               </div>
-              <p className="text-[10px] text-gray-500 mt-0.5">{h.label}</p>
+              <p className="text-meta text-gray-500 mt-0.5">{h.label}</p>
             </li>
           ))}
         </ul>

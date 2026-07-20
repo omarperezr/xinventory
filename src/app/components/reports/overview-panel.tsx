@@ -93,7 +93,7 @@ function AlertCard({ alert }: { alert: Alert }) {
               {alert.items.map((name) => (
                 <li
                   key={name}
-                  className="text-[10px] bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-600 max-w-[180px] truncate"
+                  className="text-meta bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-600 max-w-[180px] truncate"
                 >
                   {name}
                 </li>

@@ -97,16 +97,16 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3 md:space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-gray-400" />
+            <SlidersHorizontal className="w-4 h-4 text-gray-500" aria-hidden="true" />
             Buscar Inventario
           </h2>
           {isAdmin && (
             <Button
               size="sm"
               onClick={() => navigate("/")}
-              className="md:hidden h-8 px-3 text-xs flex items-center gap-1.5"
+              className="md:hidden h-10 px-3 text-xs flex items-center gap-1.5"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" aria-hidden="true" />
               Agregar
             </Button>
           )}
@@ -114,8 +114,12 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
 
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+              aria-hidden="true"
+            />
             <Input
+              aria-label="Buscar productos"
               placeholder="Buscar productos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

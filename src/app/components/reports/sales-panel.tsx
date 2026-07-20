@@ -543,11 +543,11 @@ function TicketConcentration({
           <div className="flex items-center justify-between text-xs mb-1">
             <span className="text-gray-700">
               {r.label}
-              <span className="text-gray-400 ml-1.5">{r.count} venta(s)</span>
+              <span className="text-gray-500 ml-1.5">{r.count} venta(s)</span>
             </span>
             <span className="font-medium text-gray-900 tabular-nums">
               {money(r.sum)}
-              <span className="text-gray-400 font-normal ml-1.5">
+              <span className="text-gray-500 font-normal ml-1.5">
                 {r.share.toFixed(0)}%
               </span>
             </span>

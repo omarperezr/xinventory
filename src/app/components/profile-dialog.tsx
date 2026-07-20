@@ -134,7 +134,7 @@ export function ProfileDialog({
           {/* Email */}
           <div className="space-y-1.5 border-t border-gray-100 pt-4">
             <Label className="flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-gray-400" />
+              <Mail className="w-3.5 h-3.5 text-gray-500" />
               Cambiar Correo (actual: {currentUser.email})
             </Label>
             <div className="flex gap-2">
@@ -152,7 +152,7 @@ export function ProfileDialog({
                 Enviar
               </Button>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-500">
               Recibirás un enlace de confirmación en la nueva dirección.
             </p>
             {emailMsg && (
@@ -171,7 +171,7 @@ export function ProfileDialog({
           {/* Password */}
           <div className="space-y-1.5 border-t border-gray-100 pt-4">
             <Label className="flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-gray-400" />
+              <KeyRound className="w-3.5 h-3.5 text-gray-500" />
               Cambiar Contraseña
             </Label>
 
@@ -187,7 +187,7 @@ export function ProfileDialog({
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                 >
                   {showPass ? (
                     <EyeOff className="w-4 h-4" />

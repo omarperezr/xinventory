@@ -253,25 +253,31 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                   variant="outline"
                   onClick={clearCart}
                   disabled={cartItems.length === 0}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 px-2 md:px-3 text-xs"
+                  aria-label="Limpiar la lista"
+                  className="tap-target text-red-600 hover:text-red-700 hover:bg-red-50 h-9 px-2 md:px-3 text-xs"
                 >
-                  <Trash2 className="w-3.5 h-3.5 md:mr-1.5" />
+                  <Trash2 className="w-4 h-4 md:mr-1.5" aria-hidden="true" />
                   <span className="hidden md:inline">Limpiar</span>
                 </Button>
                 <Button
                   onClick={saveCart}
                   disabled={cartItems.length === 0}
-                  className="h-8 px-2 md:px-3 text-xs"
+                  aria-label="Guardar la lista"
+                  className="tap-target h-9 px-2 md:px-3 text-xs"
                 >
-                  <Save className="w-3.5 h-3.5 md:mr-1.5" />
+                  <Save className="w-4 h-4 md:mr-1.5" aria-hidden="true" />
                   <span className="hidden md:inline">Guardar</span>
                 </Button>
               </div>
             </div>
             {cartItems.length > 0 && (
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+                  aria-hidden="true"
+                />
                 <Input
+                  aria-label="Buscar en la lista"
                   placeholder="Buscar en la lista…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -356,7 +362,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                 {item.barcode}
                               </div>
                               {item.includesTaxes && (
-                                <div className="text-[10px] text-blue-600 bg-blue-50 inline-block px-1 rounded mt-0.5">
+                                <div className="text-meta text-blue-600 bg-blue-50 inline-block px-1 rounded mt-0.5">
                                   Con Impuestos
                                 </div>
                               )}
@@ -406,7 +412,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                             <td className="px-6 py-4 text-right font-medium text-gray-900">
                               {item.applyDiscount && item.discount > 0 ? (
                                 <div className="flex flex-col items-end">
-                                  <span className="text-xs text-gray-400 line-through">
+                                  <span className="text-xs text-gray-500 line-through">
                                     {formatPrice(
                                       item.sellingPrice * item.cartQuantity,
                                     )}
@@ -424,9 +430,10 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                             <td className="px-6 py-4 text-right">
                               <button
                                 onClick={() => removeFromCart(item.id)}
-                                className="text-gray-400 hover:text-red-500 transition-colors"
+                                aria-label={`Quitar ${item.name} de la lista`}
+                                className="tap-target inline-flex items-center justify-center h-9 w-9 rounded-md text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
                               >
-                                <X className="w-4 h-4" />
+                                <X className="w-4 h-4" aria-hidden="true" />
                               </button>
                             </td>
                           </tr>
@@ -532,7 +539,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                   </span>
                                 )}
                                 {item.includesTaxes && (
-                                  <span className="text-[9px] text-blue-600 bg-blue-50 px-1 rounded">
+                                  <span className="text-meta text-blue-600 bg-blue-50 px-1 rounded">
                                     +IVA
                                   </span>
                                 )}
@@ -549,7 +556,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                       }
                                       className="h-3 w-3"
                                     />
-                                    <span className="text-[10px] text-green-600 font-medium">
+                                    <span className="text-meta text-green-600 font-medium">
                                       -{item.discount}%
                                     </span>
                                   </label>
@@ -561,7 +568,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                               <div className="text-right">
                                 {item.applyDiscount && item.discount > 0 ? (
                                   <>
-                                    <p className="text-[10px] text-gray-400 line-through">
+                                    <p className="text-meta text-gray-500 line-through">
                                       {formatPrice(
                                         item.sellingPrice * item.cartQuantity,
                                       )}
@@ -583,7 +590,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                               <button
                                 onClick={() => removeFromCart(item.id)}
                                 aria-label={`Quitar ${item.name} del carrito`}
-                                className="h-11 w-11 min-w-11 flex items-center justify-center rounded-md text-gray-400 hover:text-red-500 transition-colors"
+                                className="h-11 w-11 min-w-11 flex items-center justify-center rounded-md text-gray-500 hover:text-red-500 transition-colors"
                               >
                                 <X className="w-4 h-4" aria-hidden="true" />
                               </button>
@@ -599,7 +606,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                 updateCartItemQuantity(item.id, q)
                               }
                             />
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-gray-500">
                               {item.unit === "units"
                                 ? "unid."
                                 : item.unit === "kg"
@@ -673,34 +680,43 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                 {savedCarts.map((cart) => (
                   <div
                     key={cart.id}
-                    className="p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-blue-50 transition-all cursor-pointer group relative"
-                    onClick={() => loadCart(cart)}
+                    className="rounded-lg border border-gray-200 hover:border-primary hover:bg-blue-50 transition-all group relative"
                   >
-                    <div className="font-medium text-xs text-gray-900 mb-1 pr-5 truncate">
-                      {cart.name}
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] text-gray-500">
-                      <span>
-                        {format(new Date(cart.dateSaved), "dd MMM HH:mm")}
-                      </span>
-                      <span>{cart.items.length} items</span>
-                    </div>
-                    {cart.payments?.length > 0 && (
-                      <div className="mt-1 text-[10px] text-green-600 font-medium">
-                        Abonado:{" "}
-                        {formatPrice(
-                          cart.payments.reduce((s, p) => s + p.amount, 0),
-                        )}
-                      </div>
-                    )}
+                    {/* Loading the list is a button rather than a click
+                        handler on the card, so it can be reached by keyboard.
+                        Delete stays a sibling: buttons cannot nest. */}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteSavedCart(cart.id);
-                      }}
-                      className="absolute top-2 right-2 p-0.5 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      type="button"
+                      onClick={() => loadCart(cart)}
+                      aria-label={`Cargar la lista ${cart.name}`}
+                      className="w-full text-left p-3 cursor-pointer"
                     >
-                      <X className="w-3 h-3" />
+                      <div className="font-medium text-xs text-gray-900 mb-1 pr-8 truncate">
+                        {cart.name}
+                      </div>
+                      <div className="flex justify-between items-center text-meta text-gray-500">
+                        <span>
+                          {format(new Date(cart.dateSaved), "dd MMM HH:mm")}
+                        </span>
+                        <span>{cart.items.length} items</span>
+                      </div>
+                      {cart.payments?.length > 0 && (
+                        <div className="mt-1 text-meta text-green-600 font-medium">
+                          Abonado:{" "}
+                          {formatPrice(
+                            cart.payments.reduce((s, p) => s + p.amount, 0),
+                          )}
+                        </div>
+                      )}
+                    </button>
+                    {/* Revealed on hover on a pointer device; a touch screen
+                        has no hover, so there it is simply always visible. */}
+                    <button
+                      onClick={() => deleteSavedCart(cart.id)}
+                      aria-label={`Eliminar la lista ${cart.name}`}
+                      className="tap-target absolute top-1.5 right-1.5 inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-500 hover:text-red-500 hover:bg-red-50 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+                    >
+                      <X className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </div>
                 ))}
@@ -749,9 +765,9 @@ export function TotalView({ onCheckout }: TotalViewProps) {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Método de Pago</Label>
+              <Label htmlFor="payment-method">Método de Pago</Label>
               <Select value={selectedMethod} onValueChange={setSelectedMethod}>
-                <SelectTrigger>
+                <SelectTrigger id="payment-method">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -817,8 +833,9 @@ export function TotalView({ onCheckout }: TotalViewProps) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Notas (Opcional)</Label>
+              <Label htmlFor="transaction-notes">Notas (Opcional)</Label>
               <Textarea
+                id="transaction-notes"
                 placeholder="Notas de la transacción…"
                 value={transactionNotes}
                 onChange={(e) => setTransactionNotes(e.target.value)}

@@ -248,7 +248,7 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
               </LineChart>
             </ResponsiveContainer>
             <p className="text-[11px] text-gray-500 mt-2 flex items-start gap-1.5">
-              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-px text-gray-400" />
+              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-px text-gray-500" />
               <span>
                 {f.method === "trend"
                   ? `Ajuste de tendencia sobre ${f.sampleSize} días de ventas (calidad del ajuste ${(f.fit * 100).toFixed(0)}%).`
@@ -285,19 +285,19 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 mb-4">
               <div className="border border-gray-200 rounded-lg p-3">
-                <p className="text-[10px] text-gray-500">Inversión requerida</p>
+                <p className="text-meta text-gray-500">Inversión requerida</p>
                 <p className="text-base md:text-lg font-semibold text-gray-900">
                   {money(plan.totalCost)}
                 </p>
               </div>
               <div className="border border-gray-200 rounded-lg p-3">
-                <p className="text-[10px] text-gray-500">Ganancia esperada</p>
+                <p className="text-meta text-gray-500">Ganancia esperada</p>
                 <p className="text-base md:text-lg font-semibold text-green-700">
                   {money(plan.expectedProfit)}
                 </p>
               </div>
               <div className="border border-gray-200 rounded-lg p-3">
-                <p className="text-[10px] text-gray-500">Productos a reponer</p>
+                <p className="text-meta text-gray-500">Productos a reponer</p>
                 <p className="text-base md:text-lg font-semibold text-gray-900">
                   {plan.rows.length}
                 </p>
@@ -339,7 +339,7 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
                     <p className="text-xs md:text-sm font-medium text-gray-900 truncate">
                       {r.name}
                     </p>
-                    <p className="text-[10px] text-gray-500">
+                    <p className="text-meta text-gray-500">
                       {r.quantity} en stock · {r.velocity.toFixed(2)} u/día
                     </p>
                   </div>
@@ -351,7 +351,7 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
                     >
                       {format(date, "dd/MM/yy")}
                     </p>
-                    <p className="text-[10px] text-gray-500">
+                    <p className="text-meta text-gray-500">
                       {formatDays(r.daysOfStock)}
                     </p>
                   </div>

@@ -45,3 +45,37 @@ body {
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* Matching spacer for a bottom bar that uses .pb-safe. Reserving only the
+   bar's own height leaves the last row of content under the home indicator. */
+.h-nav-safe {
+  height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+@layer utilities {
+  /* The floor for text a user has to read. Chips, stock counts and nav labels
+     had drifted down to 9-10px, which is not legible on a phone held at arm's
+     length behind a counter. 11px is the smallest we allow. */
+  .text-meta {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+  }
+
+  /* Grows the hit area of a small control to 44px on touch devices without
+     changing what is painted, so dense desktop layouts stay dense. */
+  @media (pointer: coarse) {
+    .tap-target {
+      position: relative;
+    }
+
+    .tap-target::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 2.75rem;
+      height: 2.75rem;
+      transform: translate(-50%, -50%);
+    }
+  }
+}

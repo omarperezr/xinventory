@@ -111,7 +111,7 @@ export function SectionCard({
 
 export function EmptyNote({ children }: { children: ReactNode }) {
   return (
-    <p className="text-xs text-gray-400 py-6 text-center">{children}</p>
+    <p className="text-xs text-gray-500 py-6 text-center">{children}</p>
   );
 }
 
@@ -132,7 +132,7 @@ export function DeltaBadge({
 }) {
   if (value === null || !Number.isFinite(value)) {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+      <span className="inline-flex items-center gap-1 text-meta text-gray-500">
         <Minus className="w-3 h-3" />
         sin base
       </span>
@@ -147,11 +147,11 @@ export function DeltaBadge({
       : "text-red-700";
   const Icon = flat ? Minus : value > 0 ? ArrowUp : ArrowDown;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${color}`}>
+    <span className={`inline-flex items-center gap-0.5 text-meta font-medium ${color}`}>
       <Icon className="w-3 h-3" />
       {Math.abs(value).toFixed(value >= 100 ? 0 : 1)}
       {suffix}
-      {label && <span className="text-gray-400 font-normal ml-0.5">{label}</span>}
+      {label && <span className="text-gray-500 font-normal ml-0.5">{label}</span>}
     </span>
   );
 }
@@ -192,7 +192,7 @@ export function StatTile({
       }`}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
-        <p className="text-[10px] md:text-[11px] text-gray-500 leading-tight">{label}</p>
+        <p className="text-meta text-gray-500 leading-tight">{label}</p>
         {icon}
       </div>
       <p className={`text-lg md:text-2xl font-semibold truncate ${valueColor}`}>
@@ -202,7 +202,7 @@ export function StatTile({
         {delta !== undefined && (
           <DeltaBadge value={delta} higherIsBetter={higherIsBetter} />
         )}
-        {hint && <span className="text-[10px] text-gray-400">{hint}</span>}
+        {hint && <span className="text-meta text-gray-500">{hint}</span>}
       </div>
     </Wrapper>
   );
@@ -231,7 +231,7 @@ export function Segmented<T extends string>({
           type="button"
           onClick={() => onChange(o.value)}
           className={`${
-            size === "xs" ? "text-[10px] px-2 py-1" : "text-xs px-2.5 py-1"
+            size === "xs" ? "text-meta px-2 py-1" : "text-xs px-2.5 py-1"
           } rounded-md font-medium transition-colors whitespace-nowrap ${
             value === o.value
               ? "bg-white text-gray-900 shadow-sm"
@@ -321,7 +321,7 @@ export function RankRow({
     <div>
       <div className="flex items-center justify-between mb-1 gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[11px] font-mono text-gray-400 flex-shrink-0 w-5 tabular-nums">
+          <span className="text-[11px] font-mono text-gray-500 flex-shrink-0 w-5 tabular-nums">
             #{index}
           </span>
           <span className="text-xs md:text-sm font-medium text-gray-900 truncate">
@@ -340,7 +340,7 @@ export function RankRow({
           >
             {value}
           </span>
-          {sub && <span className="text-[10px] text-gray-400 ml-1.5">{sub}</span>}
+          {sub && <span className="text-meta text-gray-500 ml-1.5">{sub}</span>}
         </div>
       </div>
       <MeterBar pct={pct} color={color} />

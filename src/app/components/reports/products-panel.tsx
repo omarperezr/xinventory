@@ -44,7 +44,7 @@ const ABC_STYLE: Record<string, string> = {
 function AbcBadge({ abc }: { abc: string }) {
   return (
     <span
-      className={`inline-block text-[10px] font-semibold border rounded px-1 ${ABC_STYLE[abc]}`}
+      className={`inline-block text-meta font-semibold border rounded px-1 ${ABC_STYLE[abc]}`}
       title={
         abc === "A"
           ? "Clase A: aporta el primer 80% de la ganancia"
@@ -101,7 +101,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
             {p.name}
           </span>
           {!p.inCatalog && (
-            <span className="text-[10px] text-gray-400 flex-shrink-0">(eliminado)</span>
+            <span className="text-meta text-gray-500 flex-shrink-0">(eliminado)</span>
           )}
         </span>
       ),
@@ -368,7 +368,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
                       {list.length} producto(s)
                     </span>
                   </div>
-                  <p className="text-[10px] text-gray-500">{note}</p>
+                  <p className="text-meta text-gray-500">{note}</p>
                   <p className="text-[11px] text-gray-700 mt-1 tabular-nums">
                     {money(list.reduce((s, p) => s + p.profit, 0))}
                   </p>
