@@ -64,6 +64,11 @@ function usdtRateDevEndpoint(): Plugin {
 }
 
 export default defineConfig({
+  // Names the service worker cache, so every build gets a fresh one and stale
+  // chunks from a previous deploy can never be served against new HTML.
+  define: {
+    __BUILD_ID__: JSON.stringify(Date.now().toString(36)),
+  },
   plugins: [
     usdtRateDevEndpoint(),
     // The React and Tailwind plugins are both required for Make, even if

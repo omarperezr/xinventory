@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { InventoryForm } from "./inventory-form";
 import { InventoryTable } from "./inventory-table";
@@ -282,20 +282,27 @@ export function AdminView({
     }
   };
 
-  const filteredItems = items.filter((item) => {
-    if (!searchTerm.trim()) return true;
-    const term = searchTerm.toLowerCase();
-    if (filterBy === "name") return item.name.toLowerCase().includes(term);
-    if (filterBy === "barcode")
-      return item.barcode.toLowerCase().includes(term);
-    // 'all'
-    return (
-      item.name.toLowerCase().includes(term) ||
-      item.barcode.toLowerCase().includes(term)
-    );
-  });
+  const filteredItems = useMemo(
+    () =>
+      items.filter((item) => {
+        if (!searchTerm.trim()) return true;
+        const term = searchTerm.toLowerCase();
+        if (filterBy === "name") return item.name.toLowerCase().includes(term);
+        if (filterBy === "barcode")
+          return item.barcode.toLowerCase().includes(term);
+        // 'all'
+        return (
+          item.name.toLowerCase().includes(term) ||
+          item.barcode.toLowerCase().includes(term)
+        );
+      }),
+    [items, searchTerm, filterBy],
+  );
 
-  const visibleItems = sortInventory(filteredItems, sortBy);
+  const visibleItems = useMemo(
+    () => sortInventory(filteredItems, sortBy),
+    [filteredItems, sortBy],
+  );
 
   const toggleSelectMode = () => {
     setSelectMode((v) => !v);
@@ -339,29 +346,43 @@ export function AdminView({
     }
   };
 
-  if (!currentUser || currentUser.role !== "admin") return null;
+  const handleDeleteItem = useCallback(
+    (id: string) => deleteItem(id, currentUser?.name || "Admin"),
+    [deleteItem, currentUser],
+  );
 
-  const inventoryCost = items.reduce(
-    (sum, i) => sum + i.buyingPrice * i.quantity,
-    0,
+  const inventoryCost = useMemo(
+    () => items.reduce((sum, i) => sum + i.buyingPrice * i.quantity, 0),
+    [items],
   );
-  const inventoryValue = items.reduce(
-    (sum, i) => sum + i.sellingPrice * i.quantity,
-    0,
+  const inventoryValue = useMemo(
+    () => items.reduce((sum, i) => sum + i.sellingPrice * i.quantity, 0),
+    [items],
   );
-  const lowStockItems = items.filter((i) => i.quantity > 0 && i.quantity < 10);
-  const outOfStockItems = items.filter((i) => i.quantity === 0);
-  const avgMargin =
-    items.length > 0
-      ? items.reduce(
-          (sum, i) =>
-            sum +
-            (i.sellingPrice > 0
-              ? ((i.sellingPrice - i.buyingPrice) / i.sellingPrice) * 100
-              : 0),
-          0,
-        ) / items.length
-      : 0;
+  const lowStockItems = useMemo(
+    () => items.filter((i) => i.quantity > 0 && i.quantity < 10),
+    [items],
+  );
+  const outOfStockItems = useMemo(
+    () => items.filter((i) => i.quantity === 0),
+    [items],
+  );
+  const avgMargin = useMemo(
+    () =>
+      items.length > 0
+        ? items.reduce(
+            (sum, i) =>
+              sum +
+              (i.sellingPrice > 0
+                ? ((i.sellingPrice - i.buyingPrice) / i.sellingPrice) * 100
+                : 0),
+            0,
+          ) / items.length
+        : 0,
+    [items],
+  );
+
+  if (!currentUser || currentUser.role !== "admin") return null;
 
   // Render nothing for non-admins. The redirect above runs after paint, so
   // without this gate a seller sees costs and margins flash on screen first.
@@ -713,7 +734,7 @@ export function AdminView({
       <InventoryTable
         items={visibleItems}
         onEdit={onEditItem}
-        onDelete={(id) => deleteItem(id, currentUser?.name || "Admin")}
+        onDelete={handleDeleteItem}
         showBuyingPrice
         onViewHistory={setHistoryItem}
         selectMode={selectMode}

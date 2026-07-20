@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useHistory } from "../context/history-context";
 import { useApp } from "../context/app-context";
+import { supabase } from "../services/supabase";
 import {
   BarChart,
   Bar,
@@ -89,14 +90,129 @@ const CustomAreaTooltip = ({ active, payload, label, formatPrice }: any) => {
   return null;
 };
 
+// Shortens a product name for a chart axis label.
+const shorten = (name: string, max = 10) =>
+  name.length > max ? name.slice(0, max) + "…" : name;
+
+// Shape returned by the report_summary Postgres function.
+interface ServerReport {
+  totals: {
+    revenue: number;
+    cost: number;
+    profit: number;
+    margin: number;
+    transactions: number;
+    avgTicket: number;
+  };
+  itemSales: { name: string; quantity: number; total: number; cost: number }[];
+  userSales: { user: string; total: number; count: number }[];
+  paymentMethodTotals: { method: string; total: number }[];
+  daily: { day: string; total: number }[];
+}
+
+// Builds the same view models the client-side pipeline produces, but from
+// figures the database already aggregated over the full history.
+function deriveFromServer(server: ServerReport) {
+  const itemSalesByRevenue = server.itemSales;
+  const sortedItems = [...server.itemSales].sort(
+    (a, b) => b.quantity - a.quantity,
+  );
+  const sortedByProfit = server.itemSales
+    .map((i) => ({ ...i, profit: i.total - i.cost }))
+    .sort((a, b) => b.profit - a.profit);
+  const sortedUsers: [string, { total: number; count: number }][] =
+    server.userSales.map((u) => [u.user, { total: u.total, count: u.count }]);
+
+  return {
+    sortedItems,
+    sortedUsers,
+    sortedByProfit,
+    itemSalesByRevenue,
+    maxItemTotal: itemSalesByRevenue[0]?.total ?? 0,
+    mostSoldItem: sortedItems[0],
+    leastSoldItem: sortedItems[sortedItems.length - 1],
+    bestSeller: sortedUsers[0],
+    worstSeller: sortedUsers[sortedUsers.length - 1],
+    totalRevenue: server.totals.revenue,
+    totalCost: server.totals.cost,
+    totalProfit: server.totals.profit,
+    profitMargin: server.totals.margin,
+    totalTransactions: server.totals.transactions,
+    avgTicket: server.totals.avgTicket,
+    paymentMethodData: server.paymentMethodTotals.map((p, i) => ({
+      method: p.method,
+      total: p.total,
+      fill: CHART_COLORS[i % CHART_COLORS.length],
+    })),
+    topRevenueData: itemSalesByRevenue.slice(0, 6).map((item) => ({
+      name: shorten(item.name),
+      fullName: item.name,
+      revenue: parseFloat(item.total.toFixed(2)),
+    })),
+    topUnitsData: sortedItems.slice(0, 6).map((item) => ({
+      name: shorten(item.name),
+      fullName: item.name,
+      units: item.quantity,
+    })),
+    dailySalesData: server.daily.slice(-10),
+    userSalesData: sortedUsers.map(([userId, data], i) => ({
+      name: userId.split(" ")[0],
+      fullName: userId,
+      total: parseFloat(data.total.toFixed(2)),
+      count: data.count,
+      fill: CHART_COLORS[i % CHART_COLORS.length],
+    })),
+  };
+}
+
 export function ReportsView() {
   const { transactions } = useHistory();
   const { formatPrice, items, convertPrice, currencySymbol } = useApp();
 
+  // Totals come from the database so they cover the whole history, not just
+  // the page of transactions currently loaded. Falls back to computing them
+  // in the browser when the function is unavailable (migration not applied
+  // yet, or offline), which is the behaviour this screen had before.
+  const [serverReport, setServerReport] = useState<ServerReport | null>(null);
+  const [serverChecked, setServerChecked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .rpc("report_summary", { p_from: null, p_to: null })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        // Only trust a payload that has every section in the expected shape.
+        // A partial or differently-shaped response would otherwise crash the
+        // whole screen, and falling back to local aggregation is harmless.
+        const d = data as Partial<ServerReport> | null;
+        const valid =
+          !error &&
+          !!d &&
+          typeof d.totals === "object" &&
+          d.totals !== null &&
+          Array.isArray(d.itemSales) &&
+          Array.isArray(d.userSales) &&
+          Array.isArray(d.paymentMethodTotals) &&
+          Array.isArray(d.daily);
+
+        if (!valid) {
+          console.warn("report_summary unavailable, aggregating locally", error);
+          setServerReport(null);
+        } else {
+          setServerReport(d as ServerReport);
+        }
+        setServerChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [transactions.length]);
+
   // Aggregations
   // Memoized: this walks every transaction and every line item, and without
   // it the whole pipeline (plus several sorts) re-ran on every render.
-  const aggregates = useMemo(() => {
+  const clientAggregates = useMemo(() => {
   const itemSales: Record<
     string,
     { name: string; quantity: number; total: number; cost: number }
@@ -192,9 +308,6 @@ export function ReportsView() {
     }));
 
   // Chart datasets
-  const shorten = (name: string, max = 10) =>
-    name.length > max ? name.slice(0, max) + "…" : name;
-
   const topRevenueData = Object.values(itemSales)
     .sort((a, b) => b.total - a.total)
     .slice(0, 6)
@@ -263,6 +376,16 @@ export function ReportsView() {
     };
   }, [transactions, items]);
 
+  // Server figures win when available; inventory indicators always come from
+  // the live item list, since those describe stock rather than sales.
+  const aggregates = useMemo(
+    () =>
+      serverReport
+        ? { ...clientAggregates, ...deriveFromServer(serverReport) }
+        : clientAggregates,
+    [clientAggregates, serverReport],
+  );
+
   const {
     itemSales,
     sortedItems,
@@ -291,7 +414,14 @@ export function ReportsView() {
   } = aggregates;
 
   // Empty state
-  const hasData = transactions.length > 0;
+  // Based on the aggregate count, so a business with history still shows its
+  // reports even when the loaded page of transactions happens to be empty.
+  const hasData = totalTransactions > 0;
+
+  // The per-transaction detail table and the exports below list only the
+  // transactions currently loaded, whereas the totals above cover everything.
+  // Say so rather than letting the two quietly disagree.
+  const detailIsPartial = !!serverReport && transactions.length < totalTransactions;
 
   // Downloadable report (PDF / Excel)
   const buildReportData = (): ReportData => ({
@@ -330,6 +460,13 @@ export function ReportsView() {
           <p className="text-xs md:text-sm text-gray-500 mt-1">
             Análisis de rendimiento basado en el historial de transacciones.
           </p>
+          {detailIsPartial && (
+            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-2">
+              Los totales cubren las {totalTransactions} transacciones del
+              historial completo. El detalle y las descargas incluyen solo las{" "}
+              {transactions.length} cargadas.
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button

@@ -15,6 +15,12 @@ interface MoneyInputProps {
   className?: string;
   /** Renders the "$ x.xx / Bs y.yy" equivalence line under the field. */
   showPreview?: boolean;
+  /**
+   * Shorter control for dense desktop tables, where the full 44px version is
+   * wide enough to push neighbouring columns out of the row. Only use this
+   * where the control is not a primary touch target.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -35,6 +41,7 @@ export function MoneyInput({
   autoFocus,
   className,
   showPreview,
+  compact,
 }: MoneyInputProps) {
   const { bsToUsd, usdToBs, honestRateKey } = useApp();
   const [entry, setEntry] = useState<EntryCurrency>("USD");
@@ -119,7 +126,7 @@ export function MoneyInput({
                 reset();
               }
             }}
-            className="h-11 pl-8 pr-2"
+            className={`${compact ? "h-9" : "h-11"} pl-8 pr-2`}
           />
         </div>
         <button
@@ -133,7 +140,7 @@ export function MoneyInput({
             dirty.current = false;
             setEntry((c) => (c === "USD" ? "BS" : "USD"));
           }}
-          className="h-11 min-w-11 px-2 rounded-md border border-input bg-input-background text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          className={`${compact ? "h-9 min-w-9 px-1.5" : "h-11 min-w-11 px-2"} rounded-md border border-input bg-input-background text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50`}
         >
           {entry === "USD" ? "USD" : "Bs"}
         </button>

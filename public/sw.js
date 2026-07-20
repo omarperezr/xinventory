@@ -7,7 +7,14 @@
 //  - Supabase Storage images (cross-origin): cache-first, so product images
 //    stay visible offline after they have been loaded once.
 //  - Everything else cross-origin (API/auth calls): passed through, never cached.
-const CACHE = "xinventory-v1";
+//
+// The cache name carries the build id, passed as ?v= when main.tsx registers
+// this file. A fixed name meant a deploy kept serving the previous build's
+// hashed JS chunks: the new index.html asked for filenames the old cache did
+// not have, the lazy route imports rejected, and the screen went blank. A new
+// build gets a new cache, and activate below deletes the old ones.
+const VERSION = new URL(self.location.href).searchParams.get("v") || "dev";
+const CACHE = `xinventory-${VERSION}`;
 
 self.addEventListener("install", () => {
   self.skipWaiting();

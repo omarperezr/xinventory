@@ -263,18 +263,26 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     quantity: number,
   ) => {
     try {
-      const { queued } = await offlineStore.returnTransactionItem(
+      const { queued, restored } = await offlineStore.returnTransactionItem(
         transactionId,
         itemId,
         quantity,
       );
       await refreshTransactions();
       await refreshData();
-      toast.success(
-        queued
-          ? "Devolución guardada localmente (sin conexión)"
-          : "Devolución registrada",
-      );
+      if (queued) {
+        toast.success("Devolución guardada localmente (sin conexión)");
+      } else if (restored) {
+        // The product had been deleted. It is back in the catalogue but with
+        // placeholder barcode, unit, brand and type, so say so rather than
+        // letting an incomplete product appear silently.
+        toast.success("Devolución registrada. El producto fue recreado.", {
+          description: "Revisa sus datos en Administración (tipo RECUPERADO).",
+          duration: 6000,
+        });
+      } else {
+        toast.success("Devolución registrada");
+      }
     } catch (e) {
       console.error(e);
       const message = (e as { message?: string })?.message ?? "";

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import {
   History,
@@ -45,9 +45,14 @@ export function HistoryView() {
   } = useHistory();
   const { formatPrice, currency } = useApp();
   const { currentUser } = useAuth();
-  // Editing a past sale's price is admin-only, and never through a reference
-  // lens (the amount would be rebooked at a rate we don't consider real).
-  const isAdmin = currentUser?.role === "admin" && !isReferenceLens(currency);
+  // Who the user is. Controls which sales they can see and whether the
+  // seller filter is offered.
+  const isAdmin = currentUser?.role === "admin";
+  // What they may do right now. Editing a past sale's price is admin-only and
+  // never through a reference lens, because the amount would be rebooked at a
+  // rate we do not consider real. Returns are deliberately NOT covered by
+  // this: they change quantities, not prices, so the lens is irrelevant.
+  const canEditHistoricalPrice = isAdmin && !isReferenceLens(currency);
   const [searchTerm, setSearchTerm] = useState("");
   const [userFilter, setUserFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -60,35 +65,47 @@ export function HistoryView() {
 
   // Sellers may only see their own sales; admins see everyone's. Transactions
   // record the seller by name (see App.handleCheckout), so we match on that.
-  const visibleTransactions = isAdmin
-    ? transactions
-    : transactions.filter((t) => t.userId === currentUser?.name);
+  const visibleTransactions = useMemo(
+    () =>
+      isAdmin
+        ? transactions
+        : transactions.filter((t) => t.userId === currentUser?.name),
+    [isAdmin, transactions, currentUser],
+  );
 
   // Distinct sellers present in the visible set, for the admin seller filter.
-  const sellers = Array.from(
-    new Set(visibleTransactions.map((t) => t.userId).filter(Boolean)),
-  ).sort((a, b) => a.localeCompare(b));
+  const sellers = useMemo(
+    () =>
+      Array.from(
+        new Set(visibleTransactions.map((t) => t.userId).filter(Boolean)),
+      ).sort((a, b) => a.localeCompare(b)),
+    [visibleTransactions],
+  );
 
   const term = searchTerm.trim().toLowerCase();
   const userTerm = userFilter.trim().toLowerCase();
   const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
   const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
 
-  const filteredTransactions = visibleTransactions.filter((t) => {
-    if (term) {
-      const matches =
-        t.id.toLowerCase().includes(term) ||
-        (t.userId || "").toLowerCase().includes(term) ||
-        t.items.some((i) => i.name.toLowerCase().includes(term));
-      if (!matches) return false;
-    }
-    if (userTerm && !(t.userId || "").toLowerCase().includes(userTerm))
-      return false;
-    const time = new Date(t.date).getTime();
-    if (fromTime !== null && time < fromTime) return false;
-    if (toTime !== null && time > toTime) return false;
-    return true;
-  });
+  const filteredTransactions = useMemo(
+    () =>
+      visibleTransactions.filter((t) => {
+        if (term) {
+          const matches =
+            t.id.toLowerCase().includes(term) ||
+            (t.userId || "").toLowerCase().includes(term) ||
+            t.items.some((i) => i.name.toLowerCase().includes(term));
+          if (!matches) return false;
+        }
+        if (userTerm && !(t.userId || "").toLowerCase().includes(userTerm))
+          return false;
+        const time = new Date(t.date).getTime();
+        if (fromTime !== null && time < fromTime) return false;
+        if (toTime !== null && time > toTime) return false;
+        return true;
+      }),
+    [visibleTransactions, term, userTerm, fromTime, toTime],
+  );
 
   const hasActiveFilters =
     !!term || !!userTerm || !!dateFrom || !!dateTo;
@@ -368,7 +385,7 @@ export function HistoryView() {
           {selectedTransaction && (
             <div className="space-y-3 mt-1 min-h-0 flex-1 overflow-y-auto pr-1">
               {/* Items - responsive table/cards */}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto">
                 {/* Desktop table */}
                 <table className="hidden md:table w-full text-xs">
                   <thead className="bg-gray-50 text-[10px] uppercase text-gray-500 font-medium">
@@ -387,7 +404,7 @@ export function HistoryView() {
                         key={item.id}
                         item={item}
                         transactionId={selectedTransaction.id}
-                        isAdmin={isAdmin}
+                        canEditPrice={canEditHistoricalPrice}
                         onReturn={(qty) => {
                           returnItem(selectedTransaction.id, item.id, qty);
                         }}
@@ -441,7 +458,7 @@ export function HistoryView() {
                       key={item.id}
                       item={item}
                       transactionId={selectedTransaction.id}
-                      isAdmin={isAdmin}
+                      canEditPrice={canEditHistoricalPrice}
                       onReturn={(qty) => {
                         returnItem(selectedTransaction.id, item.id, qty);
                       }}
@@ -568,9 +585,13 @@ export function HistoryView() {
 function EditableHistoryPrice({
   item,
   transactionId,
+  compact,
 }: {
   item: TransactionItem;
   transactionId: string;
+  // The desktop table is tight on width; the full-height control pushed the
+  // return button out of the row.
+  compact?: boolean;
 }) {
   const { updateTransactionItemPrice } = useHistory();
   return (
@@ -580,7 +601,8 @@ function EditableHistoryPrice({
       onCommitUsd={(usd) =>
         updateTransactionItemPrice(transactionId, item.id, usd)
       }
-      className="w-32 ml-auto"
+      compact={compact}
+      className={compact ? "w-28 ml-auto" : "w-32 ml-auto"}
     />
   );
 }
@@ -589,12 +611,12 @@ function EditableHistoryPrice({
 function TransactionItemRow({
   item,
   transactionId,
-  isAdmin,
+  canEditPrice,
   onReturn,
 }: {
   item: TransactionItem;
   transactionId: string;
-  isAdmin: boolean;
+  canEditPrice: boolean;
   onReturn: (qty: number) => void;
 }) {
   const { formatPrice } = useApp();
@@ -610,8 +632,12 @@ function TransactionItemRow({
         <div className="text-[10px] text-gray-400 font-mono">{item.barcode}</div>
       </td>
       <td className="px-3 py-1.5 text-right text-gray-600">
-        {isAdmin ? (
-          <EditableHistoryPrice item={item} transactionId={transactionId} />
+        {canEditPrice ? (
+          <EditableHistoryPrice
+            item={item}
+            transactionId={transactionId}
+            compact
+          />
         ) : (
           formatPrice(item.sellingPrice)
         )}
@@ -695,12 +721,12 @@ function TransactionItemRow({
 function MobileItemCard({
   item,
   transactionId,
-  isAdmin,
+  canEditPrice,
   onReturn,
 }: {
   item: TransactionItem;
   transactionId: string;
-  isAdmin: boolean;
+  canEditPrice: boolean;
   onReturn: (qty: number) => void;
 }) {
   const { formatPrice } = useApp();
@@ -737,7 +763,7 @@ function MobileItemCard({
         </div>
       </div>
 
-      {isAdmin && (
+      {canEditPrice && (
         <div className="flex items-center justify-end gap-2 mb-2">
           <span className="text-[10px] text-gray-400">Precio:</span>
           <EditableHistoryPrice item={item} transactionId={transactionId} />

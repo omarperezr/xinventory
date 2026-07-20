@@ -294,19 +294,24 @@ export async function applyStockDelta(
 }
 
 // Registers a return: bumps quantity_returned and restocks the item in one
-// server-side transaction, bounded by the sold quantity.
+// server-side transaction, bounded by the sold quantity. When the product was
+// deleted since the sale, the server recreates it from the sale line and
+// reports that back as `restored`.
 export async function returnTransactionItem(
   transactionId: string,
   itemId: string,
   qty: number,
-): Promise<{ queued: boolean }> {
+): Promise<{ queued: boolean; restored?: boolean }> {
   if (isOnline()) {
-    const { error } = await supabase.rpc("return_transaction_item", {
+    const { data, error } = await supabase.rpc("return_transaction_item", {
       p_transaction_id: transactionId,
       p_item_id: itemId,
       p_qty: qty,
     });
-    if (!error) return { queued: false };
+    if (!error) {
+      const result = data as { restored?: boolean } | null;
+      return { queued: false, restored: !!result?.restored };
+    }
     if (!isNetworkError(error)) throw error;
   }
   // Echo the restock locally; the return itself lands on the next sync.
