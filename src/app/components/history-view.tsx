@@ -383,7 +383,7 @@ export function HistoryView() {
           </DialogHeader>
 
           {selectedTransaction && (
-            <div className="space-y-3 mt-1 min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="space-y-2 mt-1 min-h-0 flex-1 overflow-y-auto pr-1">
               {/* Items - responsive table/cards */}
               <div className="border rounded-lg overflow-x-auto md:overflow-x-visible">
                 {/* Desktop table.
@@ -405,12 +405,12 @@ export function HistoryView() {
                   </colgroup>
                   <thead className="bg-gray-50 text-meta uppercase text-gray-500 font-medium">
                     <tr>
-                      <th className="px-3 py-2 text-left">Producto</th>
-                      <th className="px-3 py-2 text-right">Precio</th>
-                      <th className="px-3 py-2 text-center">Comprado</th>
-                      <th className="px-3 py-2 text-center">Devuelto</th>
-                      <th className="px-3 py-2 text-right">Subtotal</th>
-                      <th className="px-3 py-2" />
+                      <th className="px-3 py-1.5 text-left">Producto</th>
+                      <th className="px-3 py-1.5 text-right">Precio</th>
+                      <th className="px-3 py-1.5 text-center">Comprado</th>
+                      <th className="px-3 py-1.5 text-center">Devuelto</th>
+                      <th className="px-3 py-1.5 text-right">Subtotal</th>
+                      <th className="px-3 py-1.5" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-sm">
@@ -454,11 +454,11 @@ export function HistoryView() {
                     <tr className="border-t border-gray-200">
                       <td
                         colSpan={4}
-                        className="px-3 py-1.5 text-right font-bold text-gray-900"
+                        className="px-3 py-1 text-right font-bold text-gray-900"
                       >
                         Total Pagado:
                       </td>
-                      <td className="px-3 py-1.5 text-right font-bold text-primary">
+                      <td className="px-3 py-1 text-right font-bold text-primary">
                         {formatPrice(selectedTransaction.total)}
                       </td>
                       <td />
@@ -480,7 +480,7 @@ export function HistoryView() {
                     />
                   ))}
                   {/* Mobile totals */}
-                  <div className="p-2.5 bg-gray-50 space-y-1">
+                  <div className="p-2 bg-gray-50 space-y-0.5">
                     <div className="flex justify-between text-xs text-gray-500">
                       <span>Subtotal</span>
                       <span>{formatPrice(selectedTransaction.subtotal)}</span>
@@ -498,7 +498,7 @@ export function HistoryView() {
               </div>
 
               {/* Payment details */}
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2">
+              <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 space-y-1.5">
                 <h3 className="font-medium text-gray-900 flex items-center gap-2 text-xs">
                   <CreditCard className="w-3.5 h-3.5 text-primary" />
                   Detalles del Pago
@@ -549,12 +549,12 @@ export function HistoryView() {
               </div>
 
               {/* Images */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <h3 className="font-medium text-gray-900 flex items-center gap-2 text-xs">
                   <ImageIcon className="w-3.5 h-3.5 text-primary" />
                   Adjuntos (Facturas/Recibos)
                 </h3>
-                <div className="grid grid-cols-5 md:grid-cols-8 gap-2">
+                <div className="grid grid-cols-5 md:grid-cols-12 gap-2">
                   {selectedTransaction.images.map((img, idx) => (
                     <a
                       key={idx}
@@ -642,7 +642,7 @@ function TransactionItemRow({
 
   return (
     <tr>
-      <td className="px-3 py-2">
+      <td className="px-3 py-1.5">
         <div className="font-medium text-gray-900 truncate" title={item.name}>
           {item.name}
         </div>
@@ -650,7 +650,7 @@ function TransactionItemRow({
           {item.barcode}
         </div>
       </td>
-      <td className="px-3 py-2 text-right text-gray-600">
+      <td className="px-3 py-1.5 text-right text-gray-600">
         {canEditPrice ? (
           <EditableHistoryPrice
             item={item}
@@ -661,8 +661,8 @@ function TransactionItemRow({
           formatPrice(item.sellingPrice)
         )}
       </td>
-      <td className="px-3 py-2 text-center">{item.cartQuantity}</td>
-      <td className="px-3 py-2 text-center">
+      <td className="px-3 py-1.5 text-center">{item.cartQuantity}</td>
+      <td className="px-3 py-1.5 text-center">
         {item.quantityReturned > 0 ? (
           <span className="text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded text-meta">
             -{item.quantityReturned}
@@ -671,7 +671,7 @@ function TransactionItemRow({
           <span className="text-gray-500">—</span>
         )}
       </td>
-      <td className="px-3 py-2 text-right font-medium">
+      <td className="px-3 py-1.5 text-right font-medium">
         {item.quantityReturned > 0 ? (
           <div className="flex flex-col items-end">
             <span className="text-xs text-gray-500 line-through">
@@ -683,7 +683,7 @@ function TransactionItemRow({
           formatPrice(item.sellingPrice * item.cartQuantity)
         )}
       </td>
-      <td className="px-3 py-2 text-right">
+      <td className="px-3 py-1.5 text-right">
         {available > 0 &&
           (!returnMode ? (
             <Button
