@@ -30,6 +30,7 @@ import {
   CartItem,
   InventoryItem,
   PaymentRecord,
+  InsufficientStockError,
 } from "./context/app-context";
 import { HistoryProvider, useHistory } from "./context/history-context";
 import { AuthProvider, useAuth } from "./context/auth-context";
@@ -108,8 +109,10 @@ function AppContent() {
     // sequentially: if one line fails (INSUFFICIENT_STOCK), we stop and roll
     // back the lines already taken rather than recording a partial sale.
     const applied: CartItem[] = [];
+    let failedItem: CartItem | undefined;
     try {
       for (const cartItem of cartItems) {
+        failedItem = cartItem;
         await adjustStock(
           cartItem.id,
           -cartItem.cartQuantity,
@@ -118,6 +121,7 @@ function AppContent() {
         );
         applied.push(cartItem);
       }
+      failedItem = undefined;
     } catch (err) {
       for (const done of applied) {
         try {
@@ -131,12 +135,19 @@ function AppContent() {
           console.error("No se pudo revertir el stock", rollbackErr);
         }
       }
-      const message =
-        (err as { message?: string })?.message?.includes("INSUFFICIENT_STOCK")
-          ? "Stock insuficiente: otro vendedor tomó el producto primero."
-          : "No se pudo actualizar el inventario. La venta no fue registrada.";
-      toast.error(message);
-      // Rethrow so TotalView keeps the cart intact for a retry.
+      const outOfStock = (err as { message?: string })?.message?.includes(
+        "INSUFFICIENT_STOCK",
+      );
+      toast.error(
+        outOfStock
+          ? `Stock insuficiente: otro vendedor tomó ${failedItem?.name ?? "el producto"} primero.`
+          : "No se pudo actualizar el inventario. La venta no fue registrada.",
+      );
+      // Rethrow so TotalView keeps the cart intact for a retry. The typed
+      // error names the offending line so the cart can flag it.
+      if (outOfStock && failedItem) {
+        throw new InsufficientStockError(failedItem.id, failedItem.name);
+      }
       throw err;
     }
 

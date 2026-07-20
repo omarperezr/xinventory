@@ -39,6 +39,7 @@ import {
   CartItem,
   PaymentRecord,
   isReferenceLens,
+  InsufficientStockError,
 } from "../context/app-context";
 import { useAuth } from "../context/auth-context";
 import { MoneyInput } from "./money-input";
@@ -132,6 +133,16 @@ export function TotalView({ onCheckout }: TotalViewProps) {
   const [pendingPayments, setPendingPayments] = useState<
     PaymentRecord[] | undefined
   >(undefined);
+  // Lines the server refused for lack of stock. Struck through in the cart so
+  // the seller can see exactly which product to remove, instead of having to
+  // work it out from the toast.
+  const [unavailableIds, setUnavailableIds] = useState<string[]>([]);
+
+  // Any change to the cart clears the marks: the seller has acted on them, and
+  // stale warnings on a rebuilt cart would be misleading.
+  useEffect(() => {
+    setUnavailableIds([]);
+  }, [cartItems.length]);
 
   const filteredItems = cartItems.filter(
     (item) =>
@@ -191,9 +202,28 @@ export function TotalView({ onCheckout }: TotalViewProps) {
       // The cart is deliberately left intact so the sale can be retried
       // rather than silently lost.
       console.error("Error al completar la venta", err);
-      toast.error(
-        "No se pudo completar la venta. El carrito se mantuvo; intenta de nuevo.",
-      );
+
+      // The sale was rejected, so no money was received against it. Discard
+      // the recorded payment: leaving it makes the app show the customer as
+      // having paid, and the totals then read as change owed on a sale that
+      // never happened. The cart survives so it can be corrected and re-taken.
+      clearPayments();
+      setPendingPayments(undefined);
+      setIsChangeModalOpen(false);
+      setIsPaymentModalOpen(false);
+
+      if (err instanceof InsufficientStockError) {
+        // App.tsx already named the product; flag the line and say what the
+        // seller has to do next, rather than stacking another error toast.
+        setUnavailableIds((prev) =>
+          prev.includes(err.itemId) ? prev : [...prev, err.itemId],
+        );
+        toast.warning("El pago no se registró. Corrige la lista y cobra de nuevo.");
+      } else {
+        toast.error(
+          "No se pudo completar la venta. El pago no se registró; revisa la lista e intenta de nuevo.",
+        );
+      }
     } finally {
       setProcessing(false);
     }
@@ -286,13 +316,43 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                           item.applyDiscount && item.discount > 0
                             ? item.sellingPrice * (1 - item.discount / 100)
                             : item.sellingPrice;
+                        const unavailable = unavailableIds.includes(item.id);
                         return (
-                          <tr key={item.id} className="hover:bg-gray-50">
+                          <tr
+                            key={item.id}
+                            className={
+                              unavailable
+                                ? "bg-red-50/60"
+                                : "hover:bg-gray-50"
+                            }
+                          >
                             <td className="px-6 py-4">
-                              <div className="font-medium text-gray-900">
+                              <div
+                                className={`font-medium ${
+                                  unavailable
+                                    ? "text-red-700 line-through"
+                                    : "text-gray-900"
+                                }`}
+                              >
                                 {item.name}
                               </div>
-                              <div className="text-xs text-gray-500 font-mono">
+                              {/* Text label as well as colour, so the warning
+                                  survives a colourblind or sunlit screen. */}
+                              {unavailable && (
+                                <div
+                                  role="status"
+                                  className="text-[11px] font-medium text-red-700 mt-0.5"
+                                >
+                                  Sin stock - quita este producto para continuar
+                                </div>
+                              )}
+                              <div
+                                className={`text-xs font-mono ${
+                                  unavailable
+                                    ? "text-red-400 line-through"
+                                    : "text-gray-500"
+                                }`}
+                              >
                                 {item.barcode}
                               </div>
                               {item.includesTaxes && (
@@ -438,13 +498,31 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                         item.applyDiscount && item.discount > 0
                           ? item.sellingPrice * (1 - item.discount / 100)
                           : item.sellingPrice;
+                      const unavailable = unavailableIds.includes(item.id);
                       return (
-                        <div key={item.id} className="p-3">
+                        <div
+                          key={item.id}
+                          className={`p-3 ${unavailable ? "bg-red-50/60" : ""}`}
+                        >
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-gray-900 truncate">
+                              <p
+                                className={`text-sm font-medium truncate ${
+                                  unavailable
+                                    ? "text-red-700 line-through"
+                                    : "text-gray-900"
+                                }`}
+                              >
                                 {item.name}
                               </p>
+                              {unavailable && (
+                                <p
+                                  role="status"
+                                  className="text-[11px] font-medium text-red-700"
+                                >
+                                  Sin stock - quita este producto
+                                </p>
+                              )}
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 {canEditPrice ? (
                                   <EditablePrice item={item} />

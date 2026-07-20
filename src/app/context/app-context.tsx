@@ -32,6 +32,19 @@ export interface Rates {
   USDT: number;
 }
 
+// Raised when the server refuses a sale because the stock ran out, usually
+// because another seller took the last units first. Carries the offending
+// item so the cart can point at the exact line that has to change.
+export class InsufficientStockError extends Error {
+  constructor(
+    public readonly itemId: string,
+    public readonly itemName: string,
+  ) {
+    super("INSUFFICIENT_STOCK");
+    this.name = "InsufficientStockError";
+  }
+}
+
 // Lenses other than USD and BS are reference views: they show what a price
 // looks like at a rate we do NOT consider honest, so money must never be
 // entered through them (the value would be booked at the wrong worth).
@@ -843,9 +856,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ]);
   };
 
+  // Clears only the money recorded so far. Notes survive, because this is also
+  // used when a sale is rejected and the seller has to re-take payment against
+  // a corrected cart - retyping the notes as well would be needless.
+  // clearCart resets the notes when a sale actually finishes.
   const clearPayments = () => {
     setCurrentPayments([]);
-    setTransactionNotes("");
   };
 
   return (

@@ -273,8 +273,21 @@ export async function applyStockDelta(
       return { queued: false };
     }
     // INSUFFICIENT_STOCK and friends are real rejections - surface them
-    // rather than queueing an operation the server will never accept.
-    if (!isNetworkError(error)) throw error;
+    // rather than queueing an operation the server will never accept. Undo the
+    // optimistic patch first, or the cache keeps a quantity the server refused.
+    if (!isNetworkError(error)) {
+      await patchCachedItems((rows) =>
+        rows.map((r) =>
+          r.id === itemId
+            ? { ...r, quantity: Math.max(0, (r.quantity ?? 0) - delta) }
+            : r,
+        ),
+      );
+      if (historyRow) {
+        await patchCachedHistory((rows) => rows.filter((h) => h !== historyRow));
+      }
+      throw error;
+    }
   }
   await enqueue({ kind: "stock.delta", itemId, delta, historyRow });
   return { queued: true };
