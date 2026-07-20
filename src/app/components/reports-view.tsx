@@ -1,40 +1,46 @@
-import { useEffect, useMemo, useState } from "react";
+// Reports dashboard.
+//
+// One filter row scopes everything below it, then five panels answer five
+// different questions:
+//
+//   Resumen     - how is the business doing, and what needs attention today
+//   Ventas      - when demand happens, who closes it, how customers pay
+//   Productos   - which items carry the business (past)
+//   Inventario  - what is on the shelf and what it costs to keep it (present)
+//   Proyección  - where sales are heading and what to buy (future)
+//
+// Every figure on screen is derived from the sales history the browser holds
+// plus the live catalogue. The database is asked for one thing only: how many
+// sales really exist in the selected range, so the screen can say out loud when
+// it is looking at an incomplete window instead of quietly under-reporting.
+
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useHistory } from "../context/history-context";
 import { useApp } from "../context/app-context";
 import { supabase } from "../services/supabase";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  Cell,
-  PieChart,
-  Pie,
-} from "recharts";
-import {
   BarChart2,
-  TrendingUp,
-  TrendingDown,
-  Award,
-  AlertCircle,
-  AlertTriangle,
-  DollarSign,
-  ShoppingBag,
-  Users,
-  Package,
-  Wallet,
-  CreditCard,
-  FileText,
+  Boxes,
+  CalendarRange,
+  Download,
   FileSpreadsheet,
+  FileText,
+  Info,
+  LayoutDashboard,
+  Loader2,
+  Package,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { format } from "date-fns";
+import {
+  buildReport,
+  PERIOD_OPTIONS,
+  resolveRange,
+  type PeriodKey,
+} from "../services/report-analytics";
+import { compact } from "./reports/report-ui";
 import type { ReportData } from "../services/report-export";
 
 // jspdf + xlsx are heavy; load them only when an export button is clicked.
@@ -43,1107 +49,303 @@ const exportReportPdf = async (data: ReportData) =>
 const exportReportExcel = async (data: ReportData) =>
   (await import("../services/report-export")).exportReportExcel(data);
 
-const CHART_COLORS = [
-  "#2196F3",
-  "#4CAF50",
-  "#FF9800",
-  "#E91E63",
-  "#9C27B0",
-  "#00BCD4",
+// Only the active panel is mounted, and each one is its own chunk: opening
+// "Resumen" should not pay for the product table or the forecast.
+const OverviewPanel = lazy(() =>
+  import("./reports/overview-panel").then((m) => ({ default: m.OverviewPanel })),
+);
+const SalesPanel = lazy(() =>
+  import("./reports/sales-panel").then((m) => ({ default: m.SalesPanel })),
+);
+const ProductsPanel = lazy(() =>
+  import("./reports/products-panel").then((m) => ({ default: m.ProductsPanel })),
+);
+const InventoryPanel = lazy(() =>
+  import("./reports/inventory-panel").then((m) => ({ default: m.InventoryPanel })),
+);
+const ForecastPanel = lazy(() =>
+  import("./reports/forecast-panel").then((m) => ({ default: m.ForecastPanel })),
+);
+
+type TabKey = "resumen" | "ventas" | "productos" | "inventario" | "proyeccion";
+
+const TABS: { key: TabKey; label: string; icon: typeof BarChart2; hint: string }[] = [
+  { key: "resumen", label: "Resumen", icon: LayoutDashboard, hint: "Cómo va el negocio" },
+  { key: "ventas", label: "Ventas", icon: TrendingUp, hint: "Cuándo y quién vende" },
+  { key: "productos", label: "Productos", icon: Boxes, hint: "Qué deja dinero" },
+  { key: "inventario", label: "Inventario", icon: Package, hint: "Qué hay en estante" },
+  { key: "proyeccion", label: "Proyección", icon: Sparkles, hint: "Qué viene y qué comprar" },
 ];
 
-const CustomBarTooltip = ({
-  active,
-  payload,
-  label,
-  formatPrice,
-  isRevenue,
-}: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg p-2.5 shadow-lg text-xs">
-        <p className="font-semibold text-gray-800 mb-1 max-w-[140px] truncate">
-          {payload[0]?.payload?.fullName || label}
-        </p>
-        {payload.map((entry: any, i: number) => (
-          <p key={i} style={{ color: entry.color || entry.fill }}>
-            {isRevenue ? formatPrice(entry.value) : `${entry.value} unidades`}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
-
-const CustomAreaTooltip = ({ active, payload, label, formatPrice }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg p-2.5 shadow-lg text-xs">
-        <p className="text-gray-500 mb-1">{label}</p>
-        <p className="font-semibold text-primary">
-          {formatPrice(payload[0].value)}
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
-// Shortens a product name for a chart axis label.
-const shorten = (name: string, max = 10) =>
-  name.length > max ? name.slice(0, max) + "…" : name;
-
-// Shape returned by the report_summary Postgres function.
-interface ServerReport {
-  totals: {
-    revenue: number;
-    cost: number;
-    profit: number;
-    margin: number;
-    transactions: number;
-    avgTicket: number;
-  };
-  itemSales: { name: string; quantity: number; total: number; cost: number }[];
-  userSales: { user: string; total: number; count: number }[];
-  paymentMethodTotals: { method: string; total: number }[];
-  daily: { day: string; total: number }[];
-}
-
-// Builds the same view models the client-side pipeline produces, but from
-// figures the database already aggregated over the full history.
-function deriveFromServer(server: ServerReport) {
-  const itemSalesByRevenue = server.itemSales;
-  const sortedItems = [...server.itemSales].sort(
-    (a, b) => b.quantity - a.quantity,
-  );
-  const sortedByProfit = server.itemSales
-    .map((i) => ({ ...i, profit: i.total - i.cost }))
-    .sort((a, b) => b.profit - a.profit);
-  const sortedUsers: [string, { total: number; count: number }][] =
-    server.userSales.map((u) => [u.user, { total: u.total, count: u.count }]);
-
-  return {
-    sortedItems,
-    sortedUsers,
-    sortedByProfit,
-    itemSalesByRevenue,
-    maxItemTotal: itemSalesByRevenue[0]?.total ?? 0,
-    mostSoldItem: sortedItems[0],
-    leastSoldItem: sortedItems[sortedItems.length - 1],
-    bestSeller: sortedUsers[0],
-    worstSeller: sortedUsers[sortedUsers.length - 1],
-    totalRevenue: server.totals.revenue,
-    totalCost: server.totals.cost,
-    totalProfit: server.totals.profit,
-    profitMargin: server.totals.margin,
-    totalTransactions: server.totals.transactions,
-    avgTicket: server.totals.avgTicket,
-    paymentMethodData: server.paymentMethodTotals.map((p, i) => ({
-      method: p.method,
-      total: p.total,
-      fill: CHART_COLORS[i % CHART_COLORS.length],
-    })),
-    topRevenueData: itemSalesByRevenue.slice(0, 6).map((item) => ({
-      name: shorten(item.name),
-      fullName: item.name,
-      revenue: parseFloat(item.total.toFixed(2)),
-    })),
-    topUnitsData: sortedItems.slice(0, 6).map((item) => ({
-      name: shorten(item.name),
-      fullName: item.name,
-      units: item.quantity,
-    })),
-    dailySalesData: server.daily.slice(-10),
-    userSalesData: sortedUsers.map(([userId, data], i) => ({
-      name: userId.split(" ")[0],
-      fullName: userId,
-      total: parseFloat(data.total.toFixed(2)),
-      count: data.count,
-      fill: CHART_COLORS[i % CHART_COLORS.length],
-    })),
-  };
-}
-
 export function ReportsView() {
-  const { transactions } = useHistory();
+  const { transactions, hasMore, loadingMore, loadMore } = useHistory();
   const { formatPrice, items, convertPrice, currencySymbol } = useApp();
 
-  // Totals come from the database so they cover the whole history, not just
-  // the page of transactions currently loaded. Falls back to computing them
-  // in the browser when the function is unavailable (migration not applied
-  // yet, or offline), which is the behaviour this screen had before.
-  const [serverReport, setServerReport] = useState<ServerReport | null>(null);
-  const [serverChecked, setServerChecked] = useState(false);
+  const [tab, setTab] = useState<TabKey>("resumen");
+  const [period, setPeriod] = useState<PeriodKey>("30d");
+  const [custom, setCustom] = useState({ from: "", to: "" });
 
+  const range = useMemo(
+    () => resolveRange(period, transactions, custom),
+    [period, transactions, custom],
+  );
+
+  // The expensive part: one pass over every loaded sale and line item.
+  const report = useMemo(
+    () => buildReport(transactions, items, range),
+    [transactions, items, range],
+  );
+
+  // How many sales the database has in this range, regardless of how many the
+  // browser happens to hold. Purely a completeness check - every figure on
+  // screen still comes from the local pipeline, so the two can be compared.
+  const [serverCount, setServerCount] = useState<number | null>(null);
   useEffect(() => {
     let cancelled = false;
     supabase
-      .rpc("report_summary", { p_from: null, p_to: null })
+      .rpc("report_summary", {
+        p_from: range.from.toISOString(),
+        p_to: range.to.toISOString(),
+      })
       .then(({ data, error }) => {
         if (cancelled) return;
-        // Only trust a payload that has every section in the expected shape.
-        // A partial or differently-shaped response would otherwise crash the
-        // whole screen, and falling back to local aggregation is harmless.
-        const d = data as Partial<ServerReport> | null;
-        const valid =
-          !error &&
-          !!d &&
-          typeof d.totals === "object" &&
-          d.totals !== null &&
-          Array.isArray(d.itemSales) &&
-          Array.isArray(d.userSales) &&
-          Array.isArray(d.paymentMethodTotals) &&
-          Array.isArray(d.daily);
-
-        if (!valid) {
-          console.warn("report_summary unavailable, aggregating locally", error);
-          setServerReport(null);
-        } else {
-          setServerReport(d as ServerReport);
-        }
-        setServerChecked(true);
+        const total = (data as any)?.totals?.transactions;
+        setServerCount(!error && typeof total === "number" ? total : null);
       });
     return () => {
       cancelled = true;
     };
-  }, [transactions.length]);
+  }, [range.from.getTime(), range.to.getTime(), transactions.length]);
 
-  // Aggregations
-  // Memoized: this walks every transaction and every line item, and without
-  // it the whole pipeline (plus several sorts) re-ran on every render.
-  const clientAggregates = useMemo(() => {
-  const itemSales: Record<
-    string,
-    { name: string; quantity: number; total: number; cost: number }
-  > = {};
-  const userSales: Record<string, { total: number; count: number }> = {};
-  // Keyed by sortable ISO day so the trend can be ordered chronologically;
-  // `label` is the human-readable form shown on the axis.
-  const dailySales: Record<string, { label: string; total: number }> = {};
-  const paymentMethodTotals: Record<string, number> = {};
+  const loadedCount = report.metrics.transactions;
+  const isPartial = serverCount !== null && serverCount > loadedCount;
 
-  const buyingPriceById = new Map(items.map((i) => [i.id, i.buyingPrice]));
+  const money = (usd: number) => formatPrice(usd);
+  const moneyCompact = (usd: number) => `${currencySymbol} ${compact(convertPrice(usd))}`;
 
-  transactions.forEach((t) => {
-    if (!userSales[t.userId]) userSales[t.userId] = { total: 0, count: 0 };
-    userSales[t.userId].total += t.total;
-    userSales[t.userId].count += 1;
+  const panelProps = {
+    report,
+    money,
+    moneyCompact,
+    convert: convertPrice,
+    symbol: currencySymbol,
+  };
 
-    // A malformed date must not take down the entire reports screen.
-    const parsedDate = new Date(t.date);
-    if (!Number.isNaN(parsedDate.getTime())) {
-      const key = format(parsedDate, "yyyy-MM-dd");
-      const label = format(parsedDate, "dd/MM");
-      if (!dailySales[key]) dailySales[key] = { label, total: 0 };
-      dailySales[key].total += t.total;
-    }
+  const hasData = loadedCount > 0;
 
-    t.items.forEach((item) => {
-      // Net of returns so reports reflect what was actually kept/sold.
-      const netQty = item.cartQuantity - (item.quantityReturned || 0);
-      if (netQty <= 0) return;
-      if (!itemSales[item.id])
-        itemSales[item.id] = {
-          name: item.name,
-          quantity: 0,
-          total: 0,
-          cost: 0,
-        };
-      itemSales[item.id].quantity += netQty;
-      itemSales[item.id].total += netQty * item.sellingPrice;
-      // Prefer the cost snapshotted on the sale line. Sales predating that
-      // column carry 0, so fall back to the current inventory cost for those
-      // rather than reporting a false 100% margin.
-      const buyingPrice =
-        item.buyingPrice > 0
-          ? item.buyingPrice
-          : (buyingPriceById.get(item.id) ?? 0);
-      itemSales[item.id].cost += netQty * buyingPrice;
-    });
-
-    t.payments?.forEach((p) => {
-      paymentMethodTotals[p.method] = (paymentMethodTotals[p.method] || 0) + p.amount;
-    });
-  });
-
-  const sortedItems = Object.values(itemSales).sort(
-    (a, b) => b.quantity - a.quantity,
-  );
-  const sortedUsers = Object.entries(userSales).sort(
-    ([, a], [, b]) => b.total - a.total,
-  );
-  const sortedByProfit = Object.values(itemSales)
-    .map((i) => ({ ...i, profit: i.total - i.cost }))
-    .sort((a, b) => b.profit - a.profit);
-
-  const mostSoldItem = sortedItems[0];
-  const leastSoldItem = sortedItems[sortedItems.length - 1];
-  const bestSeller = sortedUsers[0];
-  const worstSeller = sortedUsers[sortedUsers.length - 1];
-
-  const totalRevenue = transactions.reduce((s, t) => s + t.total, 0);
-  const totalCost = Object.values(itemSales).reduce((s, i) => s + i.cost, 0);
-  const totalProfit = totalRevenue - totalCost;
-  const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-  const totalTransactions = transactions.length;
-  const avgTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
-
-  // Current business situation indicators (live inventory, not sales)
-  const inventoryCost = items.reduce(
-    (sum, i) => sum + i.buyingPrice * i.quantity,
-    0,
-  );
-  const lowStockItems = items
-    .filter((i) => i.quantity > 0 && i.quantity < 10)
-    .sort((a, b) => a.quantity - b.quantity);
-  const outOfStockItems = items.filter((i) => i.quantity === 0);
-
-  const paymentMethodData = Object.entries(paymentMethodTotals)
-    .sort(([, a], [, b]) => b - a)
-    .map(([method, total], i) => ({
-      method,
-      total,
-      fill: CHART_COLORS[i % CHART_COLORS.length],
-    }));
-
-  // Chart datasets
-  const topRevenueData = Object.values(itemSales)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 6)
-    .map((item) => ({
-      name: shorten(item.name),
-      fullName: item.name,
-      revenue: parseFloat(item.total.toFixed(2)),
-    }));
-
-  const topUnitsData = sortedItems.slice(0, 6).map((item) => ({
-    name: shorten(item.name),
-    fullName: item.name,
-    units: item.quantity,
-  }));
-
-  // Sort chronologically BEFORE taking the last 10. Transactions arrive
-  // newest-first, so slicing insertion order returned the OLDEST ten days
-  // while the chart claimed to show the recent trend.
-  const dailySalesData = Object.keys(dailySales)
-    .sort()
-    .slice(-10)
-    .map((key) => ({
-      day: dailySales[key].label,
-      total: parseFloat(dailySales[key].total.toFixed(2)),
-    }));
-
-  const userSalesData = sortedUsers.map(([userId, data], i) => ({
-    name: userId.split(" ")[0],
-    fullName: userId,
-    total: parseFloat(data.total.toFixed(2)),
-    count: data.count,
-    fill: CHART_COLORS[i % CHART_COLORS.length],
-  }));
-
-  // Computed once and reused instead of re-sorting itemSales at each use site.
-  const itemSalesByRevenue = Object.values(itemSales).sort(
-    (a, b) => b.total - a.total,
-  );
-  const maxItemTotal = itemSalesByRevenue[0]?.total ?? 0;
-
-    return {
-      itemSales,
-      sortedItems,
-      sortedUsers,
-      sortedByProfit,
-      itemSalesByRevenue,
-      maxItemTotal,
-      mostSoldItem,
-      leastSoldItem,
-      bestSeller,
-      worstSeller,
-      totalRevenue,
-      totalCost,
-      totalProfit,
-      profitMargin,
-      totalTransactions,
-      avgTicket,
-      inventoryCost,
-      lowStockItems,
-      outOfStockItems,
-      paymentMethodData,
-      topRevenueData,
-      topUnitsData,
-      dailySalesData,
-      userSalesData,
-    };
-  }, [transactions, items]);
-
-  // Server figures win when available; inventory indicators always come from
-  // the live item list, since those describe stock rather than sales.
-  const aggregates = useMemo(
-    () =>
-      serverReport
-        ? { ...clientAggregates, ...deriveFromServer(serverReport) }
-        : clientAggregates,
-    [clientAggregates, serverReport],
-  );
-
-  const {
-    itemSales,
-    sortedItems,
-    sortedUsers,
-    sortedByProfit,
-    itemSalesByRevenue,
-    maxItemTotal,
-    mostSoldItem,
-    leastSoldItem,
-    bestSeller,
-    worstSeller,
-    totalRevenue,
-    totalCost,
-    totalProfit,
-    profitMargin,
-    totalTransactions,
-    avgTicket,
-    inventoryCost,
-    lowStockItems,
-    outOfStockItems,
-    paymentMethodData,
-    topRevenueData,
-    topUnitsData,
-    dailySalesData,
-    userSalesData,
-  } = aggregates;
-
-  // Empty state
-  // Based on the aggregate count, so a business with history still shows its
-  // reports even when the loaded page of transactions happens to be empty.
-  const hasData = totalTransactions > 0;
-
-  // The per-transaction detail table and the exports below list only the
-  // transactions currently loaded, whereas the totals above cover everything.
-  // Say so rather than letting the two quietly disagree.
-  const detailIsPartial = !!serverReport && transactions.length < totalTransactions;
-
-  // Downloadable report (PDF / Excel)
   const buildReportData = (): ReportData => ({
-    transactions,
+    transactions: report.rangeTransactions,
     symbol: currencySymbol,
     convert: convertPrice,
-    itemSales: itemSalesByRevenue,
-    userSales: sortedUsers.map(([user, d]) => ({
-      user,
-      total: d.total,
-      count: d.count,
-    })),
-    paymentMethodTotals: paymentMethodData.map((p) => ({
-      method: p.method,
-      total: p.total,
-    })),
-    totals: {
-      revenue: totalRevenue,
-      cost: totalCost,
-      profit: totalProfit,
-      margin: profitMargin,
-      transactions: totalTransactions,
-      avgTicket,
-    },
+    periodLabel: `${format(range.from, "dd/MM/yyyy")} — ${format(range.to, "dd/MM/yyyy")}`,
+    metrics: report.metrics,
+    previousMetrics: report.previousMetrics,
+    products: report.products,
+    categories: report.categories,
+    brands: report.brands,
+    sellers: report.sellers,
+    payments: report.payments,
+    inventory: report.inventory,
+    forecast: report.forecast,
+    alerts: report.alerts,
   });
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h2 className="text-base md:text-lg font-medium text-gray-900 flex items-center gap-2">
-            <BarChart2 className="w-5 h-5 text-primary" />
-            Reportes y Estadísticas
-          </h2>
-          <p className="text-xs md:text-sm text-gray-500 mt-1">
-            Análisis de rendimiento basado en el historial de transacciones.
-          </p>
-          {detailIsPartial && (
-            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-2">
-              Los totales cubren las {totalTransactions} transacciones del
-              historial completo. El detalle y las descargas incluyen solo las{" "}
-              {transactions.length} cargadas.
+    <div className="space-y-4 md:space-y-5 pb-8">
+      {/* Filter row - scopes every panel below it */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-5 space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <BarChart2 className="w-5 h-5 text-primary" />
+              Panel de reportes
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {format(range.from, "dd/MM/yyyy")} — {format(range.to, "dd/MM/yyyy")} ·{" "}
+              {range.days} día(s) · {loadedCount} venta(s)
             </p>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-xs"
-            disabled={!hasData}
-            onClick={() => exportReportPdf(buildReportData())}
-          >
-            <FileText className="w-4 h-4 mr-1.5 text-red-500" />
-            Descargar PDF
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-xs"
-            disabled={!hasData}
-            onClick={() => exportReportExcel(buildReportData())}
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-1.5 text-green-600" />
-            Descargar Excel
-          </Button>
-        </div>
-      </div>
+          </div>
 
-      {/* KPI summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
-                Ingresos Totales
-              </p>
-              <DollarSign className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-            </div>
-            <p className="text-base md:text-xl font-bold text-green-600 truncate">
-              {formatPrice(totalRevenue)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
-                Transacciones
-              </p>
-              <ShoppingBag className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-            </div>
-            <p className="text-base md:text-xl font-bold">
-              {totalTransactions}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
-                Más Vendido
-              </p>
-              <TrendingUp className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-            </div>
-            <p className="text-sm md:text-base font-bold truncate">
-              {mostSoldItem?.name ?? "—"}
-            </p>
-            {mostSoldItem && (
-              <p className="text-[10px] md:text-xs text-muted-foreground">
-                {mostSoldItem.quantity} u
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
-                Mejor Vendedor
-              </p>
-              <Users className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-            </div>
-            <p className="text-sm md:text-base font-bold truncate">
-              {bestSeller?.[0]?.split(" ")[0] ?? "—"}
-            </p>
-            {bestSeller && (
-              <p className="text-[10px] md:text-xs text-muted-foreground">
-                {formatPrice(bestSeller[1].total)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Profitability and business health KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
-                Ganancia Neta
-              </p>
-              <Wallet className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-            </div>
-            <p className="text-base md:text-xl font-bold text-green-600 truncate">
-              {formatPrice(totalProfit)}
-            </p>
-            <p className="text-[10px] md:text-xs text-muted-foreground">
-              Margen: {profitMargin.toFixed(0)}%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
-                Ticket Promedio
-              </p>
-              <ShoppingBag className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-            </div>
-            <p className="text-base md:text-xl font-bold text-gray-900 truncate">
-              {formatPrice(avgTicket)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
-                Costo de Inventario Actual
-              </p>
-              <Package className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-            </div>
-            <p className="text-base md:text-xl font-bold text-gray-900 truncate">
-              {formatPrice(inventoryCost)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] md:text-xs text-muted-foreground leading-tight">
-                Bajo / Sin Stock
-              </p>
-              <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
-            </div>
-            <p className="text-base md:text-xl font-bold text-gray-900">
-              {lowStockItems.length}
-              <span className="text-red-500"> / {outOfStockItems.length}</span>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Low stock alert */}
-      {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-          <h3 className="font-medium text-gray-900 mb-3 text-sm md:text-base flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-yellow-500" />
-            Alertas de Inventario
-          </h3>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {outOfStockItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between p-2.5 bg-red-50 rounded-md border border-red-100"
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-1 bg-gray-100 rounded-lg p-0.5">
+              {PERIOD_OPTIONS.map((o) => (
+                <button
+                  key={o.key}
+                  type="button"
+                  onClick={() => setPeriod(o.key)}
+                  title={o.label}
+                  className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors ${
+                    period === o.key
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  {o.short}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setPeriod("custom")}
+                title="Rango personalizado"
+                className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1 ${
+                  period === "custom"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
               >
-                <span className="text-sm font-medium text-gray-900 truncate">
-                  {item.name}
-                </span>
-                <span className="text-xs font-medium text-red-600 flex-shrink-0">
-                  Sin stock
-                </span>
-              </div>
-            ))}
-            {lowStockItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between p-2.5 bg-yellow-50 rounded-md border border-yellow-100"
+                <CalendarRange className="w-3.5 h-3.5" />
+                Rango
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                disabled={!hasData}
+                onClick={() => exportReportPdf(buildReportData())}
               >
-                <span className="text-sm font-medium text-gray-900 truncate">
-                  {item.name}
-                </span>
-                <span className="text-xs font-medium text-yellow-700 flex-shrink-0">
-                  {item.quantity} {item.unit === "units" ? "u" : item.unit}{" "}
-                  restantes
-                </span>
-              </div>
-            ))}
+                <FileText className="w-4 h-4 mr-1.5 text-red-500" />
+                PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                disabled={!hasData}
+                onClick={() => exportReportExcel(buildReportData())}
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-1.5 text-green-600" />
+                Excel
+              </Button>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Stat cards (most/least sold, best/worst seller) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
-            <CardTitle className="text-xs md:text-sm font-medium">
-              Producto Más Vendido
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            {mostSoldItem ? (
-              <>
-                <div className="text-lg md:text-2xl font-bold truncate">
-                  {mostSoldItem.name}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {mostSoldItem.quantity} unidades vendidas
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-gray-500">No hay datos suficientes</p>
+        {period === "custom" && (
+          <div className="flex flex-wrap items-end gap-2 pt-1">
+            <label className="text-[11px] text-gray-500">
+              Desde
+              <input
+                type="date"
+                value={custom.from}
+                onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))}
+                className="block mt-0.5 text-xs border border-gray-200 rounded-md px-2 py-1.5"
+              />
+            </label>
+            <label className="text-[11px] text-gray-500">
+              Hasta
+              <input
+                type="date"
+                value={custom.to}
+                onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
+                className="block mt-0.5 text-xs border border-gray-200 rounded-md px-2 py-1.5"
+              />
+            </label>
+            {!custom.from && (
+              <p className="text-[11px] text-gray-400 pb-1.5">
+                Elige una fecha inicial para aplicar el rango.
+              </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
-            <CardTitle className="text-xs md:text-sm font-medium">
-              Producto Menos Vendido
-            </CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            {leastSoldItem ? (
-              <>
-                <div className="text-lg md:text-2xl font-bold truncate">
-                  {leastSoldItem.name}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {leastSoldItem.quantity} unidades vendidas
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-gray-500">No hay datos suficientes</p>
+        {/* Say it out loud when the local window does not cover the range. */}
+        {isPartial && (
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>
+              El período tiene {serverCount} ventas registradas y el navegador
+              tiene {loadedCount}. Los reportes muestran solo las cargadas.
+            </span>
+            {hasMore && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-[11px] h-7 ml-auto"
+                disabled={loadingMore}
+                onClick={loadMore}
+              >
+                {loadingMore ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 mr-1" />
+                )}
+                Cargar más historial
+              </Button>
             )}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
-            <CardTitle className="text-xs md:text-sm font-medium">
-              Mejor Vendedor
-            </CardTitle>
-            <Award className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            {bestSeller ? (
-              <>
-                <div className="text-lg md:text-2xl font-bold truncate">
-                  {bestSeller[0]}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {formatPrice(bestSeller[1].total)} · {bestSeller[1].count}{" "}
-                  ventas
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-gray-500">No hay datos suficientes</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
-            <CardTitle className="text-xs md:text-sm font-medium">
-              Vendedor con Menos Ventas
-            </CardTitle>
-            <AlertCircle className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            {worstSeller ? (
-              <>
-                <div className="text-lg md:text-2xl font-bold truncate">
-                  {worstSeller[0]}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {formatPrice(worstSeller[1].total)} · {worstSeller[1].count}{" "}
-                  ventas
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-gray-500">No hay datos suficientes</p>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
       </div>
 
-      {/* Charts */}
-      {hasData ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          {/* Daily sales trend */}
-          {dailySalesData.length >= 2 && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 lg:col-span-2">
-              <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
-                Tendencia de Ventas Diarias
-              </h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart
-                  data={dailySalesData}
-                  margin={{ top: 5, right: 8, left: 0, bottom: 0 }}
+      {/* Panel navigation */}
+      <nav className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+        <ul className="flex gap-2 min-w-max md:min-w-0">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.key;
+            return (
+              <li key={t.key}>
+                <button
+                  type="button"
+                  onClick={() => setTab(t.key)}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${
+                    active
+                      ? "bg-white border-primary/40 shadow-sm"
+                      : "bg-white/60 border-gray-200 hover:border-gray-300"
+                  }`}
                 >
-                  <defs>
-                    <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="5%"
-                        stopColor="#2196F3"
-                        stopOpacity={0.18}
-                      />
-                      <stop offset="95%" stopColor="#2196F3" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis
-                    dataKey="day"
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    axisLine={false}
-                    tickLine={false}
+                  <Icon
+                    className={`w-4 h-4 flex-shrink-0 ${
+                      active ? "text-primary" : "text-gray-400"
+                    }`}
                   />
-                  <YAxis
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={45}
-                    tickFormatter={(v) => v.toFixed(0)}
-                  />
-                  <Tooltip
-                    content={<CustomAreaTooltip formatPrice={formatPrice} />}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="total"
-                    stroke="#2196F3"
-                    strokeWidth={2.5}
-                    fill="url(#salesGrad)"
-                    dot={{ r: 3, fill: "#2196F3" }}
-                    activeDot={{ r: 5 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+                  <span>
+                    <span
+                      className={`block text-xs md:text-sm font-medium ${
+                        active ? "text-gray-900" : "text-gray-600"
+                      }`}
+                    >
+                      {t.label}
+                    </span>
+                    <span className="hidden md:block text-[10px] text-gray-400 leading-tight">
+                      {t.hint}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
-          {/* Top products by revenue */}
-          {topRevenueData.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-              <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
-                Top Ingresos por Producto
-              </h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart
-                  data={topRevenueData}
-                  margin={{ top: 5, right: 8, left: 0, bottom: 0 }}
-                  barCategoryGap="30%"
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#f3f4f6"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={45}
-                    tickFormatter={(v) => v.toFixed(0)}
-                  />
-                  <Tooltip
-                    content={
-                      <CustomBarTooltip
-                        formatPrice={formatPrice}
-                        isRevenue={true}
-                      />
-                    }
-                  />
-                  <Bar dataKey="revenue" radius={[5, 5, 0, 0]}>
-                    {topRevenueData.map((_, i) => (
-                      <Cell
-                        key={i}
-                        fill={CHART_COLORS[i % CHART_COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Top products by units */}
-          {topUnitsData.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-              <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
-                Top Unidades Vendidas
-              </h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart
-                  data={topUnitsData}
-                  margin={{ top: 5, right: 8, left: 0, bottom: 0 }}
-                  barCategoryGap="30%"
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#f3f4f6"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={30}
-                  />
-                  <Tooltip
-                    content={
-                      <CustomBarTooltip
-                        formatPrice={formatPrice}
-                        isRevenue={false}
-                      />
-                    }
-                  />
-                  <Bar dataKey="units" fill="#4CAF50" radius={[5, 5, 0, 0]}>
-                    {topUnitsData.map((_, i) => (
-                      <Cell
-                        key={i}
-                        fill={`hsl(${142 + i * 15}, ${60 - i * 3}%, ${48 + i * 2}%)`}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Sales by user */}
-          {userSalesData.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-              <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
-                Ventas por Vendedor
-              </h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart
-                  data={userSalesData}
-                  margin={{ top: 5, right: 8, left: 0, bottom: 0 }}
-                  barCategoryGap="35%"
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#f3f4f6"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={45}
-                    tickFormatter={(v) => v.toFixed(0)}
-                  />
-                  <Tooltip
-                    content={
-                      <CustomBarTooltip
-                        formatPrice={formatPrice}
-                        isRevenue={true}
-                      />
-                    }
-                  />
-                  <Bar dataKey="total" radius={[5, 5, 0, 0]}>
-                    {userSalesData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Payment methods breakdown */}
-          {paymentMethodData.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-              <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-primary" />
-                Ventas por Método de Pago
-              </h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={paymentMethodData}
-                    dataKey="total"
-                    nameKey="method"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    innerRadius={40}
-                    paddingAngle={3}
-                    label={({ method, percent }) =>
-                      `${method} ${(percent * 100).toFixed(0)}%`
-                    }
-                    labelLine={false}
-                  >
-                    {paymentMethodData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: any) => [formatPrice(value), "Total"]}
-                    contentStyle={{ fontSize: 12 }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Pie - revenue share by product */}
-          {topRevenueData.length >= 2 && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-              <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
-                Distribución de Ingresos
-              </h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={topRevenueData}
-                    dataKey="revenue"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    innerRadius={40}
-                    paddingAngle={3}
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
-                    }
-                    labelLine={false}
-                  >
-                    {topRevenueData.map((_, i) => (
-                      <Cell
-                        key={i}
-                        fill={CHART_COLORS[i % CHART_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: any) => [formatPrice(value), "Ingresos"]}
-                    contentStyle={{ fontSize: 12 }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-      ) : (
+      {!hasData ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <BarChart2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">
-            No hay datos para mostrar gráficas
+          <p className="text-gray-600 text-sm font-medium">
+            No hay ventas en el período seleccionado
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            Realiza algunas ventas para ver estadísticas
+            Prueba con un rango más amplio, por ejemplo «Todo».
           </p>
         </div>
-      )}
-
-      {/* Detailed table */}
-      {hasData && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-          <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
-            Ranking de Productos por Ingresos
-          </h3>
-          <div className="space-y-3">
-            {itemSalesByRevenue.slice(0, 5).map((item, idx) => {
-                const pct = Math.round(
-                  (item.total / (maxItemTotal || 1)) * 100,
-                );
-                return (
-                  <div key={item.name}>
-                    <div className="flex items-center justify-between mb-1 gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-xs font-mono text-gray-400 flex-shrink-0 w-5">
-                          #{idx + 1}
-                        </span>
-                        <span className="text-sm font-medium text-gray-900 truncate">
-                          {item.name}
-                        </span>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <span className="text-sm font-semibold text-gray-900">
-                          {formatPrice(item.total)}
-                        </span>
-                        <span className="text-xs text-gray-400 ml-1.5">
-                          {item.quantity}u
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${pct}%`,
-                          backgroundColor:
-                            CHART_COLORS[idx % CHART_COLORS.length],
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      )}
-
-      {/* Profit leaders table */}
-      {hasData && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-          <h3 className="font-medium text-gray-900 mb-4 text-sm md:text-base">
-            Productos Más Rentables (Ganancia)
-          </h3>
-          <div className="space-y-3">
-            {sortedByProfit.slice(0, 5).map((item, idx) => {
-              const maxProfit = sortedByProfit[0]?.profit || 1;
-              const pct = Math.max(
-                0,
-                Math.round((item.profit / maxProfit) * 100),
-              );
-              return (
-                <div key={item.name}>
-                  <div className="flex items-center justify-between mb-1 gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-mono text-gray-400 flex-shrink-0 w-5">
-                        #{idx + 1}
-                      </span>
-                      <span className="text-sm font-medium text-gray-900 truncate">
-                        {item.name}
-                      </span>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <span
-                        className={`text-sm font-semibold ${item.profit >= 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {formatPrice(item.profit)}
-                      </span>
-                      <span className="text-xs text-gray-400 ml-1.5">
-                        {item.quantity}u
-                      </span>
-                    </div>
-                  </div>
-                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-green-500"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      ) : (
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center py-16 text-gray-400 text-sm gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Calculando…
+            </div>
+          }
+        >
+          {tab === "resumen" && <OverviewPanel {...panelProps} />}
+          {tab === "ventas" && <SalesPanel {...panelProps} />}
+          {tab === "productos" && <ProductsPanel {...panelProps} />}
+          {tab === "inventario" && <InventoryPanel {...panelProps} />}
+          {tab === "proyeccion" && <ForecastPanel {...panelProps} />}
+        </Suspense>
       )}
     </div>
   );

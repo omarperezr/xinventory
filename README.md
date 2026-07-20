@@ -45,13 +45,50 @@ Two consequences worth remembering:
 
 - **Inventory** - product catalog, stock, per-item history, bulk Excel import
 - **Sales** - cart, split payments across methods, change calculation, returns
-- **Reports** - revenue, cost, margin, per-seller and per-product breakdowns,
-  exportable to PDF and Excel
+- **Reports** - a five-panel dashboard covering past, present and future (see
+  below), exportable to PDF and Excel
 - **Offline first** - reads fall back to a local cache, writes queue in an
   outbox and replay when the connection returns
 - **Roles** - admins manage users, prices and rates; sellers ring up sales
 - **WhatsApp sharing** - builds a ready-to-send product message, since that is
   where these shops sell
+
+## Reports
+
+One date-range filter scopes five panels, each answering a different question:
+
+| Panel | Question it answers |
+|-------|---------------------|
+| Resumen | How is the business doing versus the previous equivalent period, and what needs attention today |
+| Ventas | When demand happens (weekday, hour), who closes it, how customers pay |
+| Productos | Which items carry the business — ABC/Pareto, margins, price realization, returns |
+| Inventario | What is on the shelf, what it costs to keep, what is about to run out or never moves |
+| Proyección | Where sales are heading and what to buy to cover the next 15/30/60 days |
+
+Three things are worth knowing before changing this area.
+
+**All of it is computed in the browser.** `services/report-analytics.ts` is pure:
+it takes the loaded sales history plus the live catalogue and returns view
+models, all in USD. The panels convert to the display currency at render time.
+Crossing sales with the catalogue is what makes the forward-looking reports
+possible — velocity comes from the history, remaining stock from `items`.
+
+**The database is asked one question only:** how many sales really exist in the
+selected range (`report_summary`). When that count exceeds what the browser
+holds, the screen says so and offers to load more, instead of quietly
+under-reporting. Every figure still comes from the local pipeline, so the two
+can be compared.
+
+**Payment mix is attributed, not summed.** A cash payment is recorded as the
+note handed over, so raw amounts routinely exceed the sale total — summing them
+turns a $50 sale into $62 of "cash income". Each transaction's total is split
+across its methods in proportion to what was tendered, and sales that recorded
+no payment at all are reported separately rather than folded in.
+
+Chart colours live in `components/reports/report-ui.tsx` and are validated for
+colour-vision deficiency against a white surface. Three slots fall below 3:1
+contrast, which is why every chart also ships a legend, a tooltip and a table
+or direct labels — colour is never the only way to read a value.
 
 ## Stack
 
