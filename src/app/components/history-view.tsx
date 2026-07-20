@@ -370,9 +370,9 @@ export function HistoryView() {
         open={!!selectedTransaction}
         onOpenChange={(open) => !open && setSelectedId(null)}
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-white w-[calc(100vw-2rem)] md:w-full flex flex-col p-4 md:p-5">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden bg-white w-[calc(100vw-2rem)] md:w-full flex flex-col p-4 md:p-5">
           <DialogHeader className="gap-1">
-            <DialogTitle className="text-sm md:text-base">
+            <DialogTitle className="text-base md:text-lg">
               Detalles de Transacción
             </DialogTitle>
             <DialogDescription className="text-xs md:text-sm">
@@ -387,18 +387,26 @@ export function HistoryView() {
               {/* Items - responsive table/cards */}
               <div className="border rounded-lg overflow-x-auto">
                 {/* Desktop table */}
-                <table className="hidden md:table w-full text-xs">
+                <table className="hidden md:table w-full text-sm">
                   <thead className="bg-gray-50 text-meta uppercase text-gray-500 font-medium">
                     <tr>
-                      <th className="px-3 py-1.5 text-left">Producto</th>
-                      <th className="px-3 py-1.5 text-right">Precio</th>
-                      <th className="px-3 py-1.5 text-center">Comprado</th>
-                      <th className="px-3 py-1.5 text-center">Devuelto</th>
-                      <th className="px-3 py-1.5 text-right">Subtotal</th>
-                      <th className="px-3 py-1.5" />
+                      <th className="px-3 py-2 text-left w-full">Producto</th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap">
+                        Precio
+                      </th>
+                      <th className="px-3 py-2 text-center whitespace-nowrap">
+                        Comprado
+                      </th>
+                      <th className="px-3 py-2 text-center whitespace-nowrap">
+                        Devuelto
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap">
+                        Subtotal
+                      </th>
+                      <th className="px-3 py-2" />
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 text-xs">
+                  <tbody className="divide-y divide-gray-100 text-sm">
                     {selectedTransaction.items.map((item) => (
                       <TransactionItemRow
                         key={item.id}
@@ -452,7 +460,7 @@ export function HistoryView() {
                 </table>
 
                 {/* Mobile item cards */}
-                <div className="md:hidden divide-y divide-gray-100 max-h-40 overflow-y-auto">
+                <div className="md:hidden divide-y divide-gray-100">
                   {selectedTransaction.items.map((item) => (
                     <MobileItemCard
                       key={item.id}
@@ -602,7 +610,7 @@ function EditableHistoryPrice({
         updateTransactionItemPrice(transactionId, item.id, usd)
       }
       compact={compact}
-      className={compact ? "w-28 ml-auto" : "w-32 ml-auto"}
+      className={compact ? "w-40 ml-auto" : "w-44 ml-auto"}
     />
   );
 }
@@ -627,11 +635,18 @@ function TransactionItemRow({
 
   return (
     <tr>
-      <td className="px-3 py-1.5">
-        <div className="font-medium text-gray-900">{item.name}</div>
-        <div className="text-meta text-gray-500 font-mono">{item.barcode}</div>
+      {/* w-full + max-w-0 is what lets a table cell actually truncate: the
+          column takes the leftover width, and the text inside clips instead
+          of forcing the table wider than the dialog. */}
+      <td className="px-3 py-2 w-full max-w-0">
+        <div className="font-medium text-gray-900 truncate" title={item.name}>
+          {item.name}
+        </div>
+        <div className="text-meta text-gray-500 font-mono truncate">
+          {item.barcode}
+        </div>
       </td>
-      <td className="px-3 py-1.5 text-right text-gray-600">
+      <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">
         {canEditPrice ? (
           <EditableHistoryPrice
             item={item}
@@ -642,8 +657,10 @@ function TransactionItemRow({
           formatPrice(item.sellingPrice)
         )}
       </td>
-      <td className="px-3 py-1.5 text-center">{item.cartQuantity}</td>
-      <td className="px-3 py-1.5 text-center">
+      <td className="px-3 py-2 text-center whitespace-nowrap">
+        {item.cartQuantity}
+      </td>
+      <td className="px-3 py-2 text-center whitespace-nowrap">
         {item.quantityReturned > 0 ? (
           <span className="text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded text-meta">
             -{item.quantityReturned}
@@ -652,7 +669,7 @@ function TransactionItemRow({
           <span className="text-gray-500">—</span>
         )}
       </td>
-      <td className="px-3 py-1.5 text-right font-medium">
+      <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
         {item.quantityReturned > 0 ? (
           <div className="flex flex-col items-end">
             <span className="text-xs text-gray-500 line-through">
@@ -664,7 +681,7 @@ function TransactionItemRow({
           formatPrice(item.sellingPrice * item.cartQuantity)
         )}
       </td>
-      <td className="px-3 py-1.5 text-right">
+      <td className="px-3 py-2 text-right whitespace-nowrap">
         {available > 0 &&
           (!returnMode ? (
             <Button
