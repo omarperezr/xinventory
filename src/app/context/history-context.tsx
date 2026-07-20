@@ -57,25 +57,52 @@ interface HistoryContextType {
     sellingPriceUsd: number,
   ) => Promise<void>;
   addImageToTransaction: (transactionId: string, imageUrl: string) => void;
+  // True when older sales exist beyond the currently loaded window.
+  hasMore: boolean;
+  loadingMore: boolean;
+  loadMore: () => Promise<void>;
 }
 
 const HistoryContext = createContext<HistoryContextType | undefined>(undefined);
 
+// How many recent sales to load at once. Reports and the history screen work
+// from this window; "Cargar mas" extends it.
+const PAGE_SIZE = 200;
+
 export function HistoryProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   // HistoryProvider is nested inside AppProvider (see App.tsx), so the app
   // context is available here for rate provenance and stock refreshes.
   const { honestRate, honestRateKey, refreshData } = useApp();
 
-  const refreshTransactions = async () => {
+  const refreshTransactions = async (limit: number = pageSize) => {
     try {
-      const [{ data: txRows, error: txErr }, { data: itemRows, error: itemErr }] =
-        await Promise.all([
-          supabase.from("transactions").select("*").order("date", { ascending: false }),
-          supabase.from("transaction_items").select("*"),
-        ]);
+      // Load a bounded window of the most recent sales instead of the whole
+      // table, then fetch only the line items belonging to that window. The
+      // previous version pulled every transaction_items row in the database.
+      const { data: txRows, error: txErr } = await supabase
+        .from("transactions")
+        .select("*")
+        .order("date", { ascending: false })
+        .limit(limit + 1);
       if (txErr) throw txErr;
-      if (itemErr) throw itemErr;
+
+      const page = (txRows || []).slice(0, limit);
+      setHasMore((txRows || []).length > limit);
+
+      const txIds = page.map((t: any) => t.id);
+      let itemRows: any[] = [];
+      if (txIds.length > 0) {
+        const { data, error: itemErr } = await supabase
+          .from("transaction_items")
+          .select("*")
+          .in("transaction_id", txIds);
+        if (itemErr) throw itemErr;
+        itemRows = data || [];
+      }
 
       // Group line items by transaction once (O(n+m)) instead of re-scanning
       // the full item list for every transaction (O(n*m)), which would not
@@ -87,7 +114,7 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         else itemsByTx.set(i.transaction_id, [i]);
       }
 
-      const mapped: Transaction[] = (txRows || []).map((tx: any) => {
+      const mapped: Transaction[] = page.map((tx: any) => {
         const items: TransactionItem[] = (itemsByTx.get(tx.id) || []).map(
           (i: any) => ({
             id: i.item_id,
@@ -213,6 +240,19 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Extends the loaded window by another page of older sales.
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const next = pageSize + PAGE_SIZE;
+    setPageSize(next);
+    try {
+      await refreshTransactions(next);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   // One server-side transaction bumps quantity_returned, bounds-checks it
   // against the sold quantity, and restocks the item. The previous
   // select-then-update lost concurrent returns and could return more units
@@ -305,6 +345,9 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         returnItem,
         updateTransactionItemPrice,
         addImageToTransaction,
+        hasMore,
+        loadingMore,
+        loadMore,
       }}
     >
       {children}

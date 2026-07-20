@@ -2,7 +2,12 @@ import { useEffect, useRef, useState, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { InventoryForm } from "./inventory-form";
 import { InventoryTable } from "./inventory-table";
-import { useApp, InventoryItem, RateKey } from "../context/app-context";
+import {
+  useApp,
+  InventoryItem,
+  ItemHistoryRecord,
+  RateKey,
+} from "../context/app-context";
 import { useAuth } from "../context/auth-context";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -76,6 +81,7 @@ export function AdminView({
     deleteItem,
     deleteItems,
     importItems,
+    loadItemHistory,
     rates,
     honestRateKey,
     updateRates,
@@ -85,6 +91,33 @@ export function AdminView({
   const navigate = useNavigate();
 
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
+  // History is fetched per item when this dialog opens, so the item list does
+  // not have to carry the whole item_history table.
+  const [historyRecords, setHistoryRecords] = useState<ItemHistoryRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    if (!historyItem) {
+      setHistoryRecords([]);
+      return;
+    }
+    let cancelled = false;
+    setHistoryLoading(true);
+    loadItemHistory(historyItem.id)
+      .then((records) => {
+        if (!cancelled) setHistoryRecords(records);
+      })
+      .catch((err) => {
+        console.error("No se pudo cargar el historial", err);
+        if (!cancelled) setHistoryRecords([]);
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [historyItem, loadItemHistory]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBy, setFilterBy] = useState("all");
   const [sortBy, setSortBy] = useState<SortOption[]>([]);
@@ -731,8 +764,8 @@ export function AdminView({
           </DialogHeader>
 
           <div className="relative border-l border-gray-200 ml-3 space-y-8 mt-4">
-            {historyItem?.history
-              ?.slice()
+            {historyRecords
+              .slice()
               .reverse()
               .map((record, index) => (
                 <div key={index} className="relative pl-6">
@@ -782,7 +815,12 @@ export function AdminView({
                   </div>
                 </div>
               ))}
-            {(!historyItem?.history || historyItem.history.length === 0) && (
+            {historyLoading && (
+              <p className="text-sm text-gray-500 pl-6">
+                Cargando historial...
+              </p>
+            )}
+            {!historyLoading && historyRecords.length === 0 && (
               <p className="text-sm text-gray-500 pl-6">
                 No hay historial registrado.
               </p>

@@ -96,33 +96,55 @@ export async function getOutboxCount(): Promise<number> {
   return (await getOutbox()).length;
 }
 
-// Network-first fetch of items + history, falling back to the IndexedDB
-// cache when offline or the request fails. Successful fetches refresh the
-// cache so the next offline session has up-to-date data.
+// Network-first fetch of the item list, falling back to the IndexedDB cache
+// when offline or the request fails. A successful fetch refreshes the cache so
+// the next offline session starts with current data.
+//
+// This deliberately does NOT load item_history. That table grows without limit
+// and only two screens need it: the table shows a single "last movement" date
+// (which items.updated_at already provides) and the history dialog needs one
+// item at a time, loaded on demand by fetchItemHistory below.
 export async function fetchInventory(): Promise<{
   itemRows: ItemRow[];
-  historyRows: HistoryRow[];
   offline: boolean;
 }> {
   if (isOnline()) {
     try {
-      const [{ data: itemRows, error: itemsErr }, { data: historyRows, error: histErr }] =
-        await Promise.all([
-          supabase.from("items").select("*").order("created_at", { ascending: false }),
-          supabase.from("item_history").select("*").order("date", { ascending: false }),
-        ]);
-      if (itemsErr) throw itemsErr;
-      if (histErr) throw histErr;
+      const { data: itemRows, error } = await supabase
+        .from("items")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
       await idbSet(ITEMS_KEY, itemRows || []);
-      await idbSet(HISTORY_KEY, historyRows || []);
-      return { itemRows: itemRows || [], historyRows: historyRows || [], offline: false };
+      return { itemRows: itemRows || [], offline: false };
     } catch {
       // fall through to cache
     }
   }
   const itemRows = (await idbGet<ItemRow[]>(ITEMS_KEY)) || [];
-  const historyRows = (await idbGet<HistoryRow[]>(HISTORY_KEY)) || [];
-  return { itemRows, historyRows, offline: true };
+  return { itemRows, offline: true };
+}
+
+// Loads the movement history for a single item, newest first. Falls back to
+// whatever the local cache holds, which offline means the entries this device
+// created and has not synced yet.
+export async function fetchItemHistory(itemId: string): Promise<HistoryRow[]> {
+  if (isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from("item_history")
+        .select("*")
+        .eq("item_id", itemId)
+        .order("date", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      if (data) return data as HistoryRow[];
+    } catch {
+      // fall through to cache
+    }
+  }
+  const cached = (await idbGet<HistoryRow[]>(HISTORY_KEY)) || [];
+  return cached.filter((h) => h.item_id === itemId);
 }
 
 async function patchCachedItems(mutate: (rows: ItemRow[]) => ItemRow[]): Promise<void> {

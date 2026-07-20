@@ -35,7 +35,14 @@ import { toast } from "sonner";
 import { uploadImage } from "../services/image-utils";
 
 export function HistoryView() {
-  const { transactions, returnItem, addImageToTransaction } = useHistory();
+  const {
+    transactions,
+    returnItem,
+    addImageToTransaction,
+    hasMore,
+    loadingMore,
+    loadMore,
+  } = useHistory();
   const { formatPrice, currency } = useApp();
   const { currentUser } = useAuth();
   // Editing a past sale's price is admin-only, and never through a reference
@@ -325,6 +332,20 @@ export function HistoryView() {
             ))}
           </div>
         </>
+      )}
+
+      {/* Only the most recent sales are loaded; older ones on request. */}
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="text-sm"
+          >
+            {loadingMore ? "Cargando..." : "Cargar transacciones anteriores"}
+          </Button>
+        </div>
       )}
 
       {/* Transaction detail dialog */}

@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
   ReactNode,
 } from "react";
 import { toast } from "sonner";
@@ -63,6 +64,10 @@ export interface InventoryItem {
   type: string; // Product type/category, default "UNASSIGNED"
   brand: string; // Product brand, default "GENERIC"
   notes: string; // Free-text product notes, shown in detail view
+  // When this item last changed. Used for the "last movement" column, which
+  // previously required downloading the entire item_history table.
+  updatedAt?: string;
+  // Loaded on demand by loadItemHistory, empty until then.
   history: ItemHistoryRecord[];
 }
 
@@ -90,6 +95,9 @@ interface AppContextType {
   // Inventory
   items: InventoryItem[];
   refreshData: () => Promise<void>;
+  // Loads one item's movement history on demand. The list view never carries
+  // history, so the history dialog asks for it when it opens.
+  loadItemHistory: (itemId: string) => Promise<ItemHistoryRecord[]>;
   addItem: (item: Omit<InventoryItem, "id" | "history">, user: string) => Promise<void>;
   updateItem: (
     item: InventoryItem,
@@ -190,18 +198,9 @@ function normalizeItemText<T extends { name: string; barcode: string; type: stri
   };
 }
 
-function mapRow(row: any, historyRows: any[]): InventoryItem {
-  const itemHistory: ItemHistoryRecord[] = historyRows
-    .filter((h) => h.item_id === row.id)
-    .map((h) => ({
-      date: h.date,
-      action: h.action,
-      details: h.details,
-      user: h.user_name,
-      previousStock: h.previous_stock ?? undefined,
-      newStock: h.new_stock ?? undefined,
-    }));
-
+// Maps a database row to the shape the UI uses. History is not included: it
+// is loaded per item, on demand, by loadItemHistory.
+function mapRow(row: any): InventoryItem {
   return {
     id: row.id,
     name: row.name,
@@ -217,7 +216,8 @@ function mapRow(row: any, historyRows: any[]): InventoryItem {
     type: row.type || "UNASSIGNED",
     brand: row.brand || "GENERIC",
     notes: row.notes || "",
-    history: itemHistory,
+    updatedAt: row.updated_at ?? row.created_at ?? undefined,
+    history: [],
   };
 }
 
@@ -275,8 +275,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // usable offline; see utils/offlineStore.ts for the cache/outbox logic.
   const refreshData = async () => {
     try {
-      const { itemRows, historyRows, offline } = await offlineStore.fetchInventory();
-      setItems(itemRows.map((row) => mapRow(row, historyRows)));
+      const { itemRows, offline } = await offlineStore.fetchInventory();
+      setItems(itemRows.map(mapRow));
       if (offline) return;
 
       const { data: settingsRow } = await supabase
@@ -375,7 +375,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         },
       );
 
-      await refreshData();
+      // Insert into local state rather than refetching the whole catalog.
+      setItems((prev) => [
+        {
+          ...newItemData,
+          id,
+          currency: "USD",
+          updatedAt: new Date().toISOString(),
+          history: [],
+        } as InventoryItem,
+        ...prev,
+      ]);
       toast.success(
         queued ? "Producto guardado localmente (sin conexión)" : "Producto agregado exitosamente",
       );
@@ -434,7 +444,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         historyRow,
       );
 
-      await refreshData();
+      // Apply the edit locally instead of refetching. The server timestamp is
+      // authoritative, but an approximation is fine for the display column.
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === updatedItem.id
+            ? { ...updatedItem, updatedAt: new Date().toISOString() }
+            : i,
+        ),
+      );
       if (!silent)
         toast.success(queued ? "Cambios guardados localmente (sin conexión)" : "Producto actualizado");
     } catch (e) {
@@ -446,7 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteItem = async (id: string, _user: string) => {
     try {
       const { queued } = await offlineStore.deleteItem(id);
-      await refreshData();
+      setItems((prev) => prev.filter((i) => i.id !== id));
       toast.success(queued ? "Eliminación guardada localmente (sin conexión)" : "Producto eliminado");
     } catch (e) {
       console.error(e);
@@ -464,8 +482,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user_name: user,
       }));
       const { queued } = await offlineStore.bulkDeleteItems(ids, historyRows);
-      // Avoid a full refetch of the (potentially large) items + history
-      // tables just to reflect a delete we already know the result of.
+      // No refetch: we already know the outcome of the delete.
       const idSet = new Set(ids);
       setItems((prev) => prev.filter((i) => !idSet.has(i.id)));
       toast.success(
@@ -478,6 +495,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toast.error("Error al eliminar productos");
     }
   };
+
+  // Stable identity: consumers put this in useEffect dependency arrays, and a
+  // fresh function on every provider render would restart the fetch in a loop.
+  const loadItemHistory = useCallback(
+    async (itemId: string): Promise<ItemHistoryRecord[]> => {
+      const rows = await offlineStore.fetchItemHistory(itemId);
+      return rows.map((h: any) => ({
+        date: h.date,
+        action: h.action,
+        details: h.details,
+        user: h.user_name,
+        previousStock: h.previous_stock ?? undefined,
+        newStock: h.new_stock ?? undefined,
+      }));
+    },
+    [],
+  );
 
   // Moves stock through the server-side RPC so concurrent sellers cannot
   // clobber each other's writes. Local state is patched from the delta rather
@@ -819,6 +853,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         items,
         refreshData,
+        loadItemHistory,
         addItem,
         updateItem,
         deleteItem,

@@ -144,8 +144,8 @@ function InventoryTableRow({
 
       <td className="hidden md:table-cell px-6 py-4">
         <span className="text-gray-600 text-sm">
-          {item.history?.[0]?.date
-            ? format(new Date(item.history[0].date), "dd MMM yyyy")
+          {item.updatedAt
+            ? format(new Date(item.updatedAt), "dd MMM yyyy")
             : "N/A"}
         </span>
       </td>
