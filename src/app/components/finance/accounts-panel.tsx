@@ -5,8 +5,24 @@
 // fewer dollars. The gap is a real loss caused by holding bolivares, and it is
 // invisible in a ledger that only tracks dollars.
 
-import { AlertTriangle, Landmark, Settings2, TrendingDown, Wallet } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertTriangle,
+  Landmark,
+  Link2,
+  Settings2,
+  TrendingDown,
+  Wallet,
+} from "lucide-react";
 import { Button } from "../ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import { FinanceAccount, useFinance } from "../../context/finance-context";
 import {
   Column,
   DataTable,
@@ -183,18 +199,18 @@ export function AccountsPanel({
           icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
         >
           <p className="text-xs text-gray-600 mb-3">
-            Estos métodos aparecen en las ventas del período y ninguna cuenta los
-            reclama. Edita la cuenta correspondiente y agrégalos en «métodos de
-            cobro» para que los saldos cuadren.
+            Los vendedores cobraron con estos métodos y ninguna cuenta los
+            reclama. Asígnale una cuenta a cada uno y ese dinero pasa a contar en
+            el saldo.
           </p>
-          <ul className="flex flex-wrap gap-2">
+          <ul className="space-y-2">
             {report.cashFlow.unassignedMethods.map((method) => (
-              <li
+              <MethodRow
                 key={method}
-                className="text-meta px-2 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200"
-              >
-                {method}
-              </li>
+                method={method}
+                accounts={accounts}
+                isAdmin={isAdmin}
+              />
             ))}
           </ul>
         </SectionCard>
@@ -206,5 +222,85 @@ export function AccountsPanel({
         devaluarse, por eso muestra un guion.
       </p>
     </div>
+  );
+}
+
+/**
+ * One unclaimed payment method, with the control that claims it. Assigning
+ * appends the method to the account's list rather than replacing it, so an
+ * account can collect several ("Efectivo", "Efectivo $", "Cash") without the
+ * previous ones being dropped.
+ */
+function MethodRow({
+  method,
+  accounts,
+  isAdmin,
+}: {
+  method: string;
+  accounts: FinanceAccount[];
+  isAdmin: boolean;
+}) {
+  const { saveAccount } = useFinance();
+  const [choice, setChoice] = useState("");
+  const [saving, setSaving] = useState(false);
+  const active = accounts.filter((a) => a.active);
+
+  const assign = async () => {
+    const account = accounts.find((a) => a.id === choice);
+    if (!account) return;
+    setSaving(true);
+    try {
+      await saveAccount(
+        { paymentMethods: [...account.paymentMethods, method] },
+        account.id,
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <li className="flex flex-wrap items-center gap-2 border border-gray-200 rounded-lg px-3 py-2">
+      <span className="text-xs font-medium text-gray-900 flex-1 min-w-[8rem]">
+        {method}
+      </span>
+
+      {!isAdmin ? (
+        <span className="text-meta text-gray-500">
+          Pídele a un administrador que lo asigne
+        </span>
+      ) : active.length === 0 ? (
+        <span className="text-meta text-gray-500">
+          Crea una cuenta primero, en «Gestionar»
+        </span>
+      ) : (
+        <>
+          <Select value={choice} onValueChange={setChoice}>
+            <SelectTrigger
+              className="h-9 w-48 text-xs"
+              aria-label={`Cuenta para ${method}`}
+            >
+              <SelectValue placeholder="Entra a…" />
+            </SelectTrigger>
+            <SelectContent>
+              {active.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            className="h-9 text-xs"
+            disabled={!choice || saving}
+            onClick={assign}
+          >
+            <Link2 className="w-3.5 h-3.5 mr-1.5" />
+            Asignar
+          </Button>
+        </>
+      )}
+    </li>
   );
 }
