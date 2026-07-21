@@ -6,6 +6,7 @@ import {
   ShoppingCart,
   History,
   BarChart2,
+  Banknote,
   LogIn,
   LogOut,
   User,
@@ -461,6 +462,7 @@ export function InventoryHeader() {
   const isTotal = location.pathname === "/total";
   const isHistory = location.pathname === "/history";
   const isReports = location.pathname === "/reports";
+  const isFinance = location.pathname === "/finance";
 
   const roleLabel = currentUser?.role === "admin" ? "Admin" : "Vendedor";
   const roleColor =
@@ -536,6 +538,14 @@ export function InventoryHeader() {
                 >
                   <History className="w-4 h-4 mr-2" aria-hidden="true" />
                   Historial
+                </Link>
+                <Link
+                  to="/finance"
+                  aria-current={isFinance ? "page" : undefined}
+                  className={pillClasses(isFinance)}
+                >
+                  <Banknote className="w-4 h-4 mr-2" aria-hidden="true" />
+                  Finanzas
                 </Link>
                 {isAdmin && (
                   <Link
@@ -731,6 +741,14 @@ export function InventoryHeader() {
           >
             <History className="w-5 h-5" aria-hidden="true" />
             <span className="text-meta font-medium">Historial</span>
+          </Link>
+          <Link
+            to="/finance"
+            aria-current={isFinance ? "page" : undefined}
+            className={mobileTabClasses(isFinance)}
+          >
+            <Banknote className="w-5 h-5" aria-hidden="true" />
+            <span className="text-meta font-medium">Finanzas</span>
           </Link>
           {isAdmin && (
             <Link

@@ -62,6 +62,30 @@ import { InventorySortControl } from "./inventory-sort-control";
 import { sortInventory, SortOption } from "../utils/sortInventory";
 import { parseItemsFromExcel } from "../utils/excelImport";
 
+// Stock moves for several reasons now, and the timeline has to name each one.
+// "Ajuste" and "Compra" both raise stock, but only one of them cost money.
+const HISTORY_LABEL: Record<ItemHistoryRecord["action"], string> = {
+  create: "Creación",
+  update: "Modificación",
+  delete: "Eliminación",
+  sale: "Venta",
+  return: "Devolución de cliente",
+  purchase: "Compra a proveedor",
+  adjust: "Ajuste de inventario",
+  purchase_return: "Devolución a proveedor",
+};
+
+const HISTORY_DOT: Record<ItemHistoryRecord["action"], string> = {
+  create: "bg-green-500",
+  update: "bg-blue-500",
+  delete: "bg-red-500",
+  sale: "bg-gray-400",
+  return: "bg-amber-500",
+  purchase: "bg-emerald-600",
+  adjust: "bg-amber-500",
+  purchase_return: "bg-orange-500",
+};
+
 interface AdminViewProps {
   editingItem?: InventoryItem;
   onEditItem: (item: InventoryItem) => void;
@@ -246,12 +270,15 @@ export function AdminView({
   const handleUpdateItem = async (
     item: Omit<InventoryItem, "id" | "history">,
     notes?: string,
+    adjustmentReason?: string,
   ) => {
     if (editingItem) {
       await updateItem(
         { ...item, id: editingItem.id, history: editingItem.history },
         currentUser?.name || "Desconocido",
         notes,
+        false,
+        adjustmentReason,
       );
       onCancelEdit();
     }
@@ -771,13 +798,7 @@ export function AdminView({
                 <div key={index} className="relative pl-6">
                   <span
                     className={`absolute -left-1.5 top-1.5 h-3 w-3 rounded-full border-2 border-white ${
-                      record.action === "create"
-                        ? "bg-green-500"
-                        : record.action === "update"
-                          ? "bg-blue-500"
-                          : record.action === "delete"
-                            ? "bg-red-500"
-                            : "bg-gray-400"
+                      HISTORY_DOT[record.action] ?? "bg-gray-400"
                     }`}
                   />
 
@@ -786,13 +807,13 @@ export function AdminView({
                       {format(new Date(record.date), "PPP p")}
                     </span>
                     <span className="font-medium text-gray-900">
-                      {record.action === "create"
-                        ? "Creación"
-                        : record.action === "update"
-                          ? "Modificación/Venta"
-                          : record.action === "delete"
-                            ? "Eliminación"
-                            : record.action}
+                      {HISTORY_LABEL[record.action] ?? record.action}
+                      {record.reason && (
+                        <span className="text-gray-500 font-normal">
+                          {" "}
+                          · {record.reason}
+                        </span>
+                      )}
                     </span>
                     <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md border border-gray-100">
                       {record.details}
