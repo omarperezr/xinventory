@@ -25,6 +25,11 @@ const ReportsView = lazy(() =>
     default: m.ReportsView,
   })),
 );
+const FinanceView = lazy(() =>
+  import("./components/finance-view").then((m) => ({
+    default: m.FinanceView,
+  })),
+);
 import {
   AppProvider,
   useApp,
@@ -34,6 +39,7 @@ import {
   InsufficientStockError,
 } from "./context/app-context";
 import { HistoryProvider, useHistory } from "./context/history-context";
+import { FinanceProvider } from "./context/finance-context";
 import { AuthProvider, useAuth } from "./context/auth-context";
 import { Toaster, toast } from "sonner";
 
@@ -203,6 +209,9 @@ function AppContent() {
             {/* Returns restock the item inside the same server-side
                 transaction that records them, so no separate call here. */}
             <Route path="/history" element={<HistoryView />} />
+            {/* Sellers may record what they spend in the field; only admins
+                see the whole picture and the purchase side. */}
+            <Route path="/finance" element={<FinanceView />} />
             <Route
               path="/reports"
               element={
@@ -233,7 +242,12 @@ function App() {
       <AuthProvider>
         <AppProvider>
           <HistoryProvider>
-            <AppContent />
+            {/* Finance sits inside both: it stamps the honest rate on every
+                bolivar movement, and reads the sales history to build the
+                profit statement. */}
+            <FinanceProvider>
+              <AppContent />
+            </FinanceProvider>
           </HistoryProvider>
         </AppProvider>
       </AuthProvider>
