@@ -5,7 +5,20 @@
 // period. Comparing a 7-day window against a monthly budget without that would
 // make every category look wildly under-spent.
 
-import { PieChart, PiggyBank, Target } from "lucide-react";
+import { useState } from "react";
+import { Link2, PieChart, PiggyBank, Target } from "lucide-react";
+import { Button } from "../ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import {
+  FinanceAccount,
+  useFinance,
+} from "../../context/finance-context";
 import {
   Column,
   DataTable,
@@ -26,7 +39,13 @@ import {
   NATURE_LABEL,
 } from "./finance-ui";
 
-export function BudgetPanel({ report, money }: FinancePanelProps) {
+export function BudgetPanel({
+  report,
+  money,
+  accounts,
+  isAdmin,
+}: FinancePanelProps) {
+  const unlinkedFunds = report.allocations.filter((a) => !a.accountId).length;
   const expenses = report.categories.filter((c) => c.kind === "expense");
   const income = report.categories.filter((c) => c.kind === "income");
   const biggest = expenses[0]?.amount ?? 0;
@@ -154,7 +173,11 @@ export function BudgetPanel({ report, money }: FinancePanelProps) {
 
       <SectionCard
         title="Fondos y apartados"
-        subtitle="Lo que la regla dice que debería apartarse, contra lo que se apartó"
+        subtitle={
+          unlinkedFunds > 0
+            ? `${unlinkedFunds} fondo(s) sin cuenta: vincúlalos para saber dónde está ese dinero`
+            : "Lo que la regla dice que debería apartarse, contra lo que se apartó"
+        }
         icon={<Target className="w-4 h-4 text-primary" />}
       >
         {report.allocations.length === 0 ? (
@@ -169,6 +192,8 @@ export function BudgetPanel({ report, money }: FinancePanelProps) {
                 key={allocation.id}
                 allocation={allocation}
                 money={money}
+                accounts={accounts}
+                isAdmin={isAdmin}
               />
             ))}
           </ul>
@@ -181,10 +206,25 @@ export function BudgetPanel({ report, money }: FinancePanelProps) {
 function AllocationRow({
   allocation,
   money,
+  accounts,
+  isAdmin,
 }: {
   allocation: AllocationStatus;
   money: (usd: number) => string;
+  accounts: FinanceAccount[];
+  isAdmin: boolean;
 }) {
+  const { saveAllocation } = useFinance();
+  const [linking, setLinking] = useState(false);
+  const [choice, setChoice] = useState("");
+  const linked = accounts.find((a) => a.id === allocation.accountId);
+  const activeAccounts = accounts.filter((a) => a.active);
+
+  const link = async (accountId: string) => {
+    await saveAllocation({ accountId }, allocation.id);
+    setLinking(false);
+  };
+
   const fundedPct =
     allocation.shouldBeUsd > 0
       ? (allocation.fundedUsd / allocation.shouldBeUsd) * 100
@@ -224,6 +264,86 @@ function AllocationRow({
         {allocation.targetPct !== null &&
           ` Meta: ${allocation.targetPct.toFixed(0)}% de ${money(allocation.targetUsd ?? 0)}.`}
       </p>
+
+      {/* A fund with nowhere to put the money is just a number on a screen.
+          Linking it is one control, here, rather than a trip to the settings
+          dialog. */}
+      {linked ? (
+        <p className="text-meta text-gray-500 mt-0.5 flex items-center gap-1.5">
+          <Link2 className="w-3 h-3" aria-hidden="true" />
+          Se guarda en <span className="font-medium text-gray-700">{linked.name}</span>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                setChoice(linked.id);
+                setLinking(true);
+              }}
+              className="text-primary hover:underline"
+            >
+              cambiar
+            </button>
+          )}
+        </p>
+      ) : (
+        !linking && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <span className="text-meta text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+              Sin cuenta asignada
+            </span>
+            {isAdmin && activeAccounts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setLinking(true)}
+                className="text-meta text-primary hover:underline font-medium"
+              >
+                Vincular a una cuenta
+              </button>
+            )}
+            {activeAccounts.length === 0 && (
+              <span className="text-meta text-gray-500">
+                Crea primero una cuenta en Cuentas → Gestionar.
+              </span>
+            )}
+          </div>
+        )
+      )}
+
+      {linking && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Select value={choice} onValueChange={setChoice}>
+            <SelectTrigger
+              className="h-9 w-52 text-xs"
+              aria-label={`Cuenta para ${allocation.name}`}
+            >
+              <SelectValue placeholder="Elegir cuenta" />
+            </SelectTrigger>
+            <SelectContent>
+              {activeAccounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            className="h-9 text-xs"
+            disabled={!choice}
+            onClick={() => link(choice)}
+          >
+            Vincular
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 text-xs"
+            onClick={() => setLinking(false)}
+          >
+            Cancelar
+          </Button>
+        </div>
+      )}
     </li>
   );
 }

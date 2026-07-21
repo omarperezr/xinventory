@@ -219,6 +219,9 @@ export interface AllocationStatus {
   name: string;
   basis: Allocation["basis"];
   percent: number;
+  /** Where the money is parked once moved. Null means the fund is a rule with
+   *  nowhere to put anything - the panel offers to link one. */
+  accountId: string | null;
   baseUsd: number;
   shouldBeUsd: number;
   fundedUsd: number;
@@ -872,6 +875,7 @@ export function buildFinanceReport(input: FinanceInput): FinanceReport {
         name: allocation.name,
         basis: allocation.basis,
         percent: allocation.percent,
+        accountId: allocation.accountId,
         baseUsd,
         shouldBeUsd,
         fundedUsd,

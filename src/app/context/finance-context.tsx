@@ -258,11 +258,25 @@ export interface EntryInput {
   allocationId?: string | null;
 }
 
+/** A product the catalogue does not have yet. The server creates it as part of
+ *  posting the purchase, so an abandoned basket leaves nothing behind. */
+export interface NewProductInput {
+  name: string;
+  barcode: string;
+  sellingPriceUsd: number;
+  unit: string;
+  type: string;
+  brand: string;
+  includesTaxes: boolean;
+  discount: number;
+}
+
 export interface PurchaseLineInput {
   itemId: string | null;
   name: string;
   quantity: number;
   unitCostUsd: number;
+  newProduct?: NewProductInput;
 }
 
 export interface PurchaseInput {
@@ -1019,13 +1033,31 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           name: l.name,
           quantity: l.quantity,
           unit_cost_usd: l.unitCostUsd,
+          // The id is minted here so a queued purchase creates the same product
+          // whenever it replays, instead of a second copy.
+          new_item: l.newProduct
+            ? {
+                id: crypto.randomUUID(),
+                name: normalizeName(l.newProduct.name),
+                barcode: normalizeName(l.newProduct.barcode),
+                selling_price_usd: l.newProduct.sellingPriceUsd,
+                unit: l.newProduct.unit,
+                type: normalizeName(l.newProduct.type || "UNASSIGNED"),
+                brand: normalizeName(l.newProduct.brand || "GENERIC"),
+                includes_taxes: l.newProduct.includesTaxes,
+                discount: l.newProduct.discount,
+              }
+            : undefined,
         })),
       );
 
+      const created = lines.filter((l) => l.newProduct).length;
       toast.success(
         queued
           ? "Compra guardada localmente (sin conexión). El stock se ajustará al sincronizar."
-          : "Compra registrada. Stock y costos actualizados.",
+          : created > 0
+            ? `Compra registrada. ${created} producto(s) nuevo(s) creado(s).`
+            : "Compra registrada. Stock y costos actualizados.",
       );
       if (!queued) {
         await Promise.all([refreshFinance(), refreshData()]);

@@ -7,7 +7,7 @@
 // the payment is not a state this can reach.
 
 import { useMemo, useState } from "react";
-import { Plus, Search, Trash2, Truck } from "lucide-react";
+import { PackagePlus, Plus, Search, Trash2, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -30,16 +30,29 @@ import {
 import { useApp } from "../../context/app-context";
 import { useAuth } from "../../context/auth-context";
 import {
+  NewProductInput,
   PurchaseLineInput,
   todayIso,
   useFinance,
 } from "../../context/finance-context";
+import type { UnitType } from "../../context/app-context";
 
 const NONE = "none";
 
 interface DraftLine extends PurchaseLineInput {
   key: string;
 }
+
+const emptyProduct = (name: string): NewProductInput => ({
+  name,
+  barcode: "",
+  sellingPriceUsd: 0,
+  unit: "units",
+  type: "",
+  brand: "",
+  includesTaxes: false,
+  discount: 0,
+});
 
 export function PurchaseDialog({
   open,
@@ -92,7 +105,12 @@ export function PurchaseDialog({
   const creditUsd = Math.max(parseFloat(credit) || 0, 0);
   const total = Math.max(goods + freightUsd - creditUsd, 0);
 
-  const addLine = (itemId: string | null, name: string, cost: number) => {
+  const addLine = (
+    itemId: string | null,
+    name: string,
+    cost: number,
+    newProduct?: NewProductInput,
+  ) => {
     setLines((prev) => [
       ...prev,
       {
@@ -101,9 +119,38 @@ export function PurchaseDialog({
         name,
         quantity: 1,
         unitCostUsd: cost,
+        newProduct,
       },
     ]);
     setQuery("");
+  };
+
+  // A product nobody catalogued yet, most often the reason the supplier came at
+  // all. It is described here and created by the same call that posts the
+  // purchase, so abandoning this dialog leaves no empty product behind.
+  const [newProduct, setNewProduct] = useState<NewProductInput | null>(null);
+
+  const confirmNewProduct = () => {
+    if (!newProduct) return;
+    if (!newProduct.name.trim()) {
+      toast.error("El producto necesita un nombre");
+      return;
+    }
+    const duplicate = items.find(
+      (item) =>
+        item.barcode &&
+        newProduct.barcode.trim() &&
+        item.barcode.toUpperCase() === newProduct.barcode.trim().toUpperCase(),
+    );
+    if (duplicate) {
+      toast.error(`Ese código ya lo tiene «${duplicate.name}». Búscalo arriba.`);
+      return;
+    }
+    addLine(null, newProduct.name.trim().toUpperCase(), 0, {
+      ...newProduct,
+      name: newProduct.name.trim(),
+    });
+    setNewProduct(null);
   };
 
   const patchLine = (key: string, patch: Partial<DraftLine>) => {
@@ -125,6 +172,7 @@ export function PurchaseDialog({
     setInvoice("");
     setNotes("");
     setPaidIn("USD");
+    setNewProduct(null);
   };
 
   const handleSave = async () => {
@@ -155,11 +203,12 @@ export function PurchaseDialog({
           invoiceNumber: invoice.trim(),
           notes: notes.trim(),
         },
-        lines.map(({ itemId, name, quantity, unitCostUsd }) => ({
+        lines.map(({ itemId, name, quantity, unitCostUsd, newProduct: product }) => ({
           itemId,
           name,
           quantity,
           unitCostUsd,
+          newProduct: product,
         })),
         currentUser.name,
       );
@@ -219,17 +268,168 @@ export function PurchaseDialog({
                 ))}
               </ul>
             )}
-            {query.trim().length > 1 && results.length === 0 && (
-              <button
-                type="button"
-                onClick={() => addLine(null, query.trim().toUpperCase(), 0)}
-                className="mt-1 text-xs text-primary hover:underline"
-              >
-                Agregar «{query.trim()}» como línea sin inventario (flete,
-                empaques, servicio)
-              </button>
+            {query.trim().length > 1 && !newProduct && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  onClick={() => setNewProduct(emptyProduct(query.trim()))}
+                >
+                  <PackagePlus className="w-3.5 h-3.5 mr-1.5" />
+                  Crear «{query.trim()}» como producto nuevo
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  onClick={() => addLine(null, query.trim().toUpperCase(), 0)}
+                >
+                  Agregar sin inventario
+                </Button>
+              </div>
+            )}
+            {query.trim().length > 1 && !newProduct && (
+              <p className="text-meta text-gray-500 mt-1">
+                «Sin inventario» es para lo que no se pone en estante: flete,
+                empaques, un servicio de la misma factura.
+              </p>
             )}
           </div>
+
+          {/* New product */}
+          {newProduct && (
+            <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-gray-900">
+                  Producto nuevo
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setNewProduct(null)}
+                  aria-label="Cancelar producto nuevo"
+                  className="p-1 rounded-md hover:bg-white text-gray-500"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="new-product-name">Nombre</Label>
+                  <Input
+                    id="new-product-name"
+                    value={newProduct.name}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, name: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-product-barcode">Código de barras</Label>
+                  <Input
+                    id="new-product-barcode"
+                    value={newProduct.barcode}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, barcode: e.target.value })
+                    }
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-3">
+                <div>
+                  <Label htmlFor="new-product-price">Precio de venta $</Label>
+                  <Input
+                    id="new-product-price"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={newProduct.sellingPriceUsd}
+                    onChange={(e) =>
+                      setNewProduct({
+                        ...newProduct,
+                        sellingPriceUsd: Math.max(0, Number(e.target.value) || 0),
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-product-unit">Unidad</Label>
+                  <Select
+                    value={newProduct.unit}
+                    onValueChange={(value) =>
+                      setNewProduct({ ...newProduct, unit: value as UnitType })
+                    }
+                  >
+                    <SelectTrigger id="new-product-unit" className="bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="units">Unidades</SelectItem>
+                      <SelectItem value="kg">Kilos</SelectItem>
+                      <SelectItem value="liters">Litros</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="new-product-brand">Marca</Label>
+                  <Input
+                    id="new-product-brand"
+                    value={newProduct.brand}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, brand: e.target.value })
+                    }
+                    placeholder="GENERICO"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="new-product-type">Categoría del producto</Label>
+                  <Input
+                    id="new-product-type"
+                    value={newProduct.type}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, type: e.target.value })
+                    }
+                    placeholder="N/A"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 min-h-11">
+                    <input
+                      type="checkbox"
+                      checked={newProduct.includesTaxes}
+                      onChange={(e) =>
+                        setNewProduct({
+                          ...newProduct,
+                          includesTaxes: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4"
+                    />
+                    Aplica impuesto
+                  </label>
+                </div>
+              </div>
+
+              <p className="text-meta text-gray-600">
+                El costo lo pone la línea de la compra. El producto se crea
+                cuando registres la compra, no antes: si cancelas, no queda nada
+                a medias en el catálogo.
+              </p>
+
+              <Button type="button" size="sm" onClick={confirmNewProduct}>
+                <Plus className="w-4 h-4 mr-1.5" />
+                Agregar a la compra
+              </Button>
+            </div>
+          )}
 
           {/* Lines */}
           {lines.length > 0 && (
@@ -257,10 +457,16 @@ export function PurchaseDialog({
                     <tr key={line.key} className="border-t border-gray-100">
                       <td className="px-3 py-2">
                         <p className="text-gray-900 truncate">{line.name}</p>
-                        {!line.itemId && (
-                          <p className="text-meta text-gray-500">
-                            No afecta inventario
+                        {line.newProduct ? (
+                          <p className="text-meta text-primary">
+                            Producto nuevo · se crea al registrar
                           </p>
+                        ) : (
+                          !line.itemId && (
+                            <p className="text-meta text-gray-500">
+                              No afecta inventario
+                            </p>
+                          )
                         )}
                       </td>
                       <td className="px-2 py-2">

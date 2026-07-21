@@ -156,6 +156,12 @@ already recorded and offers what is missing. `finance_entries(recurring_id,
 period_key)` is unique, so two devices confirming the same salary produce one
 row.
 
+A purchase can also create a product that was never catalogued — usually the
+reason the supplier came at all. The product is created by the same call that
+posts the purchase, so an abandoned basket leaves no empty product behind, and
+the item's history reads `create` then `purchase` rather than stock appearing
+from nowhere.
+
 Purchases are the only way stock rises with money attached. Editing the quantity
 on the item form is now an *ajuste de inventario* and demands a reason (breakage,
 theft, a physical count, a sample). Both doors stay open, but the history can
@@ -228,8 +234,10 @@ Schema and policies live in `supabase/migrations/`.
 - `0003_purchases.sql` - suppliers per item, purchases, purchase returns, the
   `post_purchase` / `post_purchase_return` functions, and the extra
   `item_history` actions those movements need.
-- `0002_rollback.sql`, `0003_rollback.sql` - undo either one. They delete
-  recorded money, not just structure, so back up first.
+- `0004_purchase_new_items.sql` - lets a purchase line create the product it is
+  buying, in the same transaction. Replaces `post_purchase`; nothing else moves.
+- `0002_rollback.sql`, `0003_rollback.sql`, `0004_rollback.sql` - undo any of
+  them. They delete recorded money, not just structure, so back up first.
 
 Apply them through the Supabase SQL editor or `supabase db push`, and take a
 backup first. Database dumps are gitignored and must never be committed.

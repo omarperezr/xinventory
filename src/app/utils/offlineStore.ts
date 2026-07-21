@@ -216,11 +216,26 @@ export interface PurchasePayload {
   created_by: string;
 }
 
+/** A product that does not exist yet, created by the same call that posts the
+ *  purchase. Abandoning the basket therefore leaves no phantom product behind. */
+export interface NewItemPayload {
+  id: string;
+  name: string;
+  barcode: string;
+  selling_price_usd: number;
+  unit: string;
+  type: string;
+  brand: string;
+  includes_taxes: boolean;
+  discount: number;
+}
+
 export interface PurchaseLinePayload {
   item_id: string | null;
   name: string;
   quantity: number;
   unit_cost_usd: number;
+  new_item?: NewItemPayload;
 }
 
 export interface PurchaseReturnPayload {
