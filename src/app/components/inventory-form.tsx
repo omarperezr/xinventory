@@ -23,7 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { InventoryItem, UnitType, useApp } from "../context/app-context";
+import {
+  ADJUSTMENT_REASONS,
+  InventoryItem,
+  UnitType,
+  useApp,
+} from "../context/app-context";
 import { uploadImages } from "../services/image-utils";
 import { toast } from "sonner";
 
@@ -31,6 +36,8 @@ interface InventoryFormProps {
   onSubmit: (
     item: Omit<InventoryItem, "id" | "history">,
     notes?: string,
+    /** Why the stock number changed. Only sent when it actually did. */
+    adjustmentReason?: string,
   ) => void | Promise<void>;
   editItem?: InventoryItem;
   onCancelEdit?: () => void;
@@ -71,6 +78,12 @@ export function InventoryForm({
 
   // Notes for history (only for edits/adds)
   const [notes, setNotes] = useState("");
+
+  // Editing the stock number here is an adjustment, never a purchase: no money
+  // moves. It must say why, so write-offs, counts and thefts stay separable
+  // from goods that were actually bought.
+  const [adjustmentReason, setAdjustmentReason] = useState("");
+  const stockChanged = !!editItem && quantity !== editItem.quantity;
 
   useEffect(() => {
     if (editItem) {
@@ -171,6 +184,13 @@ export function InventoryForm({
     const finalBuyingPrice = round2(rawBuying);
     const finalSellingPrice = round2(rawSelling);
 
+    if (stockChanged && !adjustmentReason) {
+      toast.error(
+        "Indica el motivo del ajuste de stock. Si llegó mercancía comprada, regístrala como compra en Finanzas.",
+      );
+      return;
+    }
+
     setSubmitting(true);
     let succeeded = false;
     try {
@@ -191,6 +211,7 @@ export function InventoryForm({
           notes: itemNotes,
         },
         notes,
+        stockChanged ? adjustmentReason : undefined,
       );
       succeeded = true;
     } catch (err) {
@@ -413,6 +434,33 @@ export function InventoryForm({
                 <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
               </Button>
             </div>
+            {stockChanged && (
+              <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <Label htmlFor="adjustment-reason">
+                  Motivo del ajuste
+                </Label>
+                <Select
+                  value={adjustmentReason}
+                  onValueChange={setAdjustmentReason}
+                >
+                  <SelectTrigger id="adjustment-reason" className="bg-white">
+                    <SelectValue placeholder="¿Por qué cambia el stock?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ADJUSTMENT_REASONS.map((reason) => (
+                      <SelectItem key={reason} value={reason}>
+                        {reason}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-amber-900 leading-snug">
+                  Esto es un ajuste: cambia el stock sin mover dinero. Si llegó
+                  mercancía que compraste, regístrala como <strong>compra</strong>{" "}
+                  en Finanzas para que quede el costo, el proveedor y el pago.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

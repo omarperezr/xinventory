@@ -69,13 +69,43 @@ export function isDisplayCurrency(value: string): value is DisplayCurrency {
   return (DISPLAY_CURRENCIES as readonly string[]).includes(value);
 }
 
+/**
+ * Stock can rise for two very different reasons, and the history has to say
+ * which. `purchase` means goods arrived and money left the business; `adjust`
+ * means the number on the shelf was corrected (breakage, theft, a count, a
+ * sample) with no money involved. Without the distinction the two are
+ * indistinguishable afterwards, which is how merchandise spend goes missing
+ * from the books.
+ */
+export type ItemHistoryAction =
+  | "create"
+  | "update"
+  | "delete"
+  | "sale"
+  | "return"
+  | "purchase"
+  | "adjust"
+  | "purchase_return";
+
+/** Why an adjustment happened. Free text is allowed, but these are the answers
+ *  the form offers, because "otro" everywhere teaches nothing. */
+export const ADJUSTMENT_REASONS = [
+  "Conteo físico",
+  "Merma o daño",
+  "Robo o pérdida",
+  "Muestra o regalo",
+  "Corrección de error",
+] as const;
+
 export interface ItemHistoryRecord {
   date: string;
-  action: "create" | "update" | "delete" | "sale" | "return";
+  action: ItemHistoryAction;
   details: string;
   user: string;
   previousStock?: number;
   newStock?: number;
+  /** Set on adjustments and purchase returns. */
+  reason?: string;
 }
 
 export interface InventoryItem {
@@ -129,11 +159,15 @@ interface AppContextType {
   // history, so the history dialog asks for it when it opens.
   loadItemHistory: (itemId: string) => Promise<ItemHistoryRecord[]>;
   addItem: (item: Omit<InventoryItem, "id" | "history">, user: string) => Promise<void>;
+  // `adjustmentReason` is required by the UI whenever the quantity changes: an
+  // edit that moves stock without money must say why, or purchases and silent
+  // corrections become indistinguishable in the history.
   updateItem: (
     item: InventoryItem,
     user: string,
     notes?: string,
     silent?: boolean,
+    adjustmentReason?: string,
   ) => Promise<void>;
   deleteItem: (id: string, user: string) => Promise<void>;
   deleteItems: (ids: string[], user: string) => Promise<void>;
@@ -463,6 +497,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     user: string,
     notes?: string,
     silent?: boolean,
+    adjustmentReason?: string,
   ) => {
     const updatedItem = normalizeItemText(rawUpdatedItem);
     const oldItem = items.find((i) => i.id === updatedItem.id);
@@ -471,11 +506,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       oldItem && oldItem.quantity !== updatedItem.quantity
         ? {
             item_id: updatedItem.id,
-            action: "update" as const,
-            details: `Stock modificado: ${oldItem.quantity} -> ${updatedItem.quantity}. ${notes ? `Notas: ${notes}` : ""}`,
+            // Not a purchase: no money moved. Recorded as an adjustment so the
+            // reports can separate stock that was bought from stock that was
+            // written off, counted or given away.
+            action: "adjust" as const,
+            details: `Ajuste de inventario: ${oldItem.quantity} -> ${updatedItem.quantity}.${
+              adjustmentReason ? ` Motivo: ${adjustmentReason}.` : ""
+            }${notes ? ` Notas: ${notes}` : ""}`,
             user_name: user,
             previous_stock: oldItem.quantity,
             new_stock: updatedItem.quantity,
+            reason: adjustmentReason,
           }
         : notes
           ? {
@@ -571,6 +612,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user: h.user_name,
         previousStock: h.previous_stock ?? undefined,
         newStock: h.new_stock ?? undefined,
+        reason: h.reason ?? undefined,
       }));
     },
     [],
@@ -679,11 +721,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       if (toUpdate.length > 0) {
         await supabase.from("item_history").insert(
+          // Bulk import sets quantities outright, which is an adjustment like
+          // any other hand edit - money never moved. Labelled as such so a
+          // spreadsheet cannot quietly become the shop's purchase record.
           toUpdate.map(({ id }) => ({
             item_id: id,
-            action: "update" as const,
+            action: "adjust" as const,
             details: "Actualización vía importación de Excel",
             user_name: user,
+            reason: "Importación de Excel",
           })),
         );
       }
