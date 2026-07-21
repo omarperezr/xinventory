@@ -9,6 +9,8 @@ import { idbGet, idbSet } from "./localdb";
 const ITEMS_KEY = "items";
 const HISTORY_KEY = "item_history";
 const OUTBOX_KEY = "outbox";
+const FINANCE_ENTRIES_KEY = "finance_entries";
+const FINANCE_CATALOG_KEY = "finance_catalog";
 
 export interface ItemRow {
   id: string;
@@ -28,6 +30,224 @@ export interface ItemRow {
   created_at?: string;
 }
 
+// --- Finance -----------------------------------------------------------
+// Row shapes for the ledger. Amounts are USD; a bolivar payment carries the
+// bolivares AND the rate that valued them, so history cannot be restated by a
+// later rate change.
+
+export interface FinanceAccountRow {
+  id: string;
+  name: string;
+  kind: "cash" | "bank" | "digital" | "credit" | "other";
+  basis: "USD" | "BS";
+  opening_balance_usd: number;
+  opening_balance_bs: number;
+  active: boolean;
+  sort_order: number;
+  payment_methods: string[];
+  notes: string;
+}
+
+export interface FinanceCategoryRow {
+  id: string;
+  name: string;
+  kind: "income" | "expense";
+  nature: "cogs" | "fixed" | "variable" | "tax" | "investment" | "owner" | "other";
+  monthly_budget_usd: number | null;
+  color: string | null;
+  archived: boolean;
+}
+
+export interface FinancePayeeRow {
+  id: string;
+  name: string;
+  kind:
+    | "employee"
+    | "supplier"
+    | "landlord"
+    | "service"
+    | "government"
+    | "customer"
+    | "other";
+  phone: string;
+  cedula_rif: string;
+  notes: string;
+  base_salary_usd: number | null;
+  pay_cadence: "weekly" | "biweekly" | "monthly" | null;
+  active: boolean;
+}
+
+export interface FinanceRecurringRow {
+  id: string;
+  name: string;
+  kind: "income" | "expense";
+  category_id: string | null;
+  account_id: string | null;
+  payee_id: string | null;
+  amount_usd: number;
+  cadence: "weekly" | "biweekly" | "monthly" | "quarterly" | "yearly";
+  anchor_date: string;
+  ends_on: string | null;
+  active: boolean;
+  notes: string;
+}
+
+export interface FinanceAllocationRow {
+  id: string;
+  name: string;
+  basis: "gross_sales" | "gross_profit" | "net_profit";
+  percent: number;
+  account_id: string | null;
+  target_usd: number | null;
+  active: boolean;
+  notes: string;
+}
+
+export interface FinanceEntryRow {
+  id: string;
+  kind: "income" | "expense" | "transfer";
+  status: "paid" | "pending" | "void";
+  occurred_on: string;
+  due_on: string | null;
+  category_id: string | null;
+  account_id: string | null;
+  counter_account_id: string | null;
+  payee_id: string | null;
+  amount_usd: number;
+  amount_bs: number | null;
+  rate_used: number | null;
+  rate_key: "USD" | "EUR" | "USDT" | null;
+  paid_in: "USD" | "BS";
+  description: string;
+  notes: string;
+  tags: string[];
+  attachments: string[];
+  recurring_id: string | null;
+  period_key: string | null;
+  allocation_id: string | null;
+  created_by: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// --- Purchases ---------------------------------------------------------
+
+export interface PurchaseRow {
+  id: string;
+  supplier_id: string | null;
+  account_id: string | null;
+  category_id: string | null;
+  occurred_on: string;
+  due_on: string | null;
+  payment_status: "paid" | "pending";
+  goods_usd: number;
+  freight_usd: number;
+  prorate_freight: boolean;
+  credit_applied_usd: number;
+  total_usd: number;
+  paid_in: "USD" | "BS";
+  amount_bs: number | null;
+  rate_used: number | null;
+  rate_key: "USD" | "EUR" | "USDT" | null;
+  invoice_number: string;
+  notes: string;
+  attachments: string[];
+  entry_id: string | null;
+  status: "posted" | "void";
+  created_by: string;
+  created_at?: string;
+}
+
+export interface PurchaseLineRow {
+  id: string;
+  purchase_id: string;
+  item_id: string | null;
+  name: string;
+  quantity: number;
+  unit_cost_usd: number;
+  landed_unit_cost_usd: number;
+  quantity_returned: number;
+}
+
+export interface PurchaseReturnRow {
+  id: string;
+  purchase_id: string;
+  supplier_id: string | null;
+  occurred_on: string;
+  settlement: "credit" | "cash";
+  account_id: string | null;
+  entry_id: string | null;
+  total_usd: number;
+  reason: string;
+  notes: string;
+  created_by: string;
+  created_at?: string;
+}
+
+export interface ItemSupplierRow {
+  id: string;
+  item_id: string;
+  supplier_id: string;
+  supplier_sku: string;
+  last_cost_usd: number | null;
+  last_purchased_on: string | null;
+  notes: string;
+}
+
+/** What `post_purchase` accepts. Mirrors the RPC's jsonb argument. */
+export interface PurchasePayload {
+  id: string;
+  supplier_id: string | null;
+  account_id: string | null;
+  category_id: string | null;
+  occurred_on: string;
+  due_on: string | null;
+  payment_status: "paid" | "pending";
+  freight_usd: number;
+  prorate_freight: boolean;
+  credit_applied_usd: number;
+  paid_in: "USD" | "BS";
+  amount_bs: number | null;
+  rate_used: number | null;
+  rate_key: "USD" | "EUR" | "USDT" | null;
+  invoice_number: string;
+  notes: string;
+  attachments: string[];
+  created_by: string;
+}
+
+export interface PurchaseLinePayload {
+  item_id: string | null;
+  name: string;
+  quantity: number;
+  unit_cost_usd: number;
+}
+
+export interface PurchaseReturnPayload {
+  id: string;
+  purchase_id: string;
+  occurred_on: string;
+  settlement: "credit" | "cash";
+  account_id: string | null;
+  reason: string;
+  notes: string;
+  created_by: string;
+}
+
+export interface PurchaseReturnLinePayload {
+  purchase_line_id: string;
+  quantity: number;
+}
+
+/** The definitions the ledger points at. Small, slow-changing, cached whole. */
+export interface FinanceCatalog {
+  accounts: FinanceAccountRow[];
+  categories: FinanceCategoryRow[];
+  payees: FinancePayeeRow[];
+  recurring: FinanceRecurringRow[];
+  allocations: FinanceAllocationRow[];
+}
+
 export interface HistoryRow {
   id?: string;
   item_id: string;
@@ -38,6 +258,8 @@ export interface HistoryRow {
   user_name: string;
   previous_stock?: number;
   new_stock?: number;
+  /** Why an adjustment or a supplier return happened. */
+  reason?: string;
 }
 
 type OutboxOp =
@@ -60,6 +282,23 @@ type OutboxOp =
       transactionId: string;
       itemId: string;
       qty: number;
+    }
+  // Recording an expense is exactly the operation most likely to happen away
+  // from a signal - at a pump, in a supplier's warehouse - so ledger writes
+  // queue like stock writes do. The id is minted on the device, so a replay
+  // cannot duplicate the row.
+  | { kind: "finance.entry.create"; row: FinanceEntryRow }
+  | { kind: "finance.entry.update"; id: string; row: Partial<FinanceEntryRow> }
+  | { kind: "finance.entry.delete"; id: string }
+  // A purchase is one RPC carrying its whole basket, so queueing it keeps the
+  // all-or-nothing guarantee: stock, costs, history and money still land
+  // together whenever the replay happens. The id travels with the payload, and
+  // the server returns early if it already posted.
+  | { kind: "purchase.post"; purchase: PurchasePayload; lines: PurchaseLinePayload[] }
+  | {
+      kind: "purchase.return";
+      payload: PurchaseReturnPayload;
+      lines: PurchaseReturnLinePayload[];
     };
 
 // `honest` records which rate the business treats as the real bolivar worth.
@@ -328,6 +567,224 @@ export async function returnTransactionItem(
   return { queued: true };
 }
 
+// ---------------------------------------------------------------------------
+// Finance
+// ---------------------------------------------------------------------------
+
+/** The definitions, fetched together because they are small and always needed
+ *  as a set. Cached whole so the ledger still renders names when offline. */
+export async function fetchFinanceCatalog(): Promise<{
+  catalog: FinanceCatalog;
+  offline: boolean;
+}> {
+  if (isOnline()) {
+    try {
+      const [accounts, categories, payees, recurring, allocations] =
+        await Promise.all([
+          supabase.from("finance_accounts").select("*").order("sort_order"),
+          supabase.from("finance_categories").select("*").order("name"),
+          supabase.from("finance_payees").select("*").order("name"),
+          supabase.from("finance_recurring").select("*").order("name"),
+          supabase.from("finance_allocations").select("*").order("name"),
+        ]);
+      const error =
+        accounts.error ||
+        categories.error ||
+        payees.error ||
+        recurring.error ||
+        allocations.error;
+      if (error) throw error;
+
+      const catalog: FinanceCatalog = {
+        accounts: accounts.data || [],
+        categories: categories.data || [],
+        payees: payees.data || [],
+        recurring: recurring.data || [],
+        allocations: allocations.data || [],
+      };
+      await idbSet(FINANCE_CATALOG_KEY, catalog);
+      return { catalog, offline: false };
+    } catch {
+      // fall through to cache
+    }
+  }
+  const cached = (await idbGet<FinanceCatalog>(FINANCE_CATALOG_KEY)) || {
+    accounts: [],
+    categories: [],
+    payees: [],
+    recurring: [],
+    allocations: [],
+  };
+  return { catalog: cached, offline: true };
+}
+
+/** A bounded window of the ledger, newest first. Same contract as the sales
+ *  history: the screen says out loud when the window is short rather than
+ *  under-reporting. */
+export async function fetchFinanceEntries(
+  limit: number,
+): Promise<{ rows: FinanceEntryRow[]; hasMore: boolean; offline: boolean }> {
+  if (isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from("finance_entries")
+        .select("*")
+        .neq("status", "void")
+        .order("occurred_on", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(limit + 1);
+      if (error) throw error;
+      const all = data || [];
+      const rows = all.slice(0, limit);
+      await idbSet(FINANCE_ENTRIES_KEY, rows);
+      return { rows, hasMore: all.length > limit, offline: false };
+    } catch {
+      // fall through to cache
+    }
+  }
+  const rows = (await idbGet<FinanceEntryRow[]>(FINANCE_ENTRIES_KEY)) || [];
+  return { rows, hasMore: false, offline: true };
+}
+
+async function patchCachedEntries(
+  mutate: (rows: FinanceEntryRow[]) => FinanceEntryRow[],
+): Promise<void> {
+  const rows = (await idbGet<FinanceEntryRow[]>(FINANCE_ENTRIES_KEY)) || [];
+  await idbSet(FINANCE_ENTRIES_KEY, mutate(rows));
+}
+
+export async function createFinanceEntry(
+  row: FinanceEntryRow,
+): Promise<{ queued: boolean }> {
+  await patchCachedEntries((rows) => [row, ...rows]);
+
+  if (isOnline()) {
+    const { error } = await supabase.from("finance_entries").insert(row);
+    if (!error) return { queued: false };
+    if (!isNetworkError(error)) {
+      await patchCachedEntries((rows) => rows.filter((r) => r.id !== row.id));
+      throw error;
+    }
+  }
+  await enqueue({ kind: "finance.entry.create", row });
+  return { queued: true };
+}
+
+export async function updateFinanceEntry(
+  id: string,
+  row: Partial<FinanceEntryRow>,
+): Promise<{ queued: boolean }> {
+  await patchCachedEntries((rows) =>
+    rows.map((r) => (r.id === id ? { ...r, ...row } : r)),
+  );
+
+  if (isOnline()) {
+    const { error } = await supabase
+      .from("finance_entries")
+      .update(row)
+      .eq("id", id);
+    if (!error) return { queued: false };
+    if (!isNetworkError(error)) throw error;
+  }
+  await enqueue({ kind: "finance.entry.update", id, row });
+  return { queued: true };
+}
+
+export async function deleteFinanceEntry(
+  id: string,
+): Promise<{ queued: boolean }> {
+  await patchCachedEntries((rows) => rows.filter((r) => r.id !== id));
+
+  if (isOnline()) {
+    const { error } = await supabase.from("finance_entries").delete().eq("id", id);
+    if (!error) return { queued: false };
+    if (!isNetworkError(error)) throw error;
+  }
+  await enqueue({ kind: "finance.entry.delete", id });
+  return { queued: true };
+}
+
+// ---------------------------------------------------------------------------
+// Purchases
+// ---------------------------------------------------------------------------
+
+export async function postPurchase(
+  purchase: PurchasePayload,
+  lines: PurchaseLinePayload[],
+): Promise<{ queued: boolean }> {
+  if (isOnline()) {
+    const { error } = await supabase.rpc("post_purchase", {
+      p_purchase: purchase,
+      p_lines: lines,
+    });
+    if (!error) return { queued: false };
+    if (!isNetworkError(error)) throw error;
+  }
+  // Echo the stock arrival locally so the catalogue reads correctly offline.
+  // The authoritative move happens when the queued RPC replays.
+  await patchCachedItems((rows) =>
+    rows.map((r) => {
+      const line = lines.find((l) => l.item_id === r.id);
+      return line ? { ...r, quantity: r.quantity + line.quantity } : r;
+    }),
+  );
+  await enqueue({ kind: "purchase.post", purchase, lines });
+  return { queued: true };
+}
+
+export async function postPurchaseReturn(
+  payload: PurchaseReturnPayload,
+  lines: PurchaseReturnLinePayload[],
+): Promise<{ queued: boolean }> {
+  if (isOnline()) {
+    const { error } = await supabase.rpc("post_purchase_return", {
+      p_return: payload,
+      p_lines: lines,
+    });
+    if (!error) return { queued: false };
+    if (!isNetworkError(error)) throw error;
+  }
+  await enqueue({ kind: "purchase.return", payload, lines });
+  return { queued: true };
+}
+
+/** Purchases with their lines, newest first. Online only: this is an admin
+ *  screen, and the lines are needed to render anything useful. */
+export async function fetchPurchases(limit: number): Promise<{
+  purchases: PurchaseRow[];
+  lines: PurchaseLineRow[];
+  returns: PurchaseReturnRow[];
+}> {
+  const { data: purchases, error } = await supabase
+    .from("purchases")
+    .select("*")
+    .order("occurred_on", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+
+  const ids = (purchases || []).map((p) => p.id);
+  if (ids.length === 0) return { purchases: [], lines: [], returns: [] };
+
+  const [lines, returns] = await Promise.all([
+    supabase.from("purchase_lines").select("*").in("purchase_id", ids),
+    supabase.from("purchase_returns").select("*").in("purchase_id", ids),
+  ]);
+  if (lines.error) throw lines.error;
+  if (returns.error) throw returns.error;
+
+  return {
+    purchases: purchases || [],
+    lines: lines.data || [],
+    returns: returns.data || [],
+  };
+}
+
+export async function fetchItemSuppliers(): Promise<ItemSupplierRow[]> {
+  const { data, error } = await supabase.from("item_suppliers").select("*");
+  if (error) throw error;
+  return data || [];
+}
+
 // Replays queued ops in order against Supabase. Stops at the first network
 // error (so it can be retried later); drops ops the server actively rejects.
 export async function flushOutbox(): Promise<void> {
@@ -392,6 +849,43 @@ async function drainOutbox(): Promise<void> {
             p_transaction_id: op.transactionId,
             p_item_id: op.itemId,
             p_qty: op.qty,
+          });
+          error = res.error;
+          break;
+        }
+        case "finance.entry.create": {
+          const res = await supabase.from("finance_entries").insert(op.row);
+          error = res.error;
+          break;
+        }
+        case "finance.entry.update": {
+          const res = await supabase
+            .from("finance_entries")
+            .update(op.row)
+            .eq("id", op.id);
+          error = res.error;
+          break;
+        }
+        case "finance.entry.delete": {
+          const res = await supabase
+            .from("finance_entries")
+            .delete()
+            .eq("id", op.id);
+          error = res.error;
+          break;
+        }
+        case "purchase.post": {
+          const res = await supabase.rpc("post_purchase", {
+            p_purchase: op.purchase,
+            p_lines: op.lines,
+          });
+          error = res.error;
+          break;
+        }
+        case "purchase.return": {
+          const res = await supabase.rpc("post_purchase_return", {
+            p_return: op.payload,
+            p_lines: op.lines,
           });
           error = res.error;
           break;
