@@ -5,5 +5,12 @@
             "source": "/((?!api/).*)",
             "destination": "/"
         }
+    ],
+    "crons":
+    [
+        {
+            "path": "/api/social-generate",
+            "schedule": "0 11 * * *"
+        }
     ]
 }

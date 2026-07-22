@@ -1,7 +1,8 @@
-import { defineConfig, Plugin } from 'vite'
+import { defineConfig, loadEnv, Plugin } from 'vite'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import socialGenerateHandler from './api/social-generate'
 
 // In production /api/usdt-rate is a Vercel serverless function (api/usdt-rate.ts).
 // This middleware provides the same endpoint under `vite dev`, where Vercel
@@ -63,6 +64,55 @@ function usdtRateDevEndpoint(): Plugin {
   }
 }
 
+// Same dual-endpoint treatment for the Redes Sociales generator: in
+// production it's api/social-generate.ts on Vercel; under `vite dev` this
+// middleware imports that same handler and adapts Node's req/res to its
+// minimal interface. Secrets come from .env.local via loadEnv (prefix ''),
+// because Vite only exposes VITE_-prefixed vars by itself.
+function socialGenerateDevEndpoint(): Plugin {
+  return {
+    name: 'dev-social-generate',
+    configureServer(server) {
+      const env = loadEnv('development', process.cwd(), '')
+      process.env.VITE_SUPABASE_URL ??= env.VITE_SUPABASE_URL
+      process.env.SUPABASE_SERVICE_ROLE_KEY ??= env.SUPABASE_SERVICE_ROLE_KEY
+      process.env.CRON_SECRET ??= env.CRON_SECRET
+      server.middlewares.use('/api/social-generate', async (req, res) => {
+        try {
+          await socialGenerateHandler(
+            {
+              method: req.method,
+              headers: req.headers as Record<
+                string,
+                string | string[] | undefined
+              >,
+            },
+            {
+              status(code: number) {
+                return {
+                  json(body: unknown) {
+                    res.statusCode = code
+                    res.setHeader('Content-Type', 'application/json')
+                    res.end(JSON.stringify(body))
+                  },
+                }
+              },
+            },
+          )
+        } catch (e) {
+          res.statusCode = 500
+          res.setHeader('Content-Type', 'application/json')
+          res.end(
+            JSON.stringify({
+              error: e instanceof Error ? e.message : 'error inesperado',
+            }),
+          )
+        }
+      })
+    },
+  }
+}
+
 export default defineConfig({
   // Names the service worker cache, so every build gets a fresh one and stale
   // chunks from a previous deploy can never be served against new HTML.
@@ -71,6 +121,7 @@ export default defineConfig({
   },
   plugins: [
     usdtRateDevEndpoint(),
+    socialGenerateDevEndpoint(),
     // The React and Tailwind plugins are both required for Make, even if
     // Tailwind is not being actively used – do not remove them
     react(),

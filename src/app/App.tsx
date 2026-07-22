@@ -30,6 +30,11 @@ const FinanceView = lazy(() =>
     default: m.FinanceView,
   })),
 );
+const SocialView = lazy(() =>
+  import("./components/social-view").then((m) => ({
+    default: m.SocialView,
+  })),
+);
 import {
   AppProvider,
   useApp,
@@ -40,6 +45,7 @@ import {
 } from "./context/app-context";
 import { HistoryProvider, useHistory } from "./context/history-context";
 import { FinanceProvider } from "./context/finance-context";
+import { SocialProvider } from "./context/social-context";
 import { AuthProvider, useAuth } from "./context/auth-context";
 import { Toaster, toast } from "sonner";
 
@@ -229,6 +235,25 @@ function AppContent() {
                 )
               }
             />
+            {/* The marketing calendar: config holds an AI API key, so this is
+                admin-only end to end (route gate here, RLS in the database). */}
+            <Route
+              path="/social"
+              element={
+                currentUser?.role === "admin" ? (
+                  <SocialView />
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <div className="text-red-500 font-medium text-lg mb-2">
+                      Acceso Restringido
+                    </div>
+                    <p className="text-gray-500 text-sm">
+                      Solo los administradores pueden gestionar redes sociales.
+                    </p>
+                  </div>
+                )
+              }
+            />
           </Routes>
         </Suspense>
       </main>
@@ -246,7 +271,11 @@ function App() {
                 bolivar movement, and reads the sales history to build the
                 profit statement. */}
             <FinanceProvider>
-              <AppContent />
+              {/* Social reads nothing from the other providers; it sits inside
+                  Auth only for the admin flag. */}
+              <SocialProvider>
+                <AppContent />
+              </SocialProvider>
             </FinanceProvider>
           </HistoryProvider>
         </AppProvider>

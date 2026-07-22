@@ -7,6 +7,7 @@ import {
   History,
   BarChart2,
   Banknote,
+  Megaphone,
   LogIn,
   LogOut,
   User,
@@ -463,6 +464,7 @@ export function InventoryHeader() {
   const isHistory = location.pathname === "/history";
   const isReports = location.pathname === "/reports";
   const isFinance = location.pathname === "/finance";
+  const isSocial = location.pathname === "/social";
 
   const roleLabel = currentUser?.role === "admin" ? "Admin" : "Vendedor";
   const roleColor =
@@ -555,6 +557,16 @@ export function InventoryHeader() {
                   >
                     <BarChart2 className="w-4 h-4 mr-2" aria-hidden="true" />
                     Reportes
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link
+                    to="/social"
+                    aria-current={isSocial ? "page" : undefined}
+                    className={pillClasses(isSocial)}
+                  >
+                    <Megaphone className="w-4 h-4 mr-2" aria-hidden="true" />
+                    Redes
                   </Link>
                 )}
               </nav>
@@ -758,6 +770,16 @@ export function InventoryHeader() {
             >
               <BarChart2 className="w-5 h-5" aria-hidden="true" />
               <span className="text-meta font-medium">Reportes</span>
+            </Link>
+          )}
+          {isAdmin && (
+            <Link
+              to="/social"
+              aria-current={isSocial ? "page" : undefined}
+              className={mobileTabClasses(isSocial)}
+            >
+              <Megaphone className="w-5 h-5" aria-hidden="true" />
+              <span className="text-meta font-medium">Redes</span>
             </Link>
           )}
         </div>

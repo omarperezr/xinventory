@@ -16,3 +16,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export const PRODUCT_IMAGES_BUCKET = "product-images";
+
+// Enhanced photos for the Redes Sociales module. Created (public) by the
+// api/social-generate function on first run; see 0005_social.sql.
+export const SOCIAL_IMAGES_BUCKET = "social-posts";
