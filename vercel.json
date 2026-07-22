@@ -11,6 +11,10 @@
         {
             "path": "/api/social-generate",
             "schedule": "0 11 * * *"
+        },
+        {
+            "path": "/api/storage-cleanup",
+            "schedule": "0 12 * * 0"
         }
     ]
 }
