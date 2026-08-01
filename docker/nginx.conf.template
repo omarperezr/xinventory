@@ -1,0 +1,20 @@
+# Rendered by the nginx image's envsubst entrypoint: ${API_ORIGIN} comes from
+# the container environment; nginx's own $vars are left untouched.
+server {
+  listen 80;
+  server_name _;
+  root /usr/share/nginx/html;
+
+  # Serverless functions (usdt-rate, social-generate, storage-cleanup) do not
+  # run in this container; forward them to the deployment that hosts them.
+  location /api/ {
+    proxy_pass ${API_ORIGIN};
+    proxy_ssl_server_name on;
+    proxy_set_header Host $proxy_host;
+  }
+
+  # SPA fallback — same rewrite vercel.json does in production.
+  location / {
+    try_files $uri /index.html;
+  }
+}
