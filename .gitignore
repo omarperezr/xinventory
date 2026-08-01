@@ -47,3 +47,4 @@ graphify-out/*
 *.sql.gz
 xinventory-backup-*
 .env*
+supabase/.temp/
