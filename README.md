@@ -2,262 +2,191 @@
 
 Inventory and point-of-sale app for small retail businesses in Venezuela, where
 prices are quoted in dollars but customers pay in bolivares at a rate that
-changes daily. Works offline, because mobile data in a shop is not reliable.
-
-## How money works
-
-This is the part of the app to understand before changing anything else.
-
-**Every price is stored in USD.** That is the real price of a product, and it
-does not change just because an exchange rate moved.
-
-Bolivar amounts are derived from that USD price using a rate. The app knows
-three rates:
-
-| Rate | Where it comes from | What it is for |
-|------|---------------------|----------------|
-| USDT | Binance P2P, through our own serverless endpoint | The parallel rate most businesses actually trade at |
-| USD  | BCV (official), through Alcambio | The government rate, shown because customers ask for it |
-| EUR  | BCV (official), through Alcambio | Same, for euros |
-
-One of these is marked the **honest rate**: the rate that says what a bolivar is
-really worth. An admin picks it in the rates panel, and it is normally the
-Binance USDT rate. All bookkeeping uses it. When a customer pays in bolivares,
-the amount is divided by the honest rate to get the dollars the business
-actually received.
-
-The other rates are **reference lenses**. They restate prices at a rate we do
-not treat as real, so you can show a customer the BCV figure. While a reference
-lens is selected, the app will not let anyone enter or edit money, because the
-amount would be recorded at the wrong value. A banner explains this on screen.
-
-Two consequences worth remembering:
-
-- Buying something quoted at the BCV rate genuinely is a cheaper purchase in
-  real terms, and the books reflect that. It is not a bug.
-- Showing a price and entering a price are different operations. They use
-  different code paths on purpose (`convertPrice` for display, `bsToUsd` and
-  `usdToBs` for entry) and must never be wired to the same input field. When
-  they were, simply focusing and leaving a price field silently rewrote the
-  stored price.
+changes daily. Works offline. Mobile-first. Sold to clients as isolated
+instances, with optional paid modules.
 
 ## Features
 
-- **Inventory** - product catalog, stock, per-item history, bulk Excel import
-- **Sales** - cart, split payments across methods, change calculation, returns
-- **Reports** - a five-panel dashboard covering past, present and future (see
-  below), exportable to PDF and Excel
-- **Finanzas** - the money that is not a sale: expenses, other income, salaries,
-  accounts, recurring bills, budgets, supplier purchases and returns (see below)
-- **Offline first** - reads fall back to a local cache, writes queue in an
+- **Inventory** — product catalog with swipeable photo galleries, stock,
+  per-item history, bulk Excel import
+- **Sales** — cart, split payments, change calculation, returns
+- **Offline first** — reads fall back to a local cache, writes queue in an
   outbox and replay when the connection returns
-- **Roles** - admins manage users, prices and rates; sellers ring up sales
-- **WhatsApp sharing** - builds a ready-to-send product message, since that is
-  where these shops sell
+- **Roles** — admins manage users, prices and rates; sellers ring up sales
+- **WhatsApp sharing** — sends the product photo + details ready to forward
 
-## Reports
+Paid modules (see below):
 
-One date-range filter scopes five panels, each answering a different question:
+- **Finanzas** — expenses, income, accounts, budgets, supplier purchases
+- **Reportes** — five-panel dashboard, PDF/Excel export
+- **Redes** — AI-generated social posting calendar
 
-| Panel | Question it answers |
-|-------|---------------------|
-| Resumen | How is the business doing versus the previous equivalent period, and what needs attention today |
-| Ventas | When demand happens (weekday, hour), who closes it, how customers pay |
-| Productos | Which items carry the business — ABC/Pareto, margins, price realization, returns |
-| Inventario | What is on the shelf, what it costs to keep, what is about to run out or never moves |
-| Proyección | Where sales are heading and what to buy to cover the next 15/30/60 days |
+## Paid modules
 
-Three things are worth knowing before changing this area.
+Each client instance ships only the modules they paid for. Three flags decide
+it **at build time**:
 
-**All of it is computed in the browser.** `services/report-analytics.ts` is pure:
-it takes the loaded sales history plus the live catalogue and returns view
-models, all in USD. The panels convert to the display currency at render time.
-Crossing sales with the catalogue is what makes the forward-looking reports
-possible — velocity comes from the history, remaining stock from `items`.
+```
+VITE_MODULE_FINANZAS=true
+VITE_MODULE_REPORTES=true
+VITE_MODULE_REDES=true
+```
 
-**The database is asked one question only:** how many sales really exist in the
-selected range (`report_summary`). When that count exceeds what the browser
-holds, the screen says so and offers to load more, instead of quietly
-under-reporting. Every figure still comes from the local pipeline, so the two
-can be compared.
+Anything other than `true` (including unset) excludes the module — its code is
+removed from the JavaScript bundle entirely, not hidden. There is nothing to
+unlock in the browser. The Redes server endpoint has its own server-side
+switch, `MODULE_REDES`, and returns 404 without it.
 
-**Payment mix is attributed, not summed.** A cash payment is recorded as the
-note handed over, so raw amounts routinely exceed the sale total — summing them
-turns a $50 sale into $62 of "cash income". Each transaction's total is split
-across its methods in proportion to what was tendered, and sales that recorded
-no payment at all are reported separately rather than folded in.
+Flag logic lives in `src/app/modules.ts`.
 
-Chart colours live in `components/reports/report-ui.tsx` and are validated for
-colour-vision deficiency against a white surface. Three slots fall below 3:1
-contrast, which is why every chart also ships a legend, a tooltip and a table
-or direct labels — colour is never the only way to read a value.
+## How money works
 
-## Finanzas
+**Every price is stored in USD.** Bolivar amounts are derived using a rate.
+The app knows three rates:
 
-The counter knows what came in. This module covers everything else: fuel,
-salaries, rent, taxes, bank fees, money set aside for investment, and the
-purchases that turn cash into stock.
+| Rate | Source | Purpose |
+|------|--------|---------|
+| USDT | Binance P2P (via `/api/usdt-rate`) | The parallel rate businesses actually trade at |
+| USD  | BCV official | Shown because customers ask for it |
+| EUR  | BCV official | Same, for euros |
 
-**Buying stock is not an expense.** It converts cash into inventory. The cost
-reaches the profit statement later, when the item sells, from the snapshot each
-sale line already carries. So a purchase appears in the cash flow immediately
-and in the profit statement never — what appears there is cost of goods sold.
-Recording both would charge the business twice for the same money and make any
-month with a big restock look like a catastrophe.
+One rate is marked **honest** (normally USDT): all bookkeeping uses it. The
+others are **reference lenses** — while one is selected the app blocks money
+entry, because the amount would be recorded at the wrong value.
 
-That distinction is what a category's `nature` encodes:
-
-| nature | Where it lands |
-|--------|----------------|
-| `cogs` | Cash flow only — stock bought for resale |
-| `fixed` | Profit statement, and the denominator of break-even |
-| `variable` | Profit statement |
-| `tax` | Profit statement |
-| `investment` | Below the net profit line — profit set aside, not consumed |
-| `owner` | Below the net profit line — money taken out, not a cost |
-
-Names are the shop's to change; the buckets are the app's. Nothing in the code
-looks up an account, category or payee by name, so all of them can be renamed,
-archived or deleted. What ships seeded is a starting point, inserted only when
-the tables are empty.
-
-Seven panels, one date filter, all computed in the browser like the reports:
-
-| Panel | Question it answers |
-|-------|---------------------|
-| Resumen | Did the business make money, and can it keep paying for itself |
-| Movimientos | Everything that moved, filterable by category, account or tag |
-| Obligaciones | What is owed, what is owed to us, what repeats |
-| Presupuesto | Where the money went against where it was supposed to go |
-| Cuentas | How much exists, in which pot, and what bolivares cost to hold |
-| Compras | Merchandise that arrived, from whom, at what landed cost |
-| Proveedores | Standing with each supplier, and who sells the same thing cheaper |
-
-Four things are worth knowing before changing this area.
-
-**Bolivar movements carry their own rate.** A payment in bolivares stores the
-bolivares, the rate and which rate it was, stamped once at write time by
-`finance-context.tsx`. No screen can skip it. Without that, changing the honest
-rate would restate what every past expense cost.
-
-**Bolivar accounts report their own devaluation.** A pot that holds bolivares is
-booked at what each bolivar was worth on arrival; today those bolivares buy
-fewer dollars. The gap is a real cost of holding bolivares, and it is invisible
-in a ledger that only tracks dollars.
-
-**Sales money is routed by declared method, never guessed.** An account lists
-the payment methods that land in it ("Efectivo", "Zelle"). Takings whose method
-no account claims are reported as unassigned instead of being silently dropped —
-otherwise "cash on hand" would be a fiction.
-
-**Recurring bills are proposed, never posted automatically.** There is no
-scheduler. The client walks each rule's cadence, compares it against what is
-already recorded and offers what is missing. `finance_entries(recurring_id,
-period_key)` is unique, so two devices confirming the same salary produce one
-row.
-
-A purchase can also create a product that was never catalogued — usually the
-reason the supplier came at all. The product is created by the same call that
-posts the purchase, so an abandoned basket leaves no empty product behind, and
-the item's history reads `create` then `purchase` rather than stock appearing
-from nowhere.
-
-Purchases are the only way stock rises with money attached. Editing the quantity
-on the item form is now an *ajuste de inventario* and demands a reason (breakage,
-theft, a physical count, a sample). Both doors stay open, but the history can
-finally tell them apart, and the Excel import counts as an adjustment too.
+Sales snapshot their own cost and rate at write time, so editing a product or
+the rate never rewrites past sales.
 
 ## Stack
 
-- **Frontend** - React 18, TypeScript, Vite, Tailwind, Radix UI, MUI
-- **Backend** - Supabase (Postgres, Auth, Storage, Row Level Security)
-- **Serverless** - one Vercel function that fetches the Binance P2P rate,
-  because Binance blocks direct browser requests
-- **Offline storage** - IndexedDB cache plus a sync outbox
+- **Frontend** — React 18, TypeScript, Vite, Tailwind, Radix UI, embla carousel
+- **Backend** — Supabase (Postgres, Auth, Storage, RLS) — no server of our own;
+  access rules live in Postgres
+- **Serverless** — Vercel functions: `usdt-rate` (Binance rate),
+  `social-generate` (Redes AI batch, daily cron), `storage-cleanup` (weekly cron)
+- **Edge function** — `admin-users` (Supabase): user create/update/delete,
+  admin-gated
 
-## Architecture notes
-
-**There is no backend of our own.** The browser talks to Supabase directly, so
-every access rule lives in Postgres. Row Level Security decides which rows a
-user can touch, and triggers decide which *columns* they can change. Policies
-cannot express per-column rules, and several tables allow broad updates so that
-sellers can adjust stock and register returns.
-
-**Stock never moves from the client.** Checkout calls `decrement_stock`, a
-Postgres function that subtracts and fails when there is not enough. Doing that
-arithmetic in the browser meant two sellers ringing up the same product could
-overwrite each other. Returns work the same way through
-`return_transaction_item`, which records the return and restocks in a single
-transaction.
-
-**Offline writes queue intentions, not results.** A queued stock change stores a
-delta such as "minus two", never "set quantity to eight". An absolute value
-captured while offline would wipe out any sale another device made in the
-meantime.
-
-**Sales snapshot their own cost and rate.** Each line stores the buying price at
-the time of sale, and each transaction stores which honest rate was used.
-Without that, editing a product's cost would silently rewrite the margin on
-every past sale.
-
-## Running it
+## Running locally
 
 ```bash
 npm install
-cp .env.example .env.local   # set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+cp .env.example .env.local   # fill in Supabase URL + anon key, module flags
 npm run dev
 ```
 
-Other commands:
+| Command | What it does |
+|---------|--------------|
+| `npm run dev` | Local dev server |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run build` | Typechecks, then builds to `dist/` |
+
+The anon key is safe in the browser; Row Level Security protects the data.
+
+## Creating a new client instance
+
+One script provisions everything: Supabase project + schema + admin user +
+edge function + Vercel project + deploy.
 
 ```bash
-npm run typecheck   # tsc --noEmit
-npm run build       # typechecks first, then builds
+./scripts/new-client.sh <client-name> [--finanzas] [--reportes] [--redes] \
+    [--admin-email a@b.c] [--admin-name "Nombre"] [--region us-east-1]
 ```
 
-The anon key is safe to ship in the browser bundle. It is not a secret; Row
-Level Security is what protects the data.
+Example — client "acme" who bought Finanzas and Redes:
+
+```bash
+./scripts/new-client.sh acme --finanzas --redes --admin-email admin@acme.com
+```
+
+**Tokens.** The script needs one Supabase token and one Vercel token. Put them
+in `.env` (gitignored):
+
+```
+SUPABASE_NEW_CLIENT=sbp_...   # supabase.com/dashboard/account/tokens
+VERCEL_NEW_CLIENT=...         # vercel.com/account/settings/tokens
+```
+
+Or pass `--supabase-token` / `--vercel-token`. Missing tokens are prompted.
+Using tokens from different accounts is fine — that is how you spread clients
+across Supabase accounts.
+
+**What it does, in order:**
+
+1. Creates the Supabase project (random DB password) and waits until healthy
+2. Applies every migration in `supabase/migrations/`
+3. Creates the first **admin user** (email confirmed, password generated
+   unless given)
+4. Deploys the `admin-users` edge function
+5. Creates the Vercel project, sets all env vars, deploys to production
+
+**What you get:** the live URL, and a `.env.<client-name>` file (chmod 600,
+gitignored) with every credential of the instance — Supabase keys, direct
+Postgres URL, cron secret, admin login, module flags. Guard that file.
+
+Requires: `supabase`, `vercel`, `jq`, `openssl` CLIs.
 
 ## Database
 
-Schema and policies live in `supabase/migrations/`.
+Schema lives in `supabase/migrations/`, split by module:
 
-- `0000_preflight_single.sql` - read-only audit. Run it before a migration to
-  check column names, existing policies, and rows that would violate new
-  constraints.
-- `0001_security_and_integrity.sql` - column-level guards, constraints, the
-  atomic stock functions, and indexes.
-- `0001_rollback.sql` - removes what `0001` added, if something goes wrong.
-- `0002_finance.sql` - the ledger: accounts, categories, payees, recurring
-  rules, allocations, entries, plus `finance_summary`. Seeds a default set of
-  accounts and categories only when those tables are empty.
-- `0003_purchases.sql` - suppliers per item, purchases, purchase returns, the
-  `post_purchase` / `post_purchase_return` functions, and the extra
-  `item_history` actions those movements need.
-- `0004_purchase_new_items.sql` - lets a purchase line create the product it is
-  buying, in the same transaction. Replaces `post_purchase`; nothing else moves.
-- `0002_rollback.sql`, `0003_rollback.sql`, `0004_rollback.sql` - undo any of
-  them. They delete recorded money, not just structure, so back up first.
+| File | Contents |
+|------|----------|
+| `..._core.sql` | profiles, items, sales, settings, stock RPCs, guard triggers, RLS, product-images bucket |
+| `..._finanzas.sql` | accounts, categories, payees, entries, purchases, purchase RPCs, RLS |
+| `..._redes.sql` | social config/posts/promoted, social-posts bucket, RLS |
 
-Apply them through the Supabase SQL editor or `supabase db push`, and take a
-backup first. Database dumps are gitignored and must never be committed.
+All three are pushed to every instance — tables of unsold modules sit empty
+and admin-locked; the UI and server for them simply do not exist there.
+
+Key invariants the schema enforces:
+
+- **Stock never moves from the client.** Checkout calls `decrement_stock`,
+  which subtracts atomically and fails on insufficient stock. Returns go
+  through `return_transaction_item`.
+- **Triggers guard columns RLS cannot.** Sellers can update items (stock) but
+  the guard triggers silently keep prices, discounts and roles unchanged
+  unless the caller is admin.
+- **New auth users get a `profiles` row automatically** (trigger), with the
+  role from their metadata.
+
+Manual apply, if ever needed:
+
+```bash
+supabase db push --db-url "postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres"
+supabase functions deploy admin-users --project-ref <ref>
+```
+
+## Deploying
+
+**Vercel (normal path).** One Vercel project per client, all from this repo.
+Env vars per project: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, the three `VITE_MODULE_*` flags,
+and `MODULE_REDES`. The script sets all of these.
+
+**Docker (alternative frontend host).** The image bakes the module flags at
+build time and serves the static app; `/api/*` is proxied to wherever the
+serverless functions live:
+
+```bash
+docker build \
+  --build-arg VITE_SUPABASE_URL=https://<ref>.supabase.co \
+  --build-arg VITE_SUPABASE_ANON_KEY=<key> \
+  --build-arg VITE_MODULE_FINANZAS=true \
+  -t xinventory-acme .
+
+docker run -p 8080:80 -e API_ORIGIN=https://acme.vercel.app xinventory-acme
+```
+
+Crons (`social-generate` daily, `storage-cleanup` weekly) run on Vercel via
+`vercel.json`; a pure-Docker deployment needs a host cron calling those
+endpoints with the `CRON_SECRET` bearer.
 
 ## Known gaps
 
-An honest list of what is not done yet:
-
-- `refreshData()` still refetches the whole `items` and `item_history` tables
-  after several operations. This is the first thing that will hurt as the
-  catalog grows.
-- Transactions and item history are fetched without pagination.
-- Long lists are not virtualized.
-- Most icon-only buttons still lack accessible labels, and a few clickable rows
-  cannot be reached by keyboard.
-- `xlsx@0.18.5` has known vulnerabilities with no fix published on npm. It needs
-  to move to the SheetJS CDN build or be replaced.
-- Finanzas has no receipt attachments yet. The columns exist on entries and
-  purchases; only the upload UI and a storage bucket are missing.
-- Finanzas has no PDF or Excel export. The reports module already has both and
-  the analytics output is shaped the same way, so it is mostly wiring.
-- Purchases are read online only, without pagination. The ledger itself is
-  cached and paginated; the purchase screen is admin-facing and was left simple.
+- `refreshData()` refetches whole tables after several operations; first thing
+  to hurt as catalogs grow.
+- Transactions and item history are fetched without pagination; long lists are
+  not virtualized.
+- Finanzas has no receipt attachments UI and no PDF/Excel export yet.
+- Purchases screen is online-only, without pagination.
