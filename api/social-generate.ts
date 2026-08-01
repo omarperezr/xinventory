@@ -569,6 +569,14 @@ function header(req: Req, name: string): string {
 }
 
 export default async function handler(req: Req, res: Res) {
+  // Module gate (server half of src/app/modules.ts): instances that did not
+  // buy Redes run without MODULE_REDES, so this endpoint — and the daily
+  // cron that calls it — is a 404 for them. Fail closed: unset = disabled.
+  if (process.env.MODULE_REDES !== "true") {
+    res.status(404).json({ error: "Módulo no habilitado" });
+    return;
+  }
+
   const url = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   if (!url || !serviceKey) {

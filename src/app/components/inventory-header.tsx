@@ -34,6 +34,7 @@ import {
   isReferenceLens,
 } from "../context/app-context";
 import { useAuth, UserRole } from "../context/auth-context";
+import { MODULE_FINANZAS, MODULE_REPORTES, MODULE_REDES } from "../modules";
 import { ProfileDialog } from "./profile-dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -541,15 +542,17 @@ export function InventoryHeader() {
                   <History className="w-4 h-4 mr-2" aria-hidden="true" />
                   Historial
                 </Link>
-                <Link
-                  to="/finance"
-                  aria-current={isFinance ? "page" : undefined}
-                  className={pillClasses(isFinance)}
-                >
-                  <Banknote className="w-4 h-4 mr-2" aria-hidden="true" />
-                  Finanzas
-                </Link>
-                {isAdmin && (
+                {MODULE_FINANZAS && (
+                  <Link
+                    to="/finance"
+                    aria-current={isFinance ? "page" : undefined}
+                    className={pillClasses(isFinance)}
+                  >
+                    <Banknote className="w-4 h-4 mr-2" aria-hidden="true" />
+                    Finanzas
+                  </Link>
+                )}
+                {MODULE_REPORTES && isAdmin && (
                   <Link
                     to="/reports"
                     aria-current={isReports ? "page" : undefined}
@@ -559,7 +562,7 @@ export function InventoryHeader() {
                     Reportes
                   </Link>
                 )}
-                {isAdmin && (
+                {MODULE_REDES && isAdmin && (
                   <Link
                     to="/social"
                     aria-current={isSocial ? "page" : undefined}
@@ -754,15 +757,17 @@ export function InventoryHeader() {
             <History className="w-5 h-5" aria-hidden="true" />
             <span className="text-meta font-medium">Historial</span>
           </Link>
-          <Link
-            to="/finance"
-            aria-current={isFinance ? "page" : undefined}
-            className={mobileTabClasses(isFinance)}
-          >
-            <Banknote className="w-5 h-5" aria-hidden="true" />
-            <span className="text-meta font-medium">Finanzas</span>
-          </Link>
-          {isAdmin && (
+          {MODULE_FINANZAS && (
+            <Link
+              to="/finance"
+              aria-current={isFinance ? "page" : undefined}
+              className={mobileTabClasses(isFinance)}
+            >
+              <Banknote className="w-5 h-5" aria-hidden="true" />
+              <span className="text-meta font-medium">Finanzas</span>
+            </Link>
+          )}
+          {MODULE_REPORTES && isAdmin && (
             <Link
               to="/reports"
               aria-current={isReports ? "page" : undefined}
@@ -772,7 +777,7 @@ export function InventoryHeader() {
               <span className="text-meta font-medium">Reportes</span>
             </Link>
           )}
-          {isAdmin && (
+          {MODULE_REDES && isAdmin && (
             <Link
               to="/social"
               aria-current={isSocial ? "page" : undefined}

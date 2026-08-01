@@ -1,10 +1,17 @@
 import { Suspense, lazy, useState } from "react";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+} from "react-router-dom";
 import { Package } from "lucide-react";
 import { InventoryHeader } from "./components/inventory-header";
 import { LoginPage } from "./components/login-page";
 import { OfflineSync } from "./components/offline-sync";
 import { Spinner } from "./components/ui/spinner";
+import { MODULE_FINANZAS, MODULE_REPORTES, MODULE_REDES } from "./modules";
 
 const AdminView = lazy(() =>
   import("./components/admin-view").then((m) => ({ default: m.AdminView })),
@@ -20,21 +27,29 @@ const HistoryView = lazy(() =>
     default: m.HistoryView,
   })),
 );
-const ReportsView = lazy(() =>
-  import("./components/reports-view").then((m) => ({
-    default: m.ReportsView,
-  })),
-);
-const FinanceView = lazy(() =>
-  import("./components/finance-view").then((m) => ({
-    default: m.FinanceView,
-  })),
-);
-const SocialView = lazy(() =>
-  import("./components/social-view").then((m) => ({
-    default: m.SocialView,
-  })),
-);
+// Optional modules: when the flag folds to false at build time the dynamic
+// import below is dead code, so the module's chunks never reach dist/.
+const ReportsView = MODULE_REPORTES
+  ? lazy(() =>
+      import("./components/reports-view").then((m) => ({
+        default: m.ReportsView,
+      })),
+    )
+  : null;
+const FinanceView = MODULE_FINANZAS
+  ? lazy(() =>
+      import("./components/finance-view").then((m) => ({
+        default: m.FinanceView,
+      })),
+    )
+  : null;
+const SocialView = MODULE_REDES
+  ? lazy(() =>
+      import("./components/social-view").then((m) => ({
+        default: m.SocialView,
+      })),
+    )
+  : null;
 import {
   AppProvider,
   useApp,
@@ -217,43 +232,52 @@ function AppContent() {
             <Route path="/history" element={<HistoryView />} />
             {/* Sellers may record what they spend in the field; only admins
                 see the whole picture and the purchase side. */}
-            <Route path="/finance" element={<FinanceView />} />
-            <Route
-              path="/reports"
-              element={
-                currentUser?.role === "admin" ? (
-                  <ReportsView />
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-20">
-                    <div className="text-red-500 font-medium text-lg mb-2">
-                      Acceso Restringido
+            {FinanceView && (
+              <Route path="/finance" element={<FinanceView />} />
+            )}
+            {ReportsView && (
+              <Route
+                path="/reports"
+                element={
+                  currentUser?.role === "admin" ? (
+                    <ReportsView />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-20">
+                      <div className="text-red-500 font-medium text-lg mb-2">
+                        Acceso Restringido
+                      </div>
+                      <p className="text-gray-500 text-sm">
+                        Solo los administradores pueden ver los reportes.
+                      </p>
                     </div>
-                    <p className="text-gray-500 text-sm">
-                      Solo los administradores pueden ver los reportes.
-                    </p>
-                  </div>
-                )
-              }
-            />
+                  )
+                }
+              />
+            )}
             {/* The marketing calendar: config holds an AI API key, so this is
                 admin-only end to end (route gate here, RLS in the database). */}
-            <Route
-              path="/social"
-              element={
-                currentUser?.role === "admin" ? (
-                  <SocialView />
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-20">
-                    <div className="text-red-500 font-medium text-lg mb-2">
-                      Acceso Restringido
+            {SocialView && (
+              <Route
+                path="/social"
+                element={
+                  currentUser?.role === "admin" ? (
+                    <SocialView />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-20">
+                      <div className="text-red-500 font-medium text-lg mb-2">
+                        Acceso Restringido
+                      </div>
+                      <p className="text-gray-500 text-sm">
+                        Solo los administradores pueden gestionar redes sociales.
+                      </p>
                     </div>
-                    <p className="text-gray-500 text-sm">
-                      Solo los administradores pueden gestionar redes sociales.
-                    </p>
-                  </div>
-                )
-              }
-            />
+                  )
+                }
+              />
+            )}
+            {/* Unmatched paths (incl. deep links to modules this instance
+                does not ship) land on the search page instead of a blank. */}
+            <Route path="*" element={<Navigate to="/search" replace />} />
           </Routes>
         </Suspense>
       </main>
@@ -262,22 +286,19 @@ function AppContent() {
 }
 
 function App() {
+  // Optional-module providers wrap only when their module ships; the folded
+  // false branch lets the bundler drop the provider with the rest of the
+  // module. Finance sits inside History (it stamps the honest rate on every
+  // bolivar movement and reads the sales history); Social only needs Auth.
+  let content = <AppContent />;
+  if (MODULE_REDES) content = <SocialProvider>{content}</SocialProvider>;
+  if (MODULE_FINANZAS) content = <FinanceProvider>{content}</FinanceProvider>;
+
   return (
     <BrowserRouter>
       <AuthProvider>
         <AppProvider>
-          <HistoryProvider>
-            {/* Finance sits inside both: it stamps the honest rate on every
-                bolivar movement, and reads the sales history to build the
-                profit statement. */}
-            <FinanceProvider>
-              {/* Social reads nothing from the other providers; it sits inside
-                  Auth only for the admin flag. */}
-              <SocialProvider>
-                <AppContent />
-              </SocialProvider>
-            </FinanceProvider>
-          </HistoryProvider>
+          <HistoryProvider>{content}</HistoryProvider>
         </AppProvider>
       </AuthProvider>
     </BrowserRouter>
