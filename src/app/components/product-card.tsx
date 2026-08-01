@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import useEmblaCarousel from "embla-carousel-react";
 import {
   Plus,
   Package,
@@ -52,10 +53,11 @@ function ImageSurface({
   );
 }
 
-// Shared image carousel used both as the card preview and inside the
-// product detail dialog. Tracks the active index so the share button can
-// send exactly the photo currently being displayed.
-function ImageCarousel({
+// Shared image carousel used as the card preview, inside the product detail
+// dialog and by the inventory photo viewer. Swipeable on touch (embla) with
+// arrows as the pointer fallback. Tracks the active index so the share button
+// can send exactly the photo currently being displayed.
+export function ImageCarousel({
   images,
   alt,
   activeIndex,
@@ -76,35 +78,61 @@ function ImageCarousel({
   size?: "preview" | "full";
 }) {
   const hasImages = images.length > 0;
-  const heightClass = size === "full" ? "aspect-square" : "aspect-square";
+
+  // startIndex is read once on init; feeding the live index back into the
+  // options would re-init embla mid-drag.
+  const startIndex = useRef(activeIndex).current;
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, startIndex });
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setActiveIndex(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi, setActiveIndex]);
 
   const go = (delta: number, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (images.length === 0) return;
-    setActiveIndex((activeIndex + delta + images.length) % images.length);
+    if (delta < 0) emblaApi?.scrollPrev();
+    else emblaApi?.scrollNext();
   };
 
   return (
-    <div className={`relative ${heightClass} bg-gray-100 overflow-hidden`}>
-      <ImageSurface onOpen={onOpen} alt={alt}>
-        {hasImages ? (
-          <img
-            src={images[activeIndex]}
-            alt={alt}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-cover transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Package
-              className="w-10 h-10 text-gray-500"
-              strokeWidth={1.5}
-              aria-hidden="true"
-            />
+    <div className="relative aspect-square bg-gray-100 overflow-hidden">
+      {hasImages ? (
+        <div ref={emblaRef} className="h-full overflow-hidden">
+          {/* pan-y keeps vertical page scroll working while embla owns the
+              horizontal gesture. */}
+          <div className="flex h-full touch-pan-y">
+            {images.map((src, i) => (
+              <div key={i} className="min-w-0 shrink-0 grow-0 basis-full h-full">
+                <ImageSurface onOpen={onOpen} alt={alt}>
+                  <img
+                    src={src}
+                    alt={images.length > 1 ? `${alt} — foto ${i + 1}` : alt}
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                    className={`w-full h-full select-none ${
+                      size === "full" ? "object-contain" : "object-cover"
+                    }`}
+                  />
+                </ImageSurface>
+              </div>
+            ))}
           </div>
-        )}
-      </ImageSurface>
+        </div>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <Package
+            className="w-10 h-10 text-gray-500"
+            strokeWidth={1.5}
+            aria-hidden="true"
+          />
+        </div>
+      )}
 
       {images.length > 1 && (
         <>
@@ -131,10 +159,13 @@ function ImageCarousel({
             {images.map((_, i) => (
               <span
                 key={i}
-                className={`w-1.5 h-1.5 rounded-full ${i === activeIndex ? "bg-white" : "bg-white/60"}`}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${i === activeIndex ? "bg-white" : "bg-white/60"}`}
               />
             ))}
           </div>
+          <span className="sr-only" aria-live="polite">
+            Foto {activeIndex + 1} de {images.length}
+          </span>
         </>
       )}
 

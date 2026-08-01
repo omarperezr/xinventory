@@ -22,6 +22,17 @@ body {
   }
 }
 
+/* Rapid taps (quantity steppers, nav tabs) must not trigger the mobile
+   double-tap zoom; panning and pinch-zoom elsewhere stay untouched. */
+button,
+a,
+input,
+select,
+textarea,
+label {
+  touch-action: manipulation;
+}
+
 /* Respect users who ask the OS to reduce motion. */
 @media (prefers-reduced-motion: reduce) {
   *,

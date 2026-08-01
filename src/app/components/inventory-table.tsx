@@ -1,17 +1,66 @@
-import { Edit2, Trash2, Package, Plus, Clock, Loader2 } from "lucide-react";
+import { Edit2, Trash2, Package, Clock, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import { format } from "date-fns";
 import { useState } from "react";
-import { QuantityStepper } from "./quantity-stepper";
+import { ImageCarousel } from "./product-card";
+import { shareImageToWhatsApp } from "../services/whatsapp";
 import { useApp, InventoryItem } from "../context/app-context";
+
+// First photo as a tappable thumbnail; opens the swipeable photo viewer.
+// Items without photos keep a placeholder so rows stay aligned.
+function ProductThumb({
+  item,
+  onView,
+  className = "w-14 h-14",
+}: {
+  item: InventoryItem;
+  onView?: (item: InventoryItem) => void;
+  className?: string;
+}) {
+  const images = item.images || [];
+  if (images.length === 0 || !onView) {
+    return (
+      <div
+        className={`${className} rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0`}
+      >
+        <Package className="w-5 h-5 text-gray-400" strokeWidth={1.5} aria-hidden="true" />
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onView(item)}
+      aria-label={`Ver fotos de ${item.name}`}
+      className={`${className} relative rounded-lg overflow-hidden flex-shrink-0 border border-gray-200 focus-visible:ring-2 focus-visible:ring-primary`}
+    >
+      <img
+        src={images[0]}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="w-full h-full object-cover"
+      />
+      {images.length > 1 && (
+        <span className="absolute bottom-0.5 right-0.5 text-meta font-medium bg-black/60 text-white px-1 rounded">
+          {images.length}
+        </span>
+      )}
+    </button>
+  );
+}
 
 interface InventoryTableProps {
   items: InventoryItem[];
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void | Promise<void>;
-  onAddToCart?: (item: InventoryItem, quantity: number) => void;
   onViewHistory?: (item: InventoryItem) => void;
   showBuyingPrice?: boolean;
   selectMode?: boolean;
@@ -23,8 +72,8 @@ function InventoryTableRow({
   item,
   onEdit,
   onDelete,
-  onAddToCart,
   onViewHistory,
+  onViewPhotos,
   showBuyingPrice,
   selectMode,
   selected,
@@ -33,15 +82,14 @@ function InventoryTableRow({
   item: InventoryItem;
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void | Promise<void>;
-  onAddToCart?: (item: InventoryItem, quantity: number) => void;
   onViewHistory?: (item: InventoryItem) => void;
+  onViewPhotos?: (item: InventoryItem) => void;
   showBuyingPrice?: boolean;
   selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
 }) {
   const { formatPrice } = useApp();
-  const [quantityToAdd, setQuantityToAdd] = useState(1);
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -85,21 +133,26 @@ function InventoryTableRow({
         </td>
       )}
       <td className="px-3 md:px-6 py-2 md:py-4">
-        <div className="text-xs md:text-sm font-medium text-gray-900 leading-tight">
-          {item.name}
-        </div>
-        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-          {item.includesTaxes && (
-            <span className="text-meta uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
-              +IVA
-            </span>
-          )}
-          <span className="md:hidden text-meta uppercase bg-gray-100 text-gray-600 px-1 py-0.5 rounded truncate max-w-[80px]">
-            {item.brand}
-          </span>
-        </div>
-        <div className="md:hidden text-meta text-gray-500 font-mono mt-0.5 truncate max-w-[90px]">
-          {item.barcode}
+        <div className="flex items-center gap-3">
+          <ProductThumb item={item} onView={onViewPhotos} className="w-10 h-10" />
+          <div className="min-w-0">
+            <div className="text-xs md:text-sm font-medium text-gray-900 leading-tight">
+              {item.name}
+            </div>
+            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+              {item.includesTaxes && (
+                <span className="text-meta uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+                  +IVA
+                </span>
+              )}
+              <span className="md:hidden text-meta uppercase bg-gray-100 text-gray-600 px-1 py-0.5 rounded truncate max-w-[80px]">
+                {item.brand}
+              </span>
+            </div>
+            <div className="md:hidden text-meta text-gray-500 font-mono mt-0.5 truncate max-w-[90px]">
+              {item.barcode}
+            </div>
+          </div>
         </div>
       </td>
 
@@ -162,31 +215,6 @@ function InventoryTableRow({
 
       <td className="px-2 md:px-6 py-2 md:py-4">
         <div className="flex items-center gap-1 md:gap-2">
-          {!selectMode && onAddToCart && (
-            <div className="flex items-center bg-gray-50 rounded-md border border-gray-200">
-              <Input
-                type="number"
-                min="1"
-                value={quantityToAdd}
-                onChange={(e) =>
-                  setQuantityToAdd(Math.max(1, parseInt(e.target.value) || 1))
-                }
-                aria-label={`Cantidad de ${item.name} a agregar`}
-                className="hidden md:block w-12 h-9 text-xs border-0 focus-visible:ring-0 bg-transparent text-right pr-1"
-              />
-              <Button
-                size="sm"
-                onClick={() => onAddToCart(item, quantityToAdd)}
-                className="tap-target h-9 w-9 md:w-auto md:px-2 p-0"
-                title="Agregar al Total"
-                aria-label={`Agregar ${item.name} al total`}
-                disabled={item.quantity === 0}
-              >
-                <Plus className="w-4 h-4" aria-hidden="true" />
-              </Button>
-            </div>
-          )}
-
           {!selectMode && onViewHistory && (
             <Button
               variant="ghost"
@@ -236,87 +264,13 @@ function InventoryTableRow({
   );
 }
 
-// Mobile card for search view (no edit/delete, just add to cart)
-function MobileSearchCard({
-  item,
-  onAddToCart,
-}: {
-  item: InventoryItem;
-  onAddToCart: (item: InventoryItem, qty: number) => void;
-}) {
-  const { formatPrice } = useApp();
-  const [qty, setQty] = useState(1);
-
-  const stockColor =
-    item.quantity === 0
-      ? "text-red-600"
-      : item.quantity < 10
-        ? "text-yellow-600"
-        : "text-green-600";
-
-  const unitLabel = { units: "u", kg: "kg", liters: "L" }[item.unit || "units"];
-
-  return (
-    <div className="p-3 border-b border-gray-100 last:border-0">
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-gray-900 leading-tight">
-            {item.name}
-          </p>
-          <p className="text-meta text-gray-500 font-mono mt-0.5 truncate">
-            {item.barcode}
-          </p>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            {item.includesTaxes && (
-              <span className="text-meta uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
-                +IVA
-              </span>
-            )}
-            {item.discount > 0 && (
-              <span className="text-meta bg-orange-100 text-orange-700 px-1 py-0.5 rounded">
-                -{item.discount}%
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-semibold text-primary">
-            {formatPrice(item.sellingPrice)}
-          </p>
-          <p className={`text-xs font-medium ${stockColor}`}>
-            {item.quantity} {unitLabel}
-          </p>
-        </div>
-      </div>
-      {/* Add to cart controls */}
-      <div className="flex items-center gap-2">
-        <QuantityStepper
-          value={qty}
-          onChange={setQty}
-          min={1}
-          max={item.quantity || undefined}
-          size="sm"
-          label={`Cantidad de ${item.name}`}
-        />
-        <Button
-          onClick={() => onAddToCart(item, qty)}
-          disabled={item.quantity === 0}
-          className="flex-1 h-10 text-sm"
-        >
-          <Plus className="w-4 h-4 mr-1" aria-hidden="true" />
-          Agregar al Total
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // Mobile card for the admin view (buying price, margin, edit/delete/history)
 function MobileAdminCard({
   item,
   onEdit,
   onDelete,
   onViewHistory,
+  onViewPhotos,
   showBuyingPrice,
   selectMode,
   selected,
@@ -326,6 +280,7 @@ function MobileAdminCard({
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void | Promise<void>;
   onViewHistory?: (item: InventoryItem) => void;
+  onViewPhotos?: (item: InventoryItem) => void;
   showBuyingPrice?: boolean;
   selectMode?: boolean;
   selected?: boolean;
@@ -374,6 +329,7 @@ function MobileAdminCard({
             className="mt-0.5 flex-shrink-0"
           />
         )}
+        <ProductThumb item={item} onView={onViewPhotos} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-gray-900 leading-tight">
             {item.name}
@@ -473,14 +429,20 @@ export function InventoryTable({
   items,
   onEdit,
   onDelete,
-  onAddToCart,
   onViewHistory,
   showBuyingPrice,
   selectMode,
   selectedIds,
   onToggleSelect,
 }: InventoryTableProps) {
-  const isSearchMode = !!onAddToCart && !onViewHistory;
+  // One shared photo viewer for the whole table: a swipeable carousel in a
+  // dialog, opened from any row's thumbnail.
+  const [photoItem, setPhotoItem] = useState<InventoryItem | null>(null);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const openPhotos = (item: InventoryItem) => {
+    setPhotoIndex(0);
+    setPhotoItem(item);
+  };
 
   if (items.length === 0) {
     return (
@@ -506,27 +468,20 @@ export function InventoryTable({
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
       {/* Mobile card list - no horizontal scroll on phones */}
       <div className="md:hidden">
-        {items.map((item) =>
-          isSearchMode ? (
-            <MobileSearchCard
-              key={item.id}
-              item={item}
-              onAddToCart={onAddToCart!}
-            />
-          ) : (
-            <MobileAdminCard
-              key={item.id}
-              item={item}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onViewHistory={onViewHistory}
-              showBuyingPrice={showBuyingPrice}
-              selectMode={selectMode}
-              selected={selectedIds?.has(item.id)}
-              onToggleSelect={onToggleSelect}
-            />
-          ),
-        )}
+        {items.map((item) => (
+          <MobileAdminCard
+            key={item.id}
+            item={item}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onViewHistory={onViewHistory}
+            onViewPhotos={openPhotos}
+            showBuyingPrice={showBuyingPrice}
+            selectMode={selectMode}
+            selected={selectedIds?.has(item.id)}
+            onToggleSelect={onToggleSelect}
+          />
+        ))}
       </div>
 
       {/* Desktop table */}
@@ -577,8 +532,8 @@ export function InventoryTable({
                 item={item}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                onAddToCart={onAddToCart}
                 onViewHistory={onViewHistory}
+                onViewPhotos={openPhotos}
                 showBuyingPrice={showBuyingPrice}
                 selectMode={selectMode}
                 selected={selectedIds?.has(item.id)}
@@ -588,6 +543,35 @@ export function InventoryTable({
           </tbody>
         </table>
       </div>
+
+      {/* Photo viewer */}
+      <Dialog
+        open={!!photoItem}
+        onOpenChange={(open) => !open && setPhotoItem(null)}
+      >
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="pr-6 text-base leading-snug">
+              {photoItem?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {photoItem && (
+            <div className="rounded-lg overflow-hidden">
+              <ImageCarousel
+                images={photoItem.images || []}
+                alt={photoItem.name}
+                activeIndex={photoIndex}
+                setActiveIndex={setPhotoIndex}
+                onShare={(i) => {
+                  const img = photoItem.images?.[i];
+                  if (img) shareImageToWhatsApp(photoItem, img);
+                }}
+                size="full"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Summary footer */}
       <div className="border-t border-gray-200 bg-gray-50 px-3 md:px-6 py-2 md:py-3">
