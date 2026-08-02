@@ -124,6 +124,15 @@ function AppContent() {
     // back the lines already taken rather than recording a partial sale.
     const applied: CartItem[] = [];
     let failedItem: CartItem | undefined;
+    const rollbackStock = async (reason: string) => {
+      for (const done of applied) {
+        try {
+          await adjustStock(done.id, done.cartQuantity, currentUser.name, reason);
+        } catch (rollbackErr) {
+          console.error("No se pudo revertir el stock", rollbackErr);
+        }
+      }
+    };
     try {
       for (const cartItem of cartItems) {
         failedItem = cartItem;
@@ -137,18 +146,7 @@ function AppContent() {
       }
       failedItem = undefined;
     } catch (err) {
-      for (const done of applied) {
-        try {
-          await adjustStock(
-            done.id,
-            done.cartQuantity,
-            currentUser.name,
-            `Reversión de venta incompleta (ID Transacción: ${saleRef})`,
-          );
-        } catch (rollbackErr) {
-          console.error("No se pudo revertir el stock", rollbackErr);
-        }
-      }
+      await rollbackStock(`Reversión de venta incompleta (ID Transacción: ${saleRef})`);
       const outOfStock = (err as { message?: string })?.message?.includes(
         "INSUFFICIENT_STOCK",
       );
@@ -165,15 +163,24 @@ function AppContent() {
       throw err;
     }
 
-    await addTransaction(
-      cartItems,
-      subtotal,
-      taxAmount,
-      totalAmount,
-      payments ?? currentPayments,
-      currentUser.name,
-      transactionNotes,
-    );
+    // The sale record is the point of the whole operation: if it cannot be
+    // written or queued, put the stock back rather than leaving the shelf
+    // short with nothing in the books.
+    try {
+      await addTransaction(
+        cartItems,
+        subtotal,
+        taxAmount,
+        totalAmount,
+        payments ?? currentPayments,
+        currentUser.name,
+        transactionNotes,
+      );
+    } catch (err) {
+      await rollbackStock(`Reversión de venta no registrada (ID Transacción: ${saleRef})`);
+      toast.error("No se pudo registrar la venta. El inventario fue restaurado.");
+      throw err;
+    }
 
     toast.success("Pago exitoso. Inventario actualizado.");
   };

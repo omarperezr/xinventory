@@ -220,50 +220,67 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     userId: string,
     notes?: string,
   ) => {
-    try {
-      const { data: tx, error } = await supabase
-        .from("transactions")
-        .insert({
-          subtotal_usd: subtotal,
-          tax_usd: tax,
-          total_usd: total,
+    // Id and date are minted here, not by the server: the stock decrements
+    // queue offline, so the sale itself has to queue too or the shelf empties
+    // with no record of the money. A device-minted id also keeps the replay
+    // idempotent, and a device-minted date keeps a Saturday sale on Saturday.
+    const transactionId = crypto.randomUUID();
+    const row = {
+      id: transactionId,
+      date: new Date().toISOString(),
+      subtotal_usd: subtotal,
+      tax_usd: tax,
+      total_usd: total,
+      payments,
+      notes: notes || "",
+      user_id: userId,
+      images: [],
+      // Provenance: which bolivar rate the books used for this sale, so a
+      // later change to the honest rate cannot restate history.
+      honest_rate: honestRate,
+      honest_rate_key: honestRateKey,
+    };
+    const itemRows = items.map((item) => ({
+      id: crypto.randomUUID(),
+      transaction_id: transactionId,
+      item_id: item.id,
+      name: item.name,
+      price_usd: item.sellingPrice,
+      // Cost snapshotted at sale time. Reading the live buying price later
+      // reports 0 for deleted products (a false 100% margin) and silently
+      // restates past margins whenever a cost is edited.
+      buying_price_usd: item.buyingPrice ?? 0,
+      quantity: item.cartQuantity,
+      quantity_returned: 0,
+      discount_applied: item.applyDiscount,
+      discount_value: item.discount ?? 0,
+    }));
+
+    // No try/catch: a sale that could not be recorded must reach the caller so
+    // checkout stops short of "Pago exitoso" and keeps the cart for a retry.
+    const { queued } = await offlineStore.saveTransaction(row, itemRows);
+
+    if (queued) {
+      // Show it immediately - the replay is what makes it authoritative.
+      setTransactions((prev) => [
+        {
+          id: transactionId,
+          date: row.date,
+          subtotal,
+          tax,
+          total,
+          originalTotal: total,
           payments,
-          notes: notes || "",
-          user_id: userId,
           images: [],
-          // Provenance: which bolivar rate the books used for this sale, so a
-          // later change to the honest rate cannot restate history.
-          honest_rate: honestRate,
-          honest_rate_key: honestRateKey,
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
-
-      const rows = items.map((item) => ({
-        transaction_id: tx.id,
-        item_id: item.id,
-        name: item.name,
-        price_usd: item.sellingPrice,
-        // Cost snapshotted at sale time. Reading the live buying price later
-        // reports 0 for deleted products (a false 100% margin) and silently
-        // restates past margins whenever a cost is edited.
-        buying_price_usd: item.buyingPrice ?? 0,
-        quantity: item.cartQuantity,
-        quantity_returned: 0,
-        discount_applied: item.applyDiscount,
-        discount_value: item.discount ?? 0,
-      }));
-      const { error: itemsErr } = await supabase
-        .from("transaction_items")
-        .insert(rows);
-      if (itemsErr) throw itemsErr;
-
-      await refreshTransactions();
-    } catch (e) {
-      console.error("Error saving transaction", e);
-      toast.error("Error al guardar venta");
+          notes: row.notes,
+          userId,
+          items: items.map((i) => ({ ...i, quantityReturned: 0 })),
+        },
+        ...prev,
+      ]);
+      return;
     }
+    await refreshTransactions();
   };
 
   // Extends the loaded window by another page of older sales.

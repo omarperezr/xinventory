@@ -99,9 +99,54 @@ ANON_KEY=$(jq -r '.[] | select(.name=="anon") | .api_key' <<<"$KEYS_JSON")
 SERVICE_KEY=$(jq -r '.[] | select(.name=="service_role") | .api_key' <<<"$KEYS_JSON")
 SUPABASE_URL="https://$REF.supabase.co"
 
+# Secrets first, deploy second: everything below can fail, and the DB password
+# exists nowhere else. Losing it means the project is unreachable.
+ENVFILE=".env.$CLIENT"
+umask 077
+cat > "$ENVFILE" <<EOF
+VITE_SUPABASE_URL=$SUPABASE_URL
+VITE_SUPABASE_ANON_KEY=$ANON_KEY
+POSTGRESQL_DIRECT=postgresql://postgres:$DB_PASSWORD@db.$REF.supabase.co:5432/postgres
+SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY
+SUPABASE_NEW_CLIENT=$SUPABASE_ACCESS_TOKEN
+VERCEL_NEW_CLIENT=$VERCEL_TOKEN
+VITE_MODULE_FINANZAS=$FINANZAS
+VITE_MODULE_REPORTES=$REPORTES
+VITE_MODULE_REDES=$REDES
+MODULE_REDES=$REDES
+EOF
+chmod 600 "$ENVFILE"
+echo "Credenciales guardadas en $ENVFILE"
+
+# Public signup would let anyone with the anon key create their own account on
+# this client's instance. The app creates users through the admin-users edge
+# function, so signup is never needed.
+curl -s -X PATCH "https://api.supabase.com/v1/projects/$REF/config/auth" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"disable_signup":true}' >/dev/null \
+  || echo "AVISO: no se pudo desactivar el registro público; hazlo en Authentication > Providers."
+
 if [ -d supabase/migrations ] && [ -n "$(ls -A supabase/migrations 2>/dev/null)" ]; then
   echo "Aplicando migraciones..."
+  # A client only gets the schema for the modules they bought: an unpurchased
+  # module whose tables exist is reachable straight through PostgREST with the
+  # anon key, so build-time gating alone would not withhold it.
+  HELD_DIR=$(mktemp -d)
+  restore_migrations() {
+    if [ -d "$HELD_DIR" ]; then
+      find "$HELD_DIR" -name '*.sql' -exec mv {} supabase/migrations/ \; 2>/dev/null || true
+      rmdir "$HELD_DIR" 2>/dev/null || true
+    fi
+  }
+  trap restore_migrations EXIT
+  [ "$FINANZAS" = true ] || find supabase/migrations -name '*_finanzas.sql' -exec mv {} "$HELD_DIR"/ \;
+  [ "$REDES" = true ]    || find supabase/migrations -name '*_redes.sql'    -exec mv {} "$HELD_DIR"/ \;
+
   supabase db push --db-url "postgresql://postgres:$DB_PASSWORD@db.$REF.supabase.co:5432/postgres"
+
+  restore_migrations
+  trap - EXIT
 else
   echo "AVISO: no hay supabase/migrations — aplica el esquema a mano (supabase db pull en el proyecto base primero)."
 fi
@@ -138,10 +183,16 @@ else
     echo "       El usuario de Auth existe; repite el insert en profiles al aplicar el esquema."
   fi
 fi
+# Persist the generated password now - it is not recoverable from anywhere.
+cat >> "$ENVFILE" <<EOF
+ADMIN_EMAIL=$ADMIN_EMAIL
+ADMIN_PASSWORD=$ADMIN_PASSWORD
+EOF
 
 # ── Vercel ──────────────────────────────────────────────────────────────────
 PROJECT="xinventory-$CLIENT"
 CRON_SECRET=$(openssl rand -hex 32)
+echo "CRON_SECRET=$CRON_SECRET" >> "$ENVFILE"
 echo "Creando proyecto Vercel «${PROJECT}»..."
 vercel project add "$PROJECT" --token "$VERCEL_TOKEN" >/dev/null
 # Relinks this checkout to the client's project (.vercel/ is per-run, gitignored).
@@ -160,27 +211,6 @@ setenv MODULE_REDES "$REDES"
 
 echo "Desplegando..."
 URL=$(vercel deploy --prod --yes --token "$VERCEL_TOKEN")
-
-# Per-client snapshot with every secret of this instance. Contains the
-# service role key, the DB password and the account tokens — gitignored
-# (.env.*) and readable only by you.
-ENVFILE=".env.$CLIENT"
-cat > "$ENVFILE" <<EOF
-VITE_SUPABASE_URL=$SUPABASE_URL
-VITE_SUPABASE_ANON_KEY=$ANON_KEY
-POSTGRESQL_DIRECT=postgresql://postgres:$DB_PASSWORD@db.$REF.supabase.co:5432/postgres
-SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY
-CRON_SECRET=$CRON_SECRET
-SUPABASE_NEW_CLIENT=$SUPABASE_ACCESS_TOKEN
-VERCEL_NEW_CLIENT=$VERCEL_TOKEN
-VITE_MODULE_FINANZAS=$FINANZAS
-VITE_MODULE_REPORTES=$REPORTES
-VITE_MODULE_REDES=$REDES
-MODULE_REDES=$REDES
-ADMIN_EMAIL=$ADMIN_EMAIL
-ADMIN_PASSWORD=$ADMIN_PASSWORD
-EOF
-chmod 600 "$ENVFILE"
 
 echo
 echo "── Listo ──────────────────────────────────────────"

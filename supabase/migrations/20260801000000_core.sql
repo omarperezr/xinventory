@@ -30,12 +30,17 @@ language plpgsql security definer
 set search_path to 'public'
 as $$
 begin
+  -- The role is NEVER taken from raw_user_meta_data: that object is whatever
+  -- the signup request sent, so honouring it would let anyone with the anon
+  -- key register themselves as an admin. Every new profile starts as a seller;
+  -- promotion is an admin-only UPDATE (see admin-users edge function, and
+  -- scripts/new-client.sh for the first admin).
   insert into public.profiles (id, name, email, role)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
     new.email,
-    coalesce(new.raw_user_meta_data->>'role', 'seller')
+    'seller'
   )
   on conflict (id) do nothing;
   return new;
@@ -161,6 +166,17 @@ begin
     new.buying_price_usd  := old.buying_price_usd;
     new.selling_price_usd := old.selling_price_usd;
     new.discount          := old.discount;
+
+    -- Stock is RPC-only for sellers. The UPDATE policy has to stay open (the
+    -- stock RPCs run as the caller and PostgREST exposes the table anyway), so
+    -- without this a seller could PATCH /items {"quantity": 9999} straight
+    -- past increment_stock/decrement_stock, leaving no item_history row.
+    -- The RPCs announce themselves with a transaction-local flag; a direct
+    -- table write has no such flag and silently keeps the old quantity.
+    if new.quantity is distinct from old.quantity
+       and coalesce(current_setting('app.stock_rpc', true), '') <> 'on' then
+      new.quantity := old.quantity;
+    end if;
   end if;
   -- Server-owned timestamp: phone clocks drift, so never trust the client's.
   new.updated_at := now();
@@ -230,6 +246,10 @@ begin
     raise exception 'INVALID_QUANTITY';
   end if;
 
+  -- Tells guard_item_columns this quantity change came through the sanctioned
+  -- path. Transaction-local, so it cannot leak into a later request.
+  perform set_config('app.stock_rpc', 'on', true);
+
   update public.items
      set quantity = quantity + p_qty
    where id = p_item_id
@@ -252,6 +272,8 @@ begin
   if p_qty <= 0 then
     raise exception 'INVALID_QUANTITY';
   end if;
+
+  perform set_config('app.stock_rpc', 'on', true);
 
   update public.items
      set quantity = quantity - p_qty
@@ -560,6 +582,18 @@ create policy transaction_items_insert_authenticated on public.transaction_items
   for insert to authenticated with check (true);
 create policy transaction_items_update_authenticated on public.transaction_items
   for update to authenticated using (true) with check (true);
+
+-- ── function privileges ─────────────────────────────────────────────────────
+-- Postgres grants EXECUTE to PUBLIC on every new function, and these are
+-- SECURITY DEFINER, so without this block the anon key shipped in the browser
+-- bundle can move stock with no session at all - an ex-employee with a cached
+-- item id could keep zeroing the catalogue.
+revoke execute on function public.increment_stock(uuid, integer) from public, anon;
+revoke execute on function public.decrement_stock(uuid, integer) from public, anon;
+revoke execute on function public.return_transaction_item(uuid, uuid, integer) from public, anon;
+grant execute on function public.increment_stock(uuid, integer) to authenticated;
+grant execute on function public.decrement_stock(uuid, integer) to authenticated;
+grant execute on function public.return_transaction_item(uuid, uuid, integer) to authenticated;
 
 -- ── storage ─────────────────────────────────────────────────────────────────
 insert into storage.buckets (id, name, public)

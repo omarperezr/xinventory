@@ -44,6 +44,8 @@ const BUCKETS = ["product-images", "social-posts"] as const;
 const GRACE_MS = 48 * 60 * 60 * 1000; // see header: uploads precede row saves
 const LIST_PAGE = 1000;
 const REMOVE_CHUNK = 200;
+// Below PostgREST's default max-rows so a short page always means "last page".
+const ROW_PAGE = 500;
 
 function strArray(value: unknown): string[] {
   return Array.isArray(value)
@@ -55,21 +57,45 @@ function strArray(value: unknown): string[] {
 // referenced paths
 // ---------------------------------------------------------------------------
 
+/**
+ * Reads every `images` array from a table, one page at a time.
+ *
+ * PostgREST caps an unbounded select at its max-rows setting (1000 by
+ * default) and reports no error when it truncates. Reading the table in one
+ * shot therefore hides the images of every row past the cap, and this
+ * function's callers treat anything unseen as an orphan to delete — that is
+ * live product photos, gone, for any shop with more than 1000 products.
+ */
+async function allImageUrls(db: SupabaseClient, table: string) {
+  const urls: string[] = [];
+  for (let from = 0; ; from += ROW_PAGE) {
+    const { data, error } = await db
+      .from(table)
+      .select("images")
+      .range(from, from + ROW_PAGE - 1);
+    if (error) throw new Error(`No se pudo leer ${table}`);
+    const rows = data ?? [];
+    for (const row of rows) urls.push(...strArray(row.images));
+    if (rows.length < ROW_PAGE) return urls;
+  }
+}
+
 /** Every storage path (per bucket) that some database row still points at. */
 async function referencedPaths(
   db: SupabaseClient,
 ): Promise<Map<string, Set<string>>> {
-  const [itemsRes, postsRes, configRes] = await Promise.all([
-    db.from("items").select("images"),
-    db.from("social_posts").select("images"),
+  const [itemUrls, postUrls, configRes] = await Promise.all([
+    allImageUrls(db, "items"),
+    allImageUrls(db, "social_posts"),
     db.from("social_config").select("logo_url").maybeSingle(),
   ]);
-  if (itemsRes.error) throw new Error("No se pudo leer el inventario");
-  if (postsRes.error) throw new Error("No se pudieron leer las publicaciones");
+  // Same reasoning as the pages above: a read that failed is not evidence
+  // that nothing references the logo.
+  if (configRes.error) throw new Error("No se pudo leer la configuración");
 
   const urls = [
-    ...(itemsRes.data ?? []).flatMap((r) => strArray(r.images)),
-    ...(postsRes.data ?? []).flatMap((r) => strArray(r.images)),
+    ...itemUrls,
+    ...postUrls,
     (configRes.data as { logo_url?: string } | null)?.logo_url ?? "",
   ];
 

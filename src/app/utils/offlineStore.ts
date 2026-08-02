@@ -277,6 +277,37 @@ export interface HistoryRow {
   reason?: string;
 }
 
+/** The `transactions` row as written at sale time. */
+export interface TransactionInsertRow {
+  id: string;
+  date: string;
+  subtotal_usd: number;
+  tax_usd: number;
+  total_usd: number;
+  payments: unknown[];
+  notes: string;
+  user_id: string;
+  images: string[];
+  honest_rate: number;
+  honest_rate_key: string;
+}
+
+/** A `transaction_items` row as written at sale time. */
+export interface TransactionItemInsertRow {
+  // Minted on the device so both writes are upserts: a replay that resumes
+  // after the header landed cannot duplicate the lines.
+  id: string;
+  transaction_id: string;
+  item_id: string;
+  name: string;
+  price_usd: number;
+  quantity: number;
+  quantity_returned: number;
+  discount_applied: boolean;
+  discount_value: number;
+  buying_price_usd: number;
+}
+
 type OutboxOp =
   | { kind: "item.create"; row: ItemRow; historyRow: HistoryRow }
   | { kind: "item.update"; id: string; row: Partial<ItemRow>; historyRow?: HistoryRow }
@@ -297,6 +328,15 @@ type OutboxOp =
       transactionId: string;
       itemId: string;
       qty: number;
+    }
+  // A sale is the one write that must never be lost: the stock deltas above
+  // queue happily, so an unqueued sale row means stock left the shelf with no
+  // record of the money. The id and date are minted on the device, so a replay
+  // cannot duplicate the row and a Saturday sale keeps its Saturday timestamp.
+  | {
+      kind: "transaction.create";
+      row: TransactionInsertRow;
+      itemRows: TransactionItemInsertRow[];
     }
   // Recording an expense is exactly the operation most likely to happen away
   // from a signal - at a pump, in a supplier's warehouse - so ledger writes
@@ -720,6 +760,40 @@ export async function deleteFinanceEntry(
 }
 
 // ---------------------------------------------------------------------------
+// Sales
+// ---------------------------------------------------------------------------
+
+/**
+ * Writes a sale (header + lines) or queues it. Both writes are upserts keyed
+ * on device-minted ids, so a retry after a partial write completes the sale
+ * instead of duplicating it.
+ */
+async function writeTransaction(
+  row: TransactionInsertRow,
+  itemRows: TransactionItemInsertRow[],
+): Promise<{ error: unknown }> {
+  const header = await supabase.from("transactions").upsert(row);
+  if (header.error) return { error: header.error };
+  const lines = await supabase.from("transaction_items").upsert(itemRows);
+  return { error: lines.error };
+}
+
+export async function saveTransaction(
+  row: TransactionInsertRow,
+  itemRows: TransactionItemInsertRow[],
+): Promise<{ queued: boolean }> {
+  if (isOnline()) {
+    const { error } = await writeTransaction(row, itemRows);
+    if (!error) return { queued: false };
+    // A rejection the server actively returned is a bug in the payload, not a
+    // connectivity problem: surface it instead of queueing it forever.
+    if (!isNetworkError(error)) throw error;
+  }
+  await enqueue({ kind: "transaction.create", row, itemRows });
+  return { queued: true };
+}
+
+// ---------------------------------------------------------------------------
 // Purchases
 // ---------------------------------------------------------------------------
 
@@ -813,9 +887,13 @@ export async function flushOutbox(): Promise<void> {
 }
 
 async function drainOutbox(): Promise<void> {
-  let ops = await getOutbox();
-
-  while (ops.length > 0) {
+  // The queue is re-read every round and re-read again before the head is
+  // dropped. Holding one in-memory copy across an await loses every op the
+  // user enqueues while a replay is in flight: the write-back would persist a
+  // slice taken before those ops existed.
+  for (;;) {
+    const ops = await getOutbox();
+    if (ops.length === 0) return;
     const op = ops[0];
     let error: unknown = null;
 
@@ -868,6 +946,11 @@ async function drainOutbox(): Promise<void> {
           error = res.error;
           break;
         }
+        case "transaction.create": {
+          const res = await writeTransaction(op.row, op.itemRows);
+          error = res.error;
+          break;
+        }
         case "finance.entry.create": {
           const res = await supabase.from("finance_entries").insert(op.row);
           error = res.error;
@@ -910,9 +993,10 @@ async function drainOutbox(): Promise<void> {
       error = e;
     }
 
-    if (error && isNetworkError(error)) break; // retry later
-    // success, or a real rejection we just drop
-    ops = ops.slice(1);
-    await setOutbox(ops);
+    if (error && isNetworkError(error)) return; // retry later
+    // Success, or a real rejection we just drop. Re-read first: ops enqueued
+    // while this one was in flight must survive.
+    const current = await getOutbox();
+    await setOutbox(current.slice(1));
   }
 }
