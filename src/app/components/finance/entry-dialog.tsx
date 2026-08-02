@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { MoneyInput } from "../money-input";
+import { isReferenceLens, useApp } from "../../context/app-context";
 import {
   EntryInput,
   EntryKind,
@@ -65,6 +66,13 @@ export function EntryDialog({
     updateEntry,
   } = useFinance();
   const { currentUser } = useAuth();
+  const { currency } = useApp();
+  // Finance balances render through the display lens, so under a reference
+  // rate (BCV/EUR) the user would read a lens figure and retype it here to
+  // "match" it - and it would book at the honest rate as a different USD
+  // value. Recording is blocked, same rule as the Pagar button in total-view.
+  // The MoneyInput disables itself and shows the note; this gates the save.
+  const referenceLens = isReferenceLens(currency);
 
   const [kind, setKind] = useState<EntryKind>(defaultKind);
   const [amountUsd, setAmountUsd] = useState(0);
@@ -127,6 +135,12 @@ export function EntryDialog({
 
   const handleSave = async () => {
     if (!currentUser) return;
+    if (referenceLens) {
+      toast.error(
+        "Estás viendo una tasa de referencia. Cambia a USD o Bs para registrar movimientos.",
+      );
+      return;
+    }
     if (amountUsd <= 0) {
       toast.error("El monto debe ser mayor que cero");
       return;
@@ -158,6 +172,12 @@ export function EntryDialog({
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
+      // Carried from the prefill when this posting settles a recurring
+      // occurrence. Without the pair the row is not keyed to the occurrence,
+      // so it still reads as unposted and the same bill gets booked twice -
+      // and the unique index cannot catch the second one either.
+      recurringId: prefill?.recurringId ?? null,
+      periodKey: prefill?.periodKey ?? null,
     };
 
     setSaving(true);
@@ -426,7 +446,7 @@ export function EntryDialog({
             </Button>
             <Button
               className="flex-1"
-              disabled={!canSave || saving}
+              disabled={!canSave || saving || referenceLens}
               onClick={handleSave}
             >
               {entry ? "Guardar cambios" : "Registrar"}

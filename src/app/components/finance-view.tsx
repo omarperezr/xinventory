@@ -147,6 +147,7 @@ export function FinanceView() {
         items,
         range,
         honestRate,
+        balances: finance.balances,
       }),
     [
       finance.entries,
@@ -162,6 +163,7 @@ export function FinanceView() {
       items,
       range,
       honestRate,
+      finance.balances,
     ],
   );
 
@@ -320,6 +322,16 @@ export function FinanceView() {
             <Info className="w-3.5 h-3.5 flex-shrink-0" />
             Sin conexión: se muestra la última copia guardada en este dispositivo.
             Lo que registres se enviará al reconectar.
+          </div>
+        )}
+
+        {/* Without the server totals the balances only cover the loaded window,
+            which understates every pot. Say it rather than show a wrong saldo. */}
+        {!finance.loading && !finance.balances && (
+          <div className="flex items-center gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+            Saldos parciales: no se pudo consultar el acumulado en el servidor,
+            así que solo se suman los movimientos y ventas cargados aquí.
           </div>
         )}
 

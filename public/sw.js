@@ -16,8 +16,43 @@
 const VERSION = new URL(self.location.href).searchParams.get("v") || "dev";
 const CACHE = `xinventory-${VERSION}`;
 
-self.addEventListener("install", () => {
+// A freshly activated worker starts with an EMPTY cache: on a first visit the
+// page fetched its own assets before this worker controlled anything, and on a
+// deploy activate below deletes the previous build's cache. An SPA makes no
+// further navigations, so nothing repopulates it until the next cold load: the
+// seller closes the app, goes offline, reopens, and gets a blank screen. For a
+// POS that is the whole product failing, so the shell is fetched here instead.
+//
+// The asset filenames are hashed per build and these are per-client builds with
+// no manifest to read, so they are taken from the HTML itself: entry script,
+// modulepreloads, stylesheet, icons. Lazy route chunks are not listed there and
+// still load on first visit while online.
+async function precacheShell() {
+  const cache = await caches.open(CACHE);
+  // `reload` so the HTTP cache cannot hand back the previous build's HTML.
+  const res = await fetch("/", { cache: "reload" });
+  // Throwing fails the install, which is the safe outcome: the previous worker
+  // stays in control with its populated cache instead of this empty one
+  // activating, and the browser retries the update on the next load.
+  if (!res.ok) throw new Error(`shell ${res.status}`);
+  const html = await res.clone().text();
+  await cache.put("/", res);
+
+  const urls = [...html.matchAll(/(?:src|href)="(\/[^"]*)"/g)].map((m) => m[1]);
+  // One by one: a single missing file must not fail the install, or the app
+  // never updates again.
+  await Promise.all(
+    urls.map((u) =>
+      fetch(u)
+        .then((r) => (r.ok ? cache.put(u, r) : null))
+        .catch(() => {}),
+    ),
+  );
+}
+
+self.addEventListener("install", (event) => {
   self.skipWaiting();
+  event.waitUntil(precacheShell());
 });
 
 self.addEventListener("activate", (event) => {
@@ -52,8 +87,13 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(req, copy));
+          // Only a good response replaces the cached shell. A 500 or an error
+          // page from a deploy hiccup would otherwise become what every later
+          // offline launch serves.
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(req, copy));
+          }
           return res;
         })
         .catch(async () => {

@@ -5,8 +5,13 @@
 // Two callers:
 //   * Vercel Cron (daily, see vercel.json): GET with the CRON_SECRET bearer.
 //     Runs only when `now - last_generated_at >= cadence_days`.
-//   * The «Generar ahora» button: POST with the admin's Supabase JWT. Always
-//     runs. The JWT is verified and the profile role must be 'admin'.
+//   * The «Generar ahora» button: POST with the admin's Supabase JWT. Runs
+//     unless another run is still in flight. The JWT is verified and the
+//     profile role must be 'admin'.
+//
+// Either caller claims the turn on social_config (last_generated_at) before
+// generating anything, so only one batch is ever in flight and a killed run
+// has spent its turn instead of re-generating the same days every night.
 //
 // What a run does:
 //   1. Deletes confirmed posts whose week already ended (and their images in
@@ -43,6 +48,16 @@ interface Res {
 
 const BUCKET = "social-posts";
 const CARACAS_OFFSET_MS = 4 * 60 * 60 * 1000; // UTC-4, no DST
+// Wall-clock budget for one invocation, under maxDuration so the network calls
+// are cut off while there is still time to write the posts they produced.
+const RUN_BUDGET_MS = 45000;
+// Slack on the cadence: a run started at 11:00:05 and the next cron fires at
+// 11:00:0x, so an exact comparison lands just short and pushes the batch a day
+// later every cycle. Consecutive fires are 24 h apart — an hour cannot double.
+const DUE_SLACK_MS = 60 * 60 * 1000;
+// A claim younger than this may still be generating (maxDuration is 60 s), so
+// it keeps the turn: no second run picks the same items.
+const LEASE_MS = 90000;
 
 // ---------------------------------------------------------------------------
 // small helpers
@@ -63,6 +78,16 @@ function bytesToB64(bytes: Uint8Array): string {
   }
   return btoa(bin);
 }
+
+/** fetch bounded by what is left of the run's budget. An AI call that would
+ *  outlive the function is aborted and the item degrades to templates, instead
+ *  of the runtime killing the run with part of the batch already inserted. */
+let runDeadline = Date.now() + RUN_BUDGET_MS;
+const budgetFetch: typeof fetch = (input, init) =>
+  fetch(input, {
+    ...init,
+    signal: AbortSignal.timeout(Math.max(1000, runDeadline - Date.now())),
+  });
 
 function str(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
@@ -157,11 +182,16 @@ interface Photo {
 // fallback templates (provider 'none' or any AI failure)
 // ---------------------------------------------------------------------------
 
+/** First case-insensitive occurrence of `part` cut out of `name`. Plain
+ *  string matching on purpose: inventory text is not a pattern, and a brand
+ *  like "C++" would make `new RegExp` throw. */
+function stripPart(name: string, part: string): string {
+  const at = name.toLowerCase().indexOf(part.toLowerCase());
+  return at < 0 ? name : name.slice(0, at) + name.slice(at + part.length);
+}
+
 function fallbackTexts(item: ItemRow, businessName: string): GeneratedTexts {
-  const rest = item.name
-    .replace(new RegExp(item.brand, "i"), "")
-    .replace(new RegExp(item.type, "i"), "")
-    .trim();
+  const rest = stripPart(stripPart(item.name, item.brand), item.type).trim();
   return {
     design: {
       t1: item.type === "N/A" ? "DISPONIBLE" : item.type,
@@ -289,7 +319,7 @@ async function geminiTexts(
       inline_data: { mime_type: photo.mime, data: bytesToB64(photo.bytes) },
     });
   }
-  const res = await fetch(
+  const res = await budgetFetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
       method: "POST",
@@ -321,7 +351,7 @@ async function openaiTexts(
       },
     });
   }
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await budgetFetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -357,7 +387,7 @@ async function anthropicTexts(
     });
   }
   content.push({ type: "text", text: prompt });
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await budgetFetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -418,7 +448,7 @@ async function geminiEnhance(
   apiKey: string,
   extra: string,
 ): Promise<Uint8Array | null> {
-  const res = await fetch(
+  const res = await budgetFetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
     {
       method: "POST",
@@ -463,7 +493,7 @@ async function openaiEnhance(
     new Blob([buffer], { type: mime }),
     mime.includes("png") ? "photo.png" : "photo.jpg",
   );
-  const res = await fetch("https://api.openai.com/v1/images/edits", {
+  const res = await budgetFetch("https://api.openai.com/v1/images/edits", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
@@ -476,7 +506,7 @@ async function openaiEnhance(
 
 async function fetchPhoto(url: string): Promise<Photo | null> {
   try {
-    const res = await fetch(url);
+    const res = await budgetFetch(url);
     if (!res.ok) return null;
     return {
       bytes: new Uint8Array(await res.arrayBuffer()),
@@ -569,6 +599,7 @@ function header(req: Req, name: string): string {
 }
 
 export default async function handler(req: Req, res: Res) {
+  runDeadline = Date.now() + RUN_BUDGET_MS;
   // Module gate (server half of src/app/modules.ts): instances that did not
   // buy Redes run without MODULE_REDES, so this endpoint — and the daily
   // cron that calls it — is a 404 for them. Fail closed: unset = disabled.
@@ -630,15 +661,25 @@ export default async function handler(req: Req, res: Res) {
     platforms: ["instagram", "facebook"],
     last_generated_at: null,
   };
+  // The migration ships the default row; an instance missing it would have
+  // nothing for the claim below to lock on.
+  if (!configData) await db.from("social_config").insert({ id: true });
 
   const cleaned = await cleanupFinishedWeeks(db);
 
-  if (isCron && config.last_generated_at) {
-    const elapsed = Date.now() - new Date(config.last_generated_at).getTime();
-    if (elapsed < config.cadence_days * 86400000) {
-      res.status(200).json({ generated: 0, cleaned, skipped: "no toca aún" });
-      return;
-    }
+  // How old the last claim must be for this caller to take the turn: a cadence
+  // for the cron (minus slack — see DUE_SLACK_MS), the lease for «Generar
+  // ahora», which may always run but never on top of a run still in flight.
+  const idleFor = isCron
+    ? config.cadence_days * 86400000 - DUE_SLACK_MS
+    : LEASE_MS;
+  const skipped = isCron ? "no toca aún" : "ya hay una generación en curso";
+  if (
+    config.last_generated_at &&
+    Date.now() - new Date(config.last_generated_at).getTime() < idleFor
+  ) {
+    res.status(200).json({ generated: 0, cleaned, skipped });
+    return;
   }
 
   // --- pick items to promote ---
@@ -675,11 +716,41 @@ export default async function handler(req: Req, res: Res) {
       return b.quantity - a.quantity; // then more stock first
     })
     .slice(0, config.posts_per_batch);
+  if (candidates.length === 0) {
+    res.status(200).json({ generated: 0, cleaned });
+    return;
+  }
+
+  // --- claim the turn ---
+  // The config row is the lock, and this update is the only atomic step: the
+  // candidates above were read before anyone's inserts landed, so a cron run
+  // and «Generar ahora» (or two admin tabs) inside the same window would pick
+  // the same items and post them twice. The loser bails here, before spending
+  // anything. Stamping last_generated_at now, not after the batch, is also
+  // what keeps the cadence from drifting a day per cycle and what stops a run
+  // the runtime kills from re-generating the same days every night.
+  const claim = await db
+    .from("social_config")
+    .update({ last_generated_at: new Date().toISOString() })
+    .eq("id", true)
+    .or(
+      `last_generated_at.is.null,last_generated_at.lt."${new Date(
+        Date.now() - idleFor,
+      ).toISOString()}"`,
+    )
+    .select("id");
+  if (!claim.data || claim.data.length === 0) {
+    res.status(200).json({ generated: 0, cleaned, skipped });
+    return;
+  }
 
   // --- generate, in parallel; each item degrades independently ---
   const platforms =
     config.platforms.length > 0 ? config.platforms : ["instagram", "facebook"];
-  const results = await Promise.all(
+  // allSettled, not all: one item throwing must cost its own post, not the
+  // whole run — the turn is already claimed, so a rejected batch would burn a
+  // cadence for the items that did work.
+  const results = await Promise.allSettled(
     candidates.map(async (item, i) => {
       const postId = crypto.randomUUID();
       const originals = item.images.slice(0, 4);
@@ -720,11 +791,8 @@ export default async function handler(req: Req, res: Res) {
     }),
   );
 
-  const generated = results.filter(Boolean).length;
-  if (generated > 0) {
-    await db
-      .from("social_config")
-      .upsert({ id: true, last_generated_at: new Date().toISOString() });
-  }
+  const generated = results.filter(
+    (r) => r.status === "fulfilled" && r.value,
+  ).length;
   res.status(200).json({ generated, cleaned });
 }

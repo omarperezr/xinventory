@@ -39,16 +39,15 @@ export async function idbGet<T>(key: string): Promise<T | undefined> {
   }
 }
 
+// Rejects when the write did not land (quota exceeded, Safari private mode,
+// no IndexedDB at all). Callers decide what that costs them: losing a cache
+// refresh is free, losing a queued write is not.
 export async function idbSet(key: string, value: unknown): Promise<void> {
-  try {
-    const db = await openDB();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put(value, key);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  } catch {
-    // Storage unavailable (e.g. private mode): fail silently.
-  }
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 }

@@ -526,8 +526,8 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
                   key: "value",
                   header: "Valor",
                   align: "right",
-                  render: (p: ProductStat) => money(p.returnedUnits * p.avgPrice),
-                  sortValue: (p: ProductStat) => p.returnedUnits * p.avgPrice,
+                  render: (p: ProductStat) => money(p.returnedValue),
+                  sortValue: (p: ProductStat) => p.returnedValue,
                 },
               ]}
               rows={withReturns}

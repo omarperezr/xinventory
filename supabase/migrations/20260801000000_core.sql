@@ -30,12 +30,17 @@ language plpgsql security definer
 set search_path to 'public'
 as $$
 begin
+  -- The role is NEVER taken from raw_user_meta_data: that object is whatever
+  -- the signup request sent, so honouring it would let anyone with the anon
+  -- key register themselves as an admin. Every new profile starts as a seller;
+  -- promotion is an admin-only UPDATE (see admin-users edge function, and
+  -- scripts/new-client.sh for the first admin).
   insert into public.profiles (id, name, email, role)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
     new.email,
-    coalesce(new.raw_user_meta_data->>'role', 'seller')
+    'seller'
   )
   on conflict (id) do nothing;
   return new;
@@ -161,6 +166,17 @@ begin
     new.buying_price_usd  := old.buying_price_usd;
     new.selling_price_usd := old.selling_price_usd;
     new.discount          := old.discount;
+
+    -- Stock is RPC-only for sellers. The UPDATE policy has to stay open (the
+    -- stock RPCs run as the caller and PostgREST exposes the table anyway), so
+    -- without this a seller could PATCH /items {"quantity": 9999} straight
+    -- past increment_stock/decrement_stock, leaving no item_history row.
+    -- The RPCs announce themselves with a transaction-local flag; a direct
+    -- table write has no such flag and silently keeps the old quantity.
+    if new.quantity is distinct from old.quantity
+       and coalesce(current_setting('app.stock_rpc', true), '') <> 'on' then
+      new.quantity := old.quantity;
+    end if;
   end if;
   -- Server-owned timestamp: phone clocks drift, so never trust the client's.
   new.updated_at := now();
@@ -196,6 +212,66 @@ create trigger trg_guard_transaction_columns
   before update on public.transactions
   for each row execute function public.guard_transaction_columns();
 
+-- The recorded seller is server-derived. user_id arrives as free text (the
+-- app sends the seller's display name), so an open insert let one seller post
+-- a sale attributed to a colleague - and guard_transaction_columns above then
+-- froze the forgery against correction. The column still holds the name, so
+-- existing rows and the reports that group by it are unaffected; it is just
+-- no longer the client's word for it.
+create or replace function public.set_transaction_seller()
+returns trigger
+language plpgsql security definer
+set search_path to 'public'
+as $$
+declare caller_name text;
+begin
+  select name into caller_name from public.profiles where id = auth.uid();
+  -- No profile means no user JWT (service-role tooling): keep the payload.
+  if caller_name is not null then
+    new.user_id := caller_name;
+  end if;
+  return new;
+end
+$$;
+
+drop trigger if exists trg_set_transaction_seller on public.transactions;
+create trigger trg_set_transaction_seller
+  before insert on public.transactions
+  for each row execute function public.set_transaction_seller();
+
+-- Audit rows sign themselves with the caller's profile name. With the open
+-- insert policy a seller could manipulate stock and then insert an 'adjust'
+-- row signed 'admin', so the only audit trail the app has corroborated the
+-- theft. Sanctioned RPCs announce themselves with the stock flag and keep
+-- their own attribution ('sistema' on recreated products). Offline replays
+-- run under the session that queued them (see offlineStore), so signing by
+-- session stays correct for rows that land hours late.
+-- ponytail: previous_stock/new_stock/action stay client-asserted - re-deriving
+-- them here from items.quantity would record numbers a late replay never saw.
+-- A seller can still mis-state a count, but now only under their own name.
+create or replace function public.sign_item_history()
+returns trigger
+language plpgsql security definer
+set search_path to 'public'
+as $$
+declare caller_name text;
+begin
+  if coalesce(current_setting('app.stock_rpc', true), '') = 'on' then
+    return new;
+  end if;
+  select name into caller_name from public.profiles where id = auth.uid();
+  if caller_name is not null then
+    new.user_name := caller_name;
+  end if;
+  return new;
+end
+$$;
+
+drop trigger if exists trg_sign_item_history on public.item_history;
+create trigger trg_sign_item_history
+  before insert on public.item_history
+  for each row execute function public.sign_item_history();
+
 create or replace function public.guard_transaction_item_price()
 returns trigger
 language plpgsql security definer
@@ -207,6 +283,20 @@ begin
   end if;
   if new.buying_price_usd is distinct from old.buying_price_usd
      and not public.is_admin() then
+    raise exception 'NOT_AUTHORIZED';
+  end if;
+  -- A sale line's shape is fixed once it is sold: returns go through
+  -- return_transaction_item (which restocks and leaves a history row) and
+  -- announce themselves with the same transaction-local flag the stock RPCs
+  -- use. Without this a seller could PATCH quantity_returned = quantity and
+  -- make their own sale disappear from every report, cash included, with no
+  -- stock returned and nothing in the audit trail.
+  if not public.is_admin()
+     and coalesce(current_setting('app.stock_rpc', true), '') <> 'on'
+     and (new.quantity         is distinct from old.quantity
+       or new.quantity_returned is distinct from old.quantity_returned
+       or new.discount_applied  is distinct from old.discount_applied
+       or new.discount_value    is distinct from old.discount_value) then
     raise exception 'NOT_AUTHORIZED';
   end if;
   return new;
@@ -230,6 +320,10 @@ begin
     raise exception 'INVALID_QUANTITY';
   end if;
 
+  -- Tells guard_item_columns this quantity change came through the sanctioned
+  -- path. Transaction-local, so it cannot leak into a later request.
+  perform set_config('app.stock_rpc', 'on', true);
+
   update public.items
      set quantity = quantity + p_qty
    where id = p_item_id
@@ -252,6 +346,8 @@ begin
   if p_qty <= 0 then
     raise exception 'INVALID_QUANTITY';
   end if;
+
+  perform set_config('app.stock_rpc', 'on', true);
 
   update public.items
      set quantity = quantity - p_qty
@@ -281,6 +377,10 @@ begin
   if p_qty <= 0 then
     raise exception 'INVALID_QUANTITY';
   end if;
+
+  -- Sanctioned path for both the line update below and the restock further
+  -- down; see guard_transaction_item_price and guard_item_columns.
+  perform set_config('app.stock_rpc', 'on', true);
 
   -- Bound the return to what was actually sold and not already returned.
   update public.transaction_items
@@ -354,14 +454,26 @@ end
 $$;
 
 -- ── report aggregate (used by Reportes, harmless without it) ───────────────
-create or replace function public.report_summary(p_from timestamptz default null, p_to timestamptz default null)
+-- Dropped, not replaced: the body moved from SQL to plpgsql so it can refuse
+-- non-admins outright, and OR REPLACE cannot be trusted across languages.
+drop function if exists public.report_summary(timestamptz, timestamptz);
+create function public.report_summary(p_from timestamptz default null, p_to timestamptz default null)
 returns jsonb
-language sql stable
+language plpgsql stable
 set search_path to 'public'
 as $$
-with
--- Sales in range. RLS still applies because this is SECURITY INVOKER: the
--- caller only aggregates rows they are already allowed to read.
+declare result jsonb;
+begin
+  -- The Reportes tab hides itself from sellers, but the RPC stays callable
+  -- from devtools with the anon key, and it aggregates company revenue, cost,
+  -- profit, margin and every colleague's totals. The split has to live here.
+  if not public.is_admin() then
+    raise exception 'NOT_AUTHORIZED';
+  end if;
+
+  with
+-- Sales in range. SECURITY INVOKER, so RLS still applies on top of the admin
+-- check above: the caller only aggregates rows they can already read.
 tx as (
   select t.id, t.date, t.user_id, t.payments,
          coalesce(t.subtotal_usd, 0) as subtotal_usd,
@@ -496,7 +608,10 @@ select jsonb_build_object(
       'total', round(total::numeric, 2)
     ) order by day_key) from daily
   ), '[]'::jsonb)
-);
+) into result;
+
+  return result;
+end
 $$;
 
 -- ── indexes ─────────────────────────────────────────────────────────────────
@@ -519,60 +634,126 @@ alter table public.settings enable row level security;
 alter table public.transactions enable row level security;
 alter table public.transaction_items enable row level security;
 
+-- Policies drop-then-create so re-running this file on an already-provisioned
+-- instance converges instead of failing on the first duplicate.
+drop policy if exists profiles_select_own_or_admin on public.profiles;
 create policy profiles_select_own_or_admin on public.profiles
   for select to authenticated using ((id = auth.uid()) or is_admin());
+drop policy if exists profiles_update_own_name on public.profiles;
 create policy profiles_update_own_name on public.profiles
   for update to authenticated
   using (id = auth.uid())
   with check ((id = auth.uid()) and ((role = 'admin') = is_admin()));
 
+-- Open to sellers on purpose: the catalogue they ring up from needs name,
+-- selling price, stock and images.
+-- ponytail: buying_price_usd rides along - the app fetches items with
+-- select(*) and admins and sellers share the one `authenticated` role, so no
+-- grant or RLS clause can mask a single column per profile role. Closing it
+-- needs the cost moved to an admin-only relation plus the matching client
+-- change in offlineStore/app-context.
+drop policy if exists items_select_authenticated on public.items;
 create policy items_select_authenticated on public.items
   for select to authenticated using (true);
+drop policy if exists items_insert_admin on public.items;
 create policy items_insert_admin on public.items
   for insert to authenticated with check (is_admin());
+drop policy if exists items_update_authenticated on public.items;
 create policy items_update_authenticated on public.items
   for update to authenticated using (true) with check (true);
+drop policy if exists items_delete_admin on public.items;
 create policy items_delete_admin on public.items
   for delete to authenticated using (is_admin());
 
+drop policy if exists item_history_select_authenticated on public.item_history;
 create policy item_history_select_authenticated on public.item_history
   for select to authenticated using (true);
+drop policy if exists item_history_insert_authenticated on public.item_history;
 create policy item_history_insert_authenticated on public.item_history
   for insert to authenticated with check (true);
 
+drop policy if exists settings_select_authenticated on public.settings;
 create policy settings_select_authenticated on public.settings
   for select to authenticated using (true);
+drop policy if exists settings_upsert_admin on public.settings;
 create policy settings_upsert_admin on public.settings
   for insert to authenticated with check (is_admin());
+drop policy if exists settings_update_admin on public.settings;
 create policy settings_update_admin on public.settings
   for update to authenticated using (is_admin()) with check (is_admin());
 
+-- Sellers read only their own sales. The history screen already filtered to
+-- the signed-in seller; an open SELECT still let any seller total the shop's
+-- (and each colleague's) takings from devtools. user_id holds the seller's
+-- display name (legacy schema), stamped server-side by set_transaction_seller.
+-- ponytail: name-keyed, so renaming a user hides their older sales from them
+-- (admins still see everything); keying by uuid needs a backfill and a client
+-- change.
+drop policy if exists transactions_select_authenticated on public.transactions;
 create policy transactions_select_authenticated on public.transactions
-  for select to authenticated using (true);
+  for select to authenticated
+  using (
+    is_admin()
+    or user_id = (select name from public.profiles where id = auth.uid())
+  );
+drop policy if exists transactions_insert_authenticated on public.transactions;
 create policy transactions_insert_authenticated on public.transactions
   for insert to authenticated with check (true);
+drop policy if exists transactions_update_authenticated on public.transactions;
 create policy transactions_update_authenticated on public.transactions
   for update to authenticated using (true) with check (true);
 
+-- Sale lines carry the cost snapshot; visibility rides on the parent sale's
+-- policy above (the subquery runs as the caller, so its RLS applies).
+drop policy if exists transaction_items_select_authenticated on public.transaction_items;
 create policy transaction_items_select_authenticated on public.transaction_items
-  for select to authenticated using (true);
+  for select to authenticated
+  using (exists (
+    select 1 from public.transactions t where t.id = transaction_id
+  ));
+drop policy if exists transaction_items_insert_authenticated on public.transaction_items;
 create policy transaction_items_insert_authenticated on public.transaction_items
   for insert to authenticated with check (true);
+drop policy if exists transaction_items_update_authenticated on public.transaction_items;
 create policy transaction_items_update_authenticated on public.transaction_items
   for update to authenticated using (true) with check (true);
+
+-- ── function privileges ─────────────────────────────────────────────────────
+-- Postgres grants EXECUTE to PUBLIC on every new function, and these are
+-- SECURITY DEFINER, so without this block the anon key shipped in the browser
+-- bundle can move stock with no session at all - an ex-employee with a cached
+-- item id could keep zeroing the catalogue.
+revoke execute on function public.increment_stock(uuid, integer) from public, anon;
+revoke execute on function public.decrement_stock(uuid, integer) from public, anon;
+revoke execute on function public.return_transaction_item(uuid, uuid, integer) from public, anon;
+grant execute on function public.increment_stock(uuid, integer) to authenticated;
+grant execute on function public.decrement_stock(uuid, integer) to authenticated;
+grant execute on function public.return_transaction_item(uuid, uuid, integer) to authenticated;
+-- report_summary refuses non-admins itself; the revoke keeps the anon key
+-- from reaching it at all.
+revoke execute on function public.report_summary(timestamptz, timestamptz) from public, anon;
+grant execute on function public.report_summary(timestamptz, timestamptz) to authenticated;
 
 -- ── storage ─────────────────────────────────────────────────────────────────
 insert into storage.buckets (id, name, public)
 values ('product-images', 'product-images', true)
 on conflict (id) do nothing;
 
+drop policy if exists product_images_auth_write on storage.objects;
 create policy product_images_auth_write on storage.objects
   for insert to authenticated with check (bucket_id = 'product-images');
+-- Uploads are immutable, uuid-named blobs: nothing in the app ever updates
+-- or deletes them, so mutating the public photo library is admin-only. The
+-- old open policies let any seller overwrite or wipe every product photo.
+drop policy if exists product_images_auth_update on storage.objects;
 create policy product_images_auth_update on storage.objects
   for update to authenticated
-  using (bucket_id = 'product-images') with check (bucket_id = 'product-images');
+  using (bucket_id = 'product-images' and public.is_admin())
+  with check (bucket_id = 'product-images' and public.is_admin());
+drop policy if exists product_images_auth_delete on storage.objects;
 create policy product_images_auth_delete on storage.objects
-  for delete to authenticated using (bucket_id = 'product-images');
+  for delete to authenticated
+  using (bucket_id = 'product-images' and public.is_admin());
 
 -- ── seed ────────────────────────────────────────────────────────────────────
 -- Starting exchange rates; the app refreshes them from its own sources.

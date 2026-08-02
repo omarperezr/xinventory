@@ -27,6 +27,7 @@ import {
   ADJUSTMENT_REASONS,
   InventoryItem,
   UnitType,
+  isReferenceLens,
   useApp,
 } from "../context/app-context";
 import { uploadImages } from "../services/image-utils";
@@ -51,7 +52,13 @@ export function InventoryForm({
   editItem,
   onCancelEdit,
 }: InventoryFormProps) {
-  const { bsToUsd, usdToBs } = useApp();
+  const { bsToUsd, usdToBs, currency } = useApp();
+  // Reference lenses (BCV/EUR) restate prices at a rate we do not treat as
+  // the real worth of a bolivar. An admin reading a lens figure and retyping
+  // it here would store a different price at the honest rate, so price entry
+  // is disabled - same rule as the price edits in total-view and history-view.
+  // Stock, notes and categorization stay editable: they move no money.
+  const referenceLens = isReferenceLens(currency);
   const [name, setName] = useState("");
   const [barcode, setBarcode] = useState("");
 
@@ -159,7 +166,17 @@ export function InventoryForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !barcode || !sellingPrice || !buyingPrice) return;
+    if (!name || !barcode || !sellingPrice || !buyingPrice) {
+      // Disabled fields skip the browser's `required` check, so under a
+      // reference lens an empty price lands here - say why instead of
+      // ignoring the click.
+      if (referenceLens && (!sellingPrice || !buyingPrice)) {
+        toast.error(
+          "Estás viendo una tasa de referencia. Cambia a USD o Bs para editar precios.",
+        );
+      }
+      return;
+    }
     if (submitting) return;
 
     // Convert inputs to USD for storage - the canonical base price.
@@ -178,6 +195,16 @@ export function InventoryForm({
     }
     if (rawBuying < 0 || rawSelling < 0) {
       toast.error("Los precios no pueden ser negativos");
+      return;
+    }
+
+    // Belt over the disabled fields: the lens can be switched while the form
+    // is open, and a pending Bs amount would then be booked from a figure the
+    // admin read at a reference rate. Typed dollars are unambiguous.
+    if (referenceLens && (buyingCurrency === "BS" || sellingCurrency === "BS")) {
+      toast.error(
+        "Estás viendo una tasa de referencia. Cambia a USD o Bs para editar precios.",
+      );
       return;
     }
 
@@ -287,6 +314,12 @@ export function InventoryForm({
       </FormSection>
 
       <FormSection icon={() => <span className="text-primary font-semibold text-sm w-4 h-4 flex items-center justify-center">$</span>} title="Precios">
+        {referenceLens && (
+          <p className="text-xs text-amber-700">
+            Estás viendo una tasa de referencia. Cambia a USD o Bs para editar
+            precios.
+          </p>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
             <Label
@@ -298,6 +331,7 @@ export function InventoryForm({
               <Select
                 value={buyingCurrency}
                 onValueChange={(v: InputCurrency) => setBuyingCurrency(v)}
+                disabled={referenceLens}
               >
                 <SelectTrigger aria-label="Moneda del precio de compra" className="w-[90px]">
                   <SelectValue />
@@ -316,6 +350,7 @@ export function InventoryForm({
                 onChange={(e) => setBuyingPrice(e.target.value)}
                 placeholder="0.00"
                 className="flex-1"
+                disabled={referenceLens}
                 required
               />
             </div>
@@ -332,6 +367,7 @@ export function InventoryForm({
               <Select
                 value={sellingCurrency}
                 onValueChange={(v: InputCurrency) => setSellingCurrency(v)}
+                disabled={referenceLens}
               >
                 <SelectTrigger aria-label="Moneda del precio de venta" className="w-[90px]">
                   <SelectValue />
@@ -350,6 +386,7 @@ export function InventoryForm({
                 onChange={(e) => setSellingPrice(e.target.value)}
                 placeholder="0.00"
                 className="flex-1"
+                disabled={referenceLens}
                 required
               />
             </div>

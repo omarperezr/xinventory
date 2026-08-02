@@ -76,10 +76,14 @@ create table if not exists public.finance_entries (
   status text not null default 'paid' check (status in ('paid','pending','void')),
   occurred_on date not null default current_date,
   due_on date,
-  category_id uuid references public.finance_categories(id) on delete set null,
-  account_id uuid references public.finance_accounts(id) on delete set null,
-  counter_account_id uuid references public.finance_accounts(id) on delete set null,
-  payee_id uuid references public.finance_payees(id) on delete set null,
+  -- restrict, not set null: a definition still named by a past movement may not
+  -- be deleted out from under it. Nulling account_id would take that money out
+  -- of its pot's balance for good, with nothing left to say where it went.
+  -- Retiring a definition is what `archived`/`active` are for.
+  category_id uuid references public.finance_categories(id) on delete restrict,
+  account_id uuid references public.finance_accounts(id) on delete restrict,
+  counter_account_id uuid references public.finance_accounts(id) on delete restrict,
+  payee_id uuid references public.finance_payees(id) on delete restrict,
   amount_usd numeric not null check (amount_usd > 0),
   amount_bs numeric check (amount_bs is null or amount_bs >= 0),
   rate_used numeric check (rate_used is null or rate_used > 0),
@@ -119,9 +123,9 @@ create index if not exists item_suppliers_supplier_idx on public.item_suppliers 
 
 create table if not exists public.purchases (
   id uuid primary key default gen_random_uuid(),
-  supplier_id uuid references public.finance_payees(id) on delete set null,
-  account_id uuid references public.finance_accounts(id) on delete set null,
-  category_id uuid references public.finance_categories(id) on delete set null,
+  supplier_id uuid references public.finance_payees(id) on delete restrict,
+  account_id uuid references public.finance_accounts(id) on delete restrict,
+  category_id uuid references public.finance_categories(id) on delete restrict,
   occurred_on date not null default current_date,
   due_on date,
   payment_status text not null default 'paid' check (payment_status in ('paid','pending')),
@@ -161,10 +165,10 @@ create index if not exists purchase_lines_item_idx on public.purchase_lines (ite
 create table if not exists public.purchase_returns (
   id uuid primary key default gen_random_uuid(),
   purchase_id uuid not null references public.purchases(id) on delete cascade,
-  supplier_id uuid references public.finance_payees(id) on delete set null,
+  supplier_id uuid references public.finance_payees(id) on delete restrict,
   occurred_on date not null default current_date,
   settlement text not null default 'credit' check (settlement in ('credit','cash')),
-  account_id uuid references public.finance_accounts(id) on delete set null,
+  account_id uuid references public.finance_accounts(id) on delete restrict,
   entry_id uuid references public.finance_entries(id) on delete set null,
   total_usd numeric not null default 0 check (total_usd >= 0),
   reason text not null default '',
@@ -198,6 +202,154 @@ as $$
   from public.finance_entries
   where occurred_on >= p_from::date and occurred_on <= p_to::date;
 $$;
+
+-- Cumulative account totals, over EVERY row rather than a window. The browser
+-- holds one page of the ledger and one page of the sales history, so summing
+-- what it loaded understates every balance by whatever fell out of the window -
+-- and can even report a pot in negative when its old inflows aged out before
+-- its old outflows. Definer like finance_summary, and no wider: every
+-- authenticated user may already select these rows (see the policies below).
+-- The per-method takings come back unrouted; which pot a method lands in is the
+-- admin's declaration, which lives on the client.
+-- ponytail: full scan of the sales history on every dashboard load; materialize
+-- a rollup if a shop's history ever outgrows the scan.
+create or replace function public.finance_balances()
+returns json
+language sql stable security definer
+set search_path to 'public'
+as $$
+with movement as (
+  -- Income credits its account and an expense debits it. A transfer debits
+  -- account_id (the source) to credit counter_account_id (the destination).
+  select account_id as id, 1 as sign, amount_usd, paid_in, amount_bs
+    from public.finance_entries
+   where status = 'paid' and kind = 'income' and account_id is not null
+  union all
+  select account_id, -1, amount_usd, paid_in, amount_bs
+    from public.finance_entries
+   where status = 'paid' and kind in ('expense','transfer') and account_id is not null
+  union all
+  select counter_account_id, 1, amount_usd, paid_in, amount_bs
+    from public.finance_entries
+   where status = 'paid' and kind = 'transfer' and counter_account_id is not null
+),
+-- Bolivares are reported as they were stamped at payment time. A movement
+-- booked in dollars stamps no rate, so its dollars come back as dollars and the
+-- client values them at today's honest rate.
+stamped as (
+  select id, sign, amount_usd, amount_bs,
+         (paid_in = 'BS' and coalesce(amount_bs, 0) <> 0) as in_bs
+  from movement
+),
+by_account as (
+  select id,
+         coalesce(sum(amount_usd) filter (where sign = 1), 0)  as inflow_usd,
+         coalesce(sum(amount_usd) filter (where sign = -1), 0) as outflow_usd,
+         coalesce(sum(amount_bs) filter (where sign = 1 and in_bs), 0)  as inflow_bs,
+         coalesce(sum(amount_bs) filter (where sign = -1 and in_bs), 0) as outflow_bs,
+         coalesce(sum(amount_usd) filter (where sign = 1 and not in_bs), 0)  as inflow_usd_at_rate,
+         coalesce(sum(amount_usd) filter (where sign = -1 and not in_bs), 0) as outflow_usd_at_rate
+  from stamped
+  group by id
+),
+-- Same net-of-returns arithmetic as report_summary and the history mapper.
+line as (
+  select ti.transaction_id,
+         (ti.quantity - coalesce(ti.quantity_returned, 0)) as net_qty,
+         case when ti.discount_applied and coalesce(ti.discount_value, 0) > 0
+              then ti.price_usd * (1 - ti.discount_value / 100.0)
+              else ti.price_usd
+         end as unit_price
+  from public.transaction_items ti
+),
+sellable as (
+  select * from line where net_qty > 0
+),
+tx_net as (
+  select t.id, t.payments, t.honest_rate,
+         case when coalesce(t.subtotal_usd, 0) > 0
+              then coalesce(sum(s.unit_price * s.net_qty), 0)
+                   * (1 + coalesce(t.tax_usd, 0) / t.subtotal_usd)
+              else coalesce(sum(s.unit_price * s.net_qty), 0)
+         end as net_total
+  from public.transactions t
+  left join sellable s on s.transaction_id = t.id
+  group by t.id, t.payments, t.honest_rate, t.subtotal_usd, t.tax_usd
+),
+pay as (
+  select n.id, coalesce(p.method, '') as method, coalesce(p.amount, 0) as amount,
+         n.net_total, n.honest_rate
+  from tx_net n
+  cross join lateral jsonb_to_recordset(
+    case when jsonb_typeof(n.payments) = 'array' then n.payments else '[]'::jsonb end
+  ) as p(method text, amount numeric)
+),
+-- What the drawer KEPT, not what the customer handed over: change goes straight
+-- back out and a returned sale is refunded, so $20 against an $18 sale credits
+-- $18 and a sale returned in full credits nothing.
+kept as (
+  select method, honest_rate,
+         amount
+           * least(sum(amount) over (partition by id), greatest(net_total, 0))
+           / nullif(sum(amount) over (partition by id), 0) as kept_usd
+  from pay
+),
+-- A bolivar pot holds the bolivares the counter actually took, at the rate the
+-- sale stamped. Valuing last year's takings at today's rate would invent
+-- bolivares nobody ever held and hide what holding them cost. Sales written
+-- before the rate was stamped come back as dollars instead, for the client to
+-- value at today's rate - the same split the account totals above use.
+by_method as (
+  select method,
+         coalesce(sum(kept_usd), 0) as kept_usd,
+         coalesce(sum(kept_usd * honest_rate) filter (where honest_rate > 0), 0)
+           as kept_bs,
+         coalesce(sum(kept_usd) filter (where honest_rate is null or honest_rate <= 0), 0)
+           as kept_usd_at_rate
+  from kept
+  group by method
+),
+-- Which recurring occurrences have already been posted, over the WHOLE ledger.
+-- The browser holds one page of it, so an obligation settled months ago falls
+-- out of the window and the screen asks the shop to pay it again.
+posted as (
+  select distinct recurring_id, period_key
+    from public.finance_entries
+   where recurring_id is not null and period_key is not null and status <> 'void'
+)
+select json_build_object(
+  'accounts', coalesce((
+    select json_agg(json_build_object(
+      'account_id', id,
+      'inflow_usd', inflow_usd,
+      'outflow_usd', outflow_usd,
+      'inflow_bs', inflow_bs,
+      'outflow_bs', outflow_bs,
+      'inflow_usd_at_rate', inflow_usd_at_rate,
+      'outflow_usd_at_rate', outflow_usd_at_rate
+    )) from by_account
+  ), '[]'::json),
+  'methods', coalesce((
+    select json_agg(json_build_object(
+      'method', method,
+      'kept_usd', kept_usd,
+      'kept_bs', kept_bs,
+      'kept_usd_at_rate', kept_usd_at_rate
+    )) from by_method
+  ), '[]'::json),
+  'posted_periods', coalesce((
+    select json_agg(json_build_object(
+      'recurring_id', recurring_id,
+      'period_key', period_key
+    )) from posted
+  ), '[]'::json)
+);
+$$;
+
+-- Definer functions are executable by PUBLIC on creation, which includes the
+-- anon key shipped in the browser bundle.
+revoke execute on function public.finance_balances() from public, anon;
+grant execute on function public.finance_balances() to authenticated;
 
 create or replace function public.post_purchase(p_purchase jsonb, p_lines jsonb)
 returns json
@@ -702,3 +854,67 @@ insert into public.finance_categories (name, kind, nature) values
   ('SUELDOS','expense','fixed'),
   ('VENTAS','income','other')
 on conflict (name, kind) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Converging fixups for instances provisioned before the rules above changed.
+-- The column definitions carry the current rule; these statements bring an
+-- already-created schema to the same place, so re-running this file converges
+-- instead of leaving deployed shops on the old behaviour.
+-- ---------------------------------------------------------------------------
+
+-- The references above were `on delete set null`, so deleting an account took
+-- every movement it ever held out of that pot's balance and left no trace of
+-- where the money went. Postgres names these constraints predictably.
+do $$
+declare
+  fk record;
+begin
+  for fk in
+    select * from (values
+      ('finance_entries', 'category_id',        'finance_categories'),
+      ('finance_entries', 'account_id',         'finance_accounts'),
+      ('finance_entries', 'counter_account_id', 'finance_accounts'),
+      ('finance_entries', 'payee_id',           'finance_payees'),
+      ('purchases',       'supplier_id',        'finance_payees'),
+      ('purchases',       'account_id',         'finance_accounts'),
+      ('purchases',       'category_id',        'finance_categories'),
+      ('purchase_returns','supplier_id',        'finance_payees'),
+      ('purchase_returns','account_id',         'finance_accounts')
+    ) as t(tbl, col, ref)
+  loop
+    execute format(
+      'alter table public.%I drop constraint if exists %I',
+      fk.tbl, fk.tbl || '_' || fk.col || '_fkey'
+    );
+    execute format(
+      'alter table public.%I add constraint %I foreign key (%I)
+         references public.%I(id) on delete restrict',
+      fk.tbl, fk.tbl || '_' || fk.col || '_fkey', fk.col, fk.ref
+    );
+  end loop;
+end $$;
+
+-- A bolivar account saved before the setup dialog stamped its opening balance
+-- in dollars carries opening_balance_bs with opening_balance_usd still 0. The
+-- books then read $0 while the pot is worth something, and the whole opening
+-- balance surfaces as devaluación - a gain that never happened. Valued at the
+-- honest rate the shop is on now, which is the only rate anyone recorded; a
+-- pot opened years ago at a different rate has to be corrected by hand.
+update public.finance_accounts a
+   set opening_balance_usd = a.opening_balance_bs / r.rate
+  from (
+    -- The rate the shop declared honest, whichever one that is; USDT then USD
+    -- only as a fallback for rows written before the setting existed.
+    select coalesce(
+             nullif((value ->> coalesce(value ->> 'honest', 'USDT'))::numeric, 0),
+             nullif((value ->> 'USDT')::numeric, 0),
+             nullif((value ->> 'USD')::numeric, 0)
+           ) as rate
+      from public.settings where key = 'rates'
+  ) r
+ where a.basis = 'BS'
+   and a.opening_balance_bs > 0
+   and a.opening_balance_usd = 0
+   -- No usable rate recorded means no honest conversion exists; leaving the
+   -- row alone keeps the problem visible instead of inventing a figure.
+   and r.rate is not null;

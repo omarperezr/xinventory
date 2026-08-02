@@ -648,16 +648,28 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                 </div>
 
                 {/* Pay button */}
-                <div className="p-4 bg-white border-t border-gray-200 flex justify-end">
+                <div className="p-4 bg-white border-t border-gray-200 flex flex-col items-end gap-2">
+                  {/* Collecting money under a reference lens would quote the
+                      customer bolivares at a rate the sale is not booked at:
+                      the seller takes that cash and the books record a
+                      fraction of it. Same rule as the price edit above. */}
                   <Button
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-5 text-base shadow-md hover:shadow-lg w-full md:w-auto"
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-5 text-base shadow-md hover:shadow-lg w-full md:w-auto disabled:opacity-60"
                     onClick={() => setIsPaymentModalOpen(true)}
+                    disabled={referenceLens}
                   >
                     <CreditCard className="w-5 h-5 mr-2" />
                     {remainingDue <= 0.01
                       ? "Finalizar"
-                      : `Pagar ${formatPrice(remainingDue)}`}
+                      : referenceLens
+                        ? `Pagar $ ${remainingDue.toFixed(2)}`
+                        : `Pagar ${formatPrice(remainingDue)}`}
                   </Button>
+                  {referenceLens && (
+                    <p className="text-xs text-amber-700 text-right">
+                      Estás viendo una tasa de referencia. Cambia a USD o Bs para cobrar.
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -885,10 +897,17 @@ export function TotalView({ onCheckout }: TotalViewProps) {
               Cambio Requerido
             </DialogTitle>
           </DialogHeader>
+          {/* Change is physical cash. It is quoted in dollars and honest-rate
+              bolivares, never through the display lens: the payment that
+              produced it was converted at the honest rate, so a lens figure
+              here would send the seller to the till with the wrong notes. */}
           <div className="py-8 text-center">
             <p className="text-gray-600 text-base">Dale cambio de</p>
             <p className="text-4xl font-bold text-red-600 mt-2">
-              {formatPrice(changeAmount)}
+              $ {changeAmount.toFixed(2)}
+            </p>
+            <p className="text-lg font-medium text-red-500 mt-1">
+              Bs {usdToBs(changeAmount).toFixed(2)}
             </p>
           </div>
           <DialogFooter>

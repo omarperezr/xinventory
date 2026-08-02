@@ -158,7 +158,11 @@ export function OverviewPanel({
           label="Margen"
           value={`${m.margin.toFixed(1)}%`}
           delta={delta(m.margin, p.margin)}
-          hint={`antes ${p.margin.toFixed(1)}%`}
+          hint={
+            report.previousCovered
+              ? `antes ${p.margin.toFixed(1)}%`
+              : "sin período anterior cargado"
+          }
           icon={<Percent className="w-3.5 h-3.5 text-gray-300" />}
         />
         <StatTile
@@ -189,7 +193,11 @@ export function OverviewPanel({
       {/* Trend against the previous period */}
       <SectionCard
         title="Ingresos del período"
-        subtitle={`Comparado punto a punto con los ${report.previous.days} días anteriores`}
+        subtitle={
+          report.previousCovered
+            ? `Comparado punto a punto con los ${report.previous.days} días anteriores`
+            : "Sin comparación: el período anterior no está cargado completo"
+        }
         icon={<TrendingUp className="w-4 h-4 text-primary" />}
       >
         {trend.length >= 2 ? (
@@ -197,7 +205,9 @@ export function OverviewPanel({
             <Legend
               entries={[
                 { label: "Período actual", color: SERIES[0] },
-                { label: "Período anterior", color: INK.axis },
+                ...(report.previousCovered
+                  ? [{ label: "Período anterior", color: INK.axis }]
+                  : []),
               ]}
             />
             <ResponsiveContainer width="100%" height={230}>

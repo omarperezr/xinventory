@@ -40,12 +40,17 @@ const PLATFORMS: { key: SocialPlatform; label: string }[] = [
   { key: "facebook", label: "Facebook" },
 ];
 
+/** First case-insensitive occurrence of `part` cut out of `name`. Plain
+ *  string matching on purpose: inventory text is not a pattern, and a brand
+ *  like "C++" would make `new RegExp` throw. */
+function stripPart(name: string, part: string): string {
+  const at = name.toLowerCase().indexOf(part.toLowerCase());
+  return at < 0 ? name : name.slice(0, at) + name.slice(at + part.length);
+}
+
 /** Same spirit as the server-side fallback: honest, generic, editable. */
 function designFor(item: InventoryItem): SocialPostDesign {
-  const rest = item.name
-    .replace(new RegExp(item.brand, "i"), "")
-    .replace(new RegExp(item.type, "i"), "")
-    .trim();
+  const rest = stripPart(stripPart(item.name, item.brand), item.type).trim();
   return {
     t1: item.type === "N/A" || item.type === "UNASSIGNED" ? "DISPONIBLE" : item.type,
     t2: item.brand,

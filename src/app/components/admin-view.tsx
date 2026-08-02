@@ -7,6 +7,7 @@ import {
   InventoryItem,
   ItemHistoryRecord,
   RateKey,
+  foldText,
 } from "../context/app-context";
 import { useAuth } from "../context/auth-context";
 import { Input } from "./ui/input";
@@ -175,7 +176,7 @@ export function AdminView({
     setImporting(true);
     const toastId = toast.loading("Leyendo archivo Excel...");
     try {
-      const rows = await parseItemsFromExcel(file);
+      const { items: rows, skipped } = await parseItemsFromExcel(file);
       if (rows.length === 0) {
         toast.error("No se encontraron productos válidos en el archivo", { id: toastId });
         return;
@@ -197,9 +198,19 @@ export function AdminView({
         })),
         currentUser?.name || "Admin",
       );
+      // Every row the sheet contained is accounted for: silently dropping the
+      // ones we could not read is how an admin ends up believing the inventory
+      // is complete when a tenth of it never arrived.
+      const notes = [
+        result.duplicates > 0
+          ? `${result.duplicates} repetida(s) por código de barras`
+          : "",
+        skipped > 0 ? `${skipped} omitida(s) por datos ilegibles` : "",
+      ].filter(Boolean);
       toast.success(
-        `Importación completa: ${result.created} creado(s), ${result.updated} actualizado(s)`,
-        { id: toastId },
+        `Importación completa: ${result.created} creado(s), ${result.updated} actualizado(s)` +
+          (notes.length ? `. ${notes.join(", ")}` : ""),
+        { id: toastId, duration: notes.length ? 8000 : undefined },
       );
     } catch (err) {
       console.error(err);
@@ -288,14 +299,14 @@ export function AdminView({
     () =>
       items.filter((item) => {
         if (!searchTerm.trim()) return true;
-        const term = searchTerm.toLowerCase();
-        if (filterBy === "name") return item.name.toLowerCase().includes(term);
+        const term = foldText(searchTerm);
+        if (filterBy === "name") return foldText(item.name).includes(term);
         if (filterBy === "barcode")
-          return item.barcode.toLowerCase().includes(term);
+          return foldText(item.barcode).includes(term);
         // 'all'
         return (
-          item.name.toLowerCase().includes(term) ||
-          item.barcode.toLowerCase().includes(term)
+          foldText(item.name).includes(term) ||
+          foldText(item.barcode).includes(term)
         );
       }),
     [items, searchTerm, filterBy],
@@ -644,9 +655,12 @@ export function AdminView({
             </DialogDescription>
           </DialogHeader>
           <InventoryForm
-            onSubmit={async (item, notes) => {
+            onSubmit={async (item, notes, adjustmentReason) => {
               if (editingItem) {
-                await handleUpdateItem(item, notes);
+                // The form makes the seller pick a reason before it will
+                // submit a stock change; dropping it here left every write-off,
+                // theft and recount indistinguishable in the item history.
+                await handleUpdateItem(item, notes, adjustmentReason);
               } else {
                 await handleAddItem(item, notes);
               }

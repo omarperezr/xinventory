@@ -9,7 +9,11 @@ export function OfflineSync() {
   const [pending, setPending] = useState(0);
   const [syncing, setSyncing] = useState(false);
 
-  const checkPending = async () => setPending(await getOutboxCount());
+  const checkPending = async () => {
+    const count = await getOutboxCount();
+    setPending(count);
+    return count;
+  };
 
   const sync = async () => {
     if (!navigator.onLine || syncing) return;
@@ -17,6 +21,9 @@ export function OfflineSync() {
     try {
       await flushOutbox();
       await checkPending();
+      // Safe to refetch even when the flush stopped early: fetchInventory
+      // replays whatever is still queued on top of the server rows, so this
+      // cannot restore stock that a queued sale already took off the shelf.
       await refreshData();
     } finally {
       setSyncing(false);
@@ -33,10 +40,13 @@ export function OfflineSync() {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    const interval = setInterval(() => {
-      checkPending();
-      if (navigator.onLine) sync();
-    }, 5000);
+    // The poll only reads the pending counter (a local IndexedDB read) and
+    // only retries a flush when something is actually queued. It used to call
+    // sync() on every tick, which refetched the whole inventory and settings
+    // every five seconds for a queue that was almost always empty.
+    const interval = setInterval(async () => {
+      if ((await checkPending()) > 0) sync();
+    }, 15000);
 
     return () => {
       window.removeEventListener("online", handleOnline);

@@ -69,7 +69,9 @@ export function PurchaseDialog({
   const [query, setQuery] = useState("");
   const [supplierId, setSupplierId] = useState(NONE);
   const [accountId, setAccountId] = useState(NONE);
-  const [categoryId, setCategoryId] = useState(NONE);
+  // Null until the user picks: the categories arrive after the first render, so
+  // the merchandise default has to be derived rather than seeded.
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [occurredOn, setOccurredOn] = useState(todayIso());
   const [dueOn, setDueOn] = useState("");
   const [pending, setPending] = useState(false);
@@ -82,11 +84,14 @@ export function PurchaseDialog({
   const [saving, setSaving] = useState(false);
 
   const suppliers = payees.filter((p) => p.active);
-  // The default category is whichever one the shop marked as merchandise, so
-  // the P&L keeps treating stock as inventory rather than as an expense.
+  // Only categories the shop marked as merchandise, defaulting to the first,
+  // so the P&L keeps treating stock as inventory rather than as an expense -
+  // the same goods already reach it as cost of goods sold when they sell.
   const merchandiseCategories = categories.filter(
-    (c) => !c.archived && c.kind === "expense",
+    (c) => !c.archived && c.kind === "expense" && c.nature === "cogs",
   );
+  const effectiveCategoryId =
+    categoryId ?? merchandiseCategories[0]?.id ?? NONE;
 
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -162,7 +167,7 @@ export function PurchaseDialog({
     setQuery("");
     setSupplierId(NONE);
     setAccountId(NONE);
-    setCategoryId(NONE);
+    setCategoryId(null);
     setOccurredOn(todayIso());
     setDueOn("");
     setPending(false);
@@ -192,7 +197,7 @@ export function PurchaseDialog({
         {
           supplierId: supplierId === NONE ? null : supplierId,
           accountId: accountId === NONE ? null : accountId,
-          categoryId: categoryId === NONE ? null : categoryId,
+          categoryId: effectiveCategoryId === NONE ? null : effectiveCategoryId,
           occurredOn,
           dueOn: pending ? dueOn || null : null,
           paymentStatus: pending ? "pending" : "paid",
@@ -559,7 +564,7 @@ export function PurchaseDialog({
             </div>
             <div>
               <Label htmlFor="purchase-category">Categoría</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
+              <Select value={effectiveCategoryId} onValueChange={setCategoryId}>
                 <SelectTrigger id="purchase-category">
                   <SelectValue placeholder="Compra de mercancía" />
                 </SelectTrigger>

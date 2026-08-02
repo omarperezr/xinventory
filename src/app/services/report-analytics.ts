@@ -228,9 +228,12 @@ export function buildLines(
 // ---------------------------------------------------------------------------
 
 export interface PeriodMetrics {
+  /** Gross collected, tax included. */
   revenue: number;
   cost: number;
+  /** `revenue - tax - cost`: what the shop keeps. */
   profit: number;
+  /** Profit over revenue net of tax, so it matches the per-product margins. */
   margin: number;
   transactions: number;
   units: number;
@@ -261,7 +264,11 @@ export function computeMetrics(
   const grossValue = lines.reduce((s, l) => s + l.soldQty * l.unitPrice, 0);
   const discountGiven = lines.reduce((s, l) => s + l.discountGiven, 0);
   const listValue = lines.reduce((s, l) => s + l.listPrice * Math.max(0, l.netQty), 0);
-  const profit = revenue - cost;
+  // Collected tax is money held for the state, never margin. Profit and margin
+  // are measured net of it, the same basis the per-product tables use, so the
+  // tables can add up to the headline.
+  const netRevenue = revenue - tax;
+  const profit = netRevenue - cost;
 
   const activeDayKeys = new Set(txs.map((t) => dayKey(new Date(t.date))));
 
@@ -269,7 +276,7 @@ export function computeMetrics(
     revenue,
     cost,
     profit,
-    margin: revenue > 0 ? (profit / revenue) * 100 : 0,
+    margin: netRevenue > 0 ? (profit / netRevenue) * 100 : 0,
     transactions: txs.length,
     units,
     avgTicket: txs.length > 0 ? revenue / txs.length : 0,
@@ -343,11 +350,32 @@ function bucketLabel(d: Date, g: Granularity): string {
 export interface SeriesPoint {
   key: string;
   label: string;
+  /** Gross collected, tax included. */
   revenue: number;
+  tax: number;
   cost: number;
   profit: number;
   transactions: number;
   units: number;
+}
+
+/**
+ * Ceiling on how many buckets one series may hold. A range that needs more
+ * widens its bucket instead of being cut short: a bucket that is never created
+ * takes every sale inside it out of the chart and out of the totals.
+ *
+ * 4000 daily buckets is about eleven years, so in practice only an absurd
+ * custom range ever widens.
+ * ponytail: past that ceiling the daily series becomes weekly and `forecast`
+ * still reads one bucket as one day. Raise the ceiling, or pass the bucket
+ * size into `forecast`, if a range that long ever becomes real.
+ */
+const MAX_BUCKETS = 4000;
+
+function fitGranularity(days: number, g: Granularity): Granularity {
+  if (g === "day" && days > MAX_BUCKETS) g = "week";
+  if (g === "week" && days / 7 > MAX_BUCKETS) g = "month";
+  return g;
 }
 
 /**
@@ -361,39 +389,59 @@ export function buildSeries(
   range: DateRange,
   g: Granularity,
 ): SeriesPoint[] {
+  const gran = fitGranularity(range.days, g);
   const buckets = new Map<string, SeriesPoint>();
-  let cursor = bucketStart(range.from, g);
+  // Creates the bucket if it is missing, so no sale can fall outside the grid
+  // and be dropped without a trace.
+  const bucketAt = (d: Date): SeriesPoint => {
+    const start = bucketStart(d, gran);
+    const key = dayKey(start);
+    let b = buckets.get(key);
+    if (!b) {
+      b = {
+        key,
+        label: bucketLabel(start, gran),
+        revenue: 0,
+        tax: 0,
+        cost: 0,
+        profit: 0,
+        transactions: 0,
+        units: 0,
+      };
+      buckets.set(key, b);
+    }
+    return b;
+  };
+
   const end = range.to.getTime();
-  // Guard against a pathological range producing an unbounded loop.
-  for (let i = 0; cursor.getTime() <= end && i < 800; i++) {
-    const key = dayKey(cursor);
-    buckets.set(key, {
-      key,
-      label: bucketLabel(cursor, g),
-      revenue: 0,
-      cost: 0,
-      profit: 0,
-      transactions: 0,
-      units: 0,
-    });
-    cursor = advance(cursor, g);
+  // Only the empty-bucket grid is bounded. A range so absurd that even monthly
+  // buckets blow past the ceiling stops being pre-filled with zeros, but every
+  // sale still creates its own bucket below, so nothing is dropped - the chart
+  // just loses its empty stretches instead of the browser losing the tab.
+  let guard = 0;
+  for (
+    let cursor = bucketStart(range.from, gran);
+    cursor.getTime() <= end && guard < MAX_BUCKETS;
+    cursor = advance(cursor, gran)
+  ) {
+    guard++;
+    bucketAt(cursor);
   }
 
   for (const t of txs) {
     const d = new Date(t.date);
     if (Number.isNaN(d.getTime())) continue;
-    const b = buckets.get(dayKey(bucketStart(d, g)));
-    if (!b) continue;
+    const b = bucketAt(d);
     b.revenue += t.total;
+    b.tax += t.tax;
     b.transactions += 1;
   }
   for (const l of lines) {
-    const b = buckets.get(dayKey(bucketStart(l.date, g)));
-    if (!b) continue;
+    const b = bucketAt(l.date);
     b.cost += l.cost;
     b.units += Math.max(0, l.netQty);
   }
-  for (const b of buckets.values()) b.profit = b.revenue - b.cost;
+  for (const b of buckets.values()) b.profit = b.revenue - b.tax - b.cost;
 
   return [...buckets.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
@@ -421,10 +469,13 @@ export function weekdayProfile(txs: Transaction[], range: DateRange): WeekdayPoi
 
   // Count occurrences over the range so a 10-day window does not make Monday
   // look twice as good as Tuesday simply because it came around twice.
-  let cursor = startOfDay(range.from);
-  for (let i = 0; cursor.getTime() <= range.to.getTime() && i < 800; i++) {
-    points[(cursor.getDay() + 6) % 7].occurrences += 1;
-    cursor = new Date(cursor.getTime() + MS_PER_DAY);
+  // Counted arithmetically rather than by walking the range: a walk needs a
+  // bound, and a bound that stops early keeps counting revenue while it stops
+  // counting days, which inflates every average below.
+  const first = (startOfDay(range.from).getDay() + 6) % 7;
+  for (let i = 0; i < 7; i++) {
+    points[(first + i) % 7].occurrences =
+      Math.floor(range.days / 7) + (i < range.days % 7 ? 1 : 0);
   }
 
   for (const t of txs) {
@@ -485,6 +536,8 @@ export interface ProductStat {
   priceRealization: number;
   discountGiven: number;
   returnedUnits: number;
+  /** Returned units at the price they were charged at, not at the net average. */
+  returnedValue: number;
   returnRate: number;
   ticketCount: number;
   lastSold: Date | null;
@@ -525,6 +578,7 @@ export function productStats(
         priceRealization: 0,
         discountGiven: 0,
         returnedUnits: 0,
+        returnedValue: 0,
         returnRate: 0,
         ticketCount: 0,
         lastSold: null,
@@ -545,6 +599,7 @@ export function productStats(
     p.profit += l.profit;
     p.discountGiven += l.discountGiven;
     p.returnedUnits += l.returnedQty;
+    p.returnedValue += l.returnedQty * l.unitPrice;
     p.grossValue += l.soldQty * l.unitPrice;
     p.txIds.add(l.txId);
     if (!p.lastSold || l.date > p.lastSold) p.lastSold = l.date;
@@ -559,7 +614,10 @@ export function productStats(
       avgPrice,
       margin: p.revenue > 0 ? (p.profit / p.revenue) * 100 : 0,
       priceRealization: p.listPrice > 0 ? (avgPrice / p.listPrice) * 100 : 100,
-      returnRate: grossValue > 0 ? (p.returnedUnits * avgPrice) / grossValue * 100 : 0,
+      // Against what was charged, never against `avgPrice`: that one is net of
+      // returns, so a product sold and then fully returned would price its own
+      // returns at zero and report the worst offender as a flat 0%.
+      returnRate: grossValue > 0 ? (p.returnedValue / grossValue) * 100 : 0,
       velocity: days > 0 ? p.units / days : 0,
     };
   });
@@ -586,10 +644,15 @@ export function productStats(
       p.abc = "C";
       continue;
     }
+    // Classified on what was already accumulated *before* this product, not on
+    // its own running total: the product that carries you past 80% is the one
+    // that got you there, so it belongs in A. Reading the total after adding it
+    // sends a single product holding 96% of the profit straight to class C and
+    // leaves class A empty.
+    const before = (running / denom) * 100;
     running += useProfit ? Math.max(0, p.profit) : p.revenue;
     p.cumulativeProfitShare = (running / denom) * 100;
-    p.abc =
-      p.cumulativeProfitShare <= 80 ? "A" : p.cumulativeProfitShare <= 95 ? "B" : "C";
+    p.abc = before < 80 ? "A" : before < 95 ? "B" : "C";
   }
 
   return ranked;
@@ -653,7 +716,9 @@ export function groupLines(
 
 export interface SellerStat {
   seller: string;
+  /** Gross collected, tax included. */
   revenue: number;
+  tax: number;
   cost: number;
   profit: number;
   margin: number;
@@ -673,6 +738,7 @@ export function sellerStats(txs: Transaction[], lines: SaleLine[]): SellerStat[]
       s = {
         seller,
         revenue: 0,
+        tax: 0,
         cost: 0,
         profit: 0,
         margin: 0,
@@ -691,6 +757,7 @@ export function sellerStats(txs: Transaction[], lines: SaleLine[]): SellerStat[]
   for (const t of txs) {
     const s = ensure(t.userId || "—");
     s.revenue += t.total;
+    s.tax += t.tax;
     s.transactions += 1;
   }
   for (const l of lines) {
@@ -702,14 +769,17 @@ export function sellerStats(txs: Transaction[], lines: SaleLine[]): SellerStat[]
 
   const total = [...acc.values()].reduce((sum, s) => sum + s.revenue, 0);
   return [...acc.values()]
-    .map((s) => ({
-      ...s,
-      profit: s.revenue - s.cost,
-      margin: s.revenue > 0 ? ((s.revenue - s.cost) / s.revenue) * 100 : 0,
-      avgTicket: s.transactions > 0 ? s.revenue / s.transactions : 0,
-      unitsPerTicket: s.transactions > 0 ? s.units / s.transactions : 0,
-      share: total > 0 ? (s.revenue / total) * 100 : 0,
-    }))
+    .map((s) => {
+      const netRevenue = s.revenue - s.tax;
+      return {
+        ...s,
+        profit: netRevenue - s.cost,
+        margin: netRevenue > 0 ? ((netRevenue - s.cost) / netRevenue) * 100 : 0,
+        avgTicket: s.transactions > 0 ? s.revenue / s.transactions : 0,
+        unitsPerTicket: s.transactions > 0 ? s.units / s.transactions : 0,
+        share: total > 0 ? (s.revenue / total) * 100 : 0,
+      };
+    })
     .sort((a, b) => b.revenue - a.revenue);
 }
 
@@ -1176,7 +1246,7 @@ export function buildAlerts(
       level: "warning",
       title: `${returned.length} producto(s) con devoluciones altas`,
       detail: `${returned[0].name} tiene ${returned[0].returnRate.toFixed(0)}% de devoluciones. Puede ser un problema de calidad, talla o expectativa.`,
-      impact: returned.reduce((s, p) => s + p.returnedUnits * p.avgPrice, 0),
+      impact: returned.reduce((s, p) => s + p.returnedValue, 0),
       items: returned.slice(0, 6).map((p) => p.name),
     });
   }
@@ -1257,7 +1327,14 @@ export interface ReportBundle {
   previous: DateRange;
   granularity: Granularity;
   metrics: PeriodMetrics;
+  /** Zeroed when `previousCovered` is false - there is nothing to compare to. */
   previousMetrics: PeriodMetrics;
+  /**
+   * Whether the loaded history reaches back through the whole previous window.
+   * When false every "vs período anterior" figure is suppressed and the screen
+   * and the export have to say so instead of showing a delta.
+   */
+  previousCovered: boolean;
   series: SeriesPoint[];
   previousSeries: SeriesPoint[];
   /** Always daily, whatever `granularity` says - the forecast works on days. */
@@ -1284,6 +1361,8 @@ export function buildReport(
   items: InventoryItem[],
   range: DateRange,
   options: InventoryOptions = DEFAULT_INVENTORY_OPTIONS,
+  /** False when the server still holds sales older than the ones loaded here. */
+  historyComplete = true,
 ): ReportBundle {
   const catalog = buildCatalog(items);
   const prevRange = previousRange(range);
@@ -1308,11 +1387,27 @@ export function buildReport(
     }
   }
 
+  // Sales load newest-first, so a page that covers the selected range in full
+  // can still start in the middle of the previous one. Comparing against a
+  // half-loaded window reports a collapse that is really a missing page, so
+  // unless the history reaches back past the start of that window there is no
+  // comparison to make: a zeroed baseline leaves every delta without a base
+  // rather than confidently wrong, and drops the two trend alerts with it.
+  const previousCovered =
+    historyComplete ||
+    (oldestLoaded !== null && oldestLoaded.getTime() <= prevRange.from.getTime());
+
   const metrics = computeMetrics(rangeTxs, lines, range.days);
-  const previousMetrics = computeMetrics(prevTxs, prevLines, prevRange.days);
+  const previousMetrics = computeMetrics(
+    previousCovered ? prevTxs : [],
+    previousCovered ? prevLines : [],
+    prevRange.days,
+  );
   const granularity = chooseGranularity(range.days);
   const series = buildSeries(rangeTxs, lines, range, granularity);
-  const previousSeries = buildSeries(prevTxs, prevLines, prevRange, granularity);
+  const previousSeries = previousCovered
+    ? buildSeries(prevTxs, prevLines, prevRange, granularity)
+    : [];
   const products = productStats(lines, catalog, range.days);
   const productById = new Map(products.map((p) => [p.itemId, p]));
   const inventory = inventoryReport(
@@ -1329,12 +1424,18 @@ export function buildReport(
   const dailySeries =
     granularity === "day" ? series : buildSeries(rangeTxs, lines, range, "day");
 
+  // The forecast extends gross revenue, so the share of it that becomes profit
+  // has to be measured on gross too - `margin` is net of tax.
+  const profitShare =
+    metrics.revenue > 0 ? (metrics.profit / metrics.revenue) * 100 : 0;
+
   return {
     range,
     previous: prevRange,
     granularity,
     metrics,
     previousMetrics,
+    previousCovered,
     series,
     previousSeries,
     dailySeries,
@@ -1347,7 +1448,7 @@ export function buildReport(
     payments: paymentStats(rangeTxs),
     paymentCoverage: paymentCoverage(rangeTxs),
     inventory,
-    forecast: forecast(dailySeries, metrics.margin),
+    forecast: forecast(dailySeries, profitShare),
     alerts: buildAlerts(metrics, previousMetrics, products, inventory, range),
     rangeTransactions: rangeTxs,
     oldestLoaded,

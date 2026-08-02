@@ -44,9 +44,14 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-for bin in supabase vercel jq openssl; do
+for bin in supabase vercel jq openssl curl; do
   command -v "$bin" >/dev/null || { echo "falta $bin en PATH"; exit 1; }
 done
+
+# An env file from an earlier attempt holds the only copy of that project's DB
+# password; a re-run must never truncate it.
+ENVFILE=".env.$CLIENT"
+[ -e "$ENVFILE" ] && { echo "ya existe $ENVFILE de un intento anterior: guárdalo o muévelo antes de reintentar (contiene la única copia de esa contraseña)"; exit 1; }
 
 # Reads one VAR=value line from the env files; tolerant of a missing match.
 readenv() {
@@ -81,12 +86,30 @@ else
   read -r -p "org id a usar: " ORG_ID
 fi
 
+# Supabase does not enforce unique project names, so a second run would create
+# a second «$CLIENT» and any lookup by name could then point migrations, keys
+# and the admin user at the orphan from the failed attempt.
+DUPES=$(supabase projects list -o json | jq -r --arg n "$CLIENT" '[.[] | select(.name==$n) | .id] | join(" ")')
+[ -n "$DUPES" ] && { echo "ya existe un proyecto Supabase «${CLIENT}» (ref: $DUPES): bórralo o usa otro nombre antes de reintentar"; exit 1; }
+
 DB_PASSWORD=$(openssl rand -base64 24 | tr '+/' '-_')
 echo "Creando proyecto Supabase «${CLIENT}»..."
-supabase projects create "$CLIENT" --org-id "$ORG_ID" --db-password "$DB_PASSWORD" --region "$REGION" >/dev/null
+CREATE_JSON=$(supabase projects create "$CLIENT" --org-id "$ORG_ID" --db-password "$DB_PASSWORD" --region "$REGION" -o json)
 
-REF=$(supabase projects list -o json | jq -r --arg n "$CLIENT" '.[] | select(.name==$n) | .id' | head -1)
-[ -z "$REF" ] && { echo "no se pudo obtener el project ref"; exit 1; }
+# The password exists nowhere else and everything below can fail (the wait
+# loop, the keys call): persist it before any of it, not after.
+umask 077
+cat > "$ENVFILE" <<EOF
+SUPABASE_DB_PASSWORD=$DB_PASSWORD
+EOF
+chmod 600 "$ENVFILE"
+
+# The ref comes from the create response; falling back to a name lookup only
+# when the CLI printed nothing usable, and only if it matches exactly once.
+REF=$(jq -r '.id // empty' <<<"$CREATE_JSON" 2>/dev/null || true)
+[ -z "$REF" ] && REF=$(supabase projects list -o json | jq -r --arg n "$CLIENT" '[.[] | select(.name==$n) | .id] | if length == 1 then .[0] else empty end')
+[ -z "$REF" ] && { echo "no se pudo obtener el project ref; búscalo en el dashboard (la contraseña está en $ENVFILE)"; exit 1; }
+echo "SUPABASE_PROJECT_REF=$REF" >> "$ENVFILE"
 echo "Project ref: $REF — esperando a que esté listo..."
 for _ in $(seq 1 30); do
   STATUS=$(supabase projects list -o json | jq -r --arg r "$REF" '.[] | select(.id==$r) | .status')
@@ -99,9 +122,64 @@ ANON_KEY=$(jq -r '.[] | select(.name=="anon") | .api_key' <<<"$KEYS_JSON")
 SERVICE_KEY=$(jq -r '.[] | select(.name=="service_role") | .api_key' <<<"$KEYS_JSON")
 SUPABASE_URL="https://$REF.supabase.co"
 
+# db.$REF.supabase.co is IPv6-only unless the project pays for the IPv4 add-on,
+# so from an IPv4-only ISP — most home and office ones — every migration failed
+# to connect. Supavisor's session pooler (port 5432) speaks the same protocol
+# over IPv4; its host prefix varies per project, so ask the API for it.
+POOLER_HOST=$(curl -s "https://api.supabase.com/v1/projects/$REF/config/database/pooler" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  | jq -r 'if type=="array" then .[0] else . end | .db_host // empty' 2>/dev/null) || true
+# ponytail: región → prefijo aws-0 como respaldo; si el proyecto vive en otro,
+# el push falla con "no such host" y toca copiar el host del dashboard.
+DB_URL="postgresql://postgres.$REF:$DB_PASSWORD@${POOLER_HOST:-aws-0-$REGION.pooler.supabase.com}:5432/postgres"
+
+# Secrets first, deploy second: everything below can fail, and the DB password
+# exists nowhere else. Losing it means the project is unreachable.
+cat >> "$ENVFILE" <<EOF
+VITE_SUPABASE_URL=$SUPABASE_URL
+VITE_SUPABASE_ANON_KEY=$ANON_KEY
+# Session pooler: la conexión directa db.<ref> exige el add-on IPv4.
+POSTGRESQL_DIRECT=$DB_URL
+SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY
+SUPABASE_NEW_CLIENT=$SUPABASE_ACCESS_TOKEN
+VERCEL_NEW_CLIENT=$VERCEL_TOKEN
+VITE_MODULE_FINANZAS=$FINANZAS
+VITE_MODULE_REPORTES=$REPORTES
+VITE_MODULE_REDES=$REDES
+MODULE_REDES=$REDES
+EOF
+chmod 600 "$ENVFILE"
+echo "Credenciales guardadas en $ENVFILE"
+
+# Public signup would let anyone with the anon key create their own account on
+# this client's instance. The app creates users through the admin-users edge
+# function, so signup is never needed.
+curl -s -X PATCH "https://api.supabase.com/v1/projects/$REF/config/auth" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"disable_signup":true}' >/dev/null \
+  || echo "AVISO: no se pudo desactivar el registro público; hazlo en Authentication > Providers."
+
 if [ -d supabase/migrations ] && [ -n "$(ls -A supabase/migrations 2>/dev/null)" ]; then
   echo "Aplicando migraciones..."
-  supabase db push --db-url "postgresql://postgres:$DB_PASSWORD@db.$REF.supabase.co:5432/postgres"
+  # A client only gets the schema for the modules they bought: an unpurchased
+  # module whose tables exist is reachable straight through PostgREST with the
+  # anon key, so build-time gating alone would not withhold it.
+  HELD_DIR=$(mktemp -d)
+  restore_migrations() {
+    if [ -d "$HELD_DIR" ]; then
+      find "$HELD_DIR" -name '*.sql' -exec mv {} supabase/migrations/ \; 2>/dev/null || true
+      rmdir "$HELD_DIR" 2>/dev/null || true
+    fi
+  }
+  trap restore_migrations EXIT
+  [ "$FINANZAS" = true ] || find supabase/migrations -name '*_finanzas.sql' -exec mv {} "$HELD_DIR"/ \;
+  [ "$REDES" = true ]    || find supabase/migrations -name '*_redes.sql'    -exec mv {} "$HELD_DIR"/ \;
+
+  supabase db push --db-url "$DB_URL"
+
+  restore_migrations
+  trap - EXIT
 else
   echo "AVISO: no hay supabase/migrations — aplica el esquema a mano (supabase db pull en el proyecto base primero)."
 fi
@@ -138,10 +216,16 @@ else
     echo "       El usuario de Auth existe; repite el insert en profiles al aplicar el esquema."
   fi
 fi
+# Persist the generated password now - it is not recoverable from anywhere.
+cat >> "$ENVFILE" <<EOF
+ADMIN_EMAIL=$ADMIN_EMAIL
+ADMIN_PASSWORD=$ADMIN_PASSWORD
+EOF
 
 # ── Vercel ──────────────────────────────────────────────────────────────────
 PROJECT="xinventory-$CLIENT"
 CRON_SECRET=$(openssl rand -hex 32)
+echo "CRON_SECRET=$CRON_SECRET" >> "$ENVFILE"
 echo "Creando proyecto Vercel «${PROJECT}»..."
 vercel project add "$PROJECT" --token "$VERCEL_TOKEN" >/dev/null
 # Relinks this checkout to the client's project (.vercel/ is per-run, gitignored).
@@ -160,27 +244,6 @@ setenv MODULE_REDES "$REDES"
 
 echo "Desplegando..."
 URL=$(vercel deploy --prod --yes --token "$VERCEL_TOKEN")
-
-# Per-client snapshot with every secret of this instance. Contains the
-# service role key, the DB password and the account tokens — gitignored
-# (.env.*) and readable only by you.
-ENVFILE=".env.$CLIENT"
-cat > "$ENVFILE" <<EOF
-VITE_SUPABASE_URL=$SUPABASE_URL
-VITE_SUPABASE_ANON_KEY=$ANON_KEY
-POSTGRESQL_DIRECT=postgresql://postgres:$DB_PASSWORD@db.$REF.supabase.co:5432/postgres
-SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY
-CRON_SECRET=$CRON_SECRET
-SUPABASE_NEW_CLIENT=$SUPABASE_ACCESS_TOKEN
-VERCEL_NEW_CLIENT=$VERCEL_TOKEN
-VITE_MODULE_FINANZAS=$FINANZAS
-VITE_MODULE_REPORTES=$REPORTES
-VITE_MODULE_REDES=$REDES
-MODULE_REDES=$REDES
-ADMIN_EMAIL=$ADMIN_EMAIL
-ADMIN_PASSWORD=$ADMIN_PASSWORD
-EOF
-chmod 600 "$ENVFILE"
 
 echo
 echo "── Listo ──────────────────────────────────────────"
