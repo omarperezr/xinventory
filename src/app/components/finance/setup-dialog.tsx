@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import { Archive, Check, Plus, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -25,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { useApp } from "../../context/app-context";
 import {
   Allocation,
   CategoryNature,
@@ -190,6 +192,7 @@ function FormShell({
 
 function AccountsTab() {
   const { accounts, entries, saveAccount, deleteAccount } = useFinance();
+  const { bsToUsd } = useApp();
   const [editing, setEditing] = useState<FinanceAccount | "new" | null>(null);
 
   const blank: FinanceAccount = {
@@ -222,6 +225,12 @@ function AccountsTab() {
 
   const save = async () => {
     if (!draft.name.trim()) return;
+    // No usable rate means no honest dollar value for the opening bolivares,
+    // and a saldo inicial nobody can value is worse than none.
+    if (!Number.isFinite(draft.openingBalanceUsd)) {
+      toast.error("Verifica las tasas de cambio para valorar el saldo inicial");
+      return;
+    }
     await saveAccount(
       {
         ...draft,
@@ -323,7 +332,14 @@ function AccountsTab() {
               <Select
                 value={draft.basis}
                 onValueChange={(value) =>
-                  setDraft({ ...draft, basis: value === "USD" ? "USD" : "BS" })
+                  // The opening figure belongs to the currency it was typed in.
+                  // Carrying it across would book bolivares as dollars.
+                  setDraft({
+                    ...draft,
+                    basis: value === "USD" ? "USD" : "BS",
+                    openingBalanceBs: 0,
+                    openingBalanceUsd: 0,
+                  })
                 }
                 disabled={editing !== "new" && hasMovements(draft.id)}
               >
@@ -358,7 +374,17 @@ function AccountsTab() {
                   const value = Number(e.target.value) || 0;
                   setDraft(
                     draft.basis === "BS"
-                      ? { ...draft, openingBalanceBs: value }
+                      ? // Bolivares in the pot, dollars in the books. The opening
+                        // figure is stamped at today's honest rate, once, like
+                        // every other bolivar amount. Left at zero, the report
+                        // compares the pot's worth against empty books and calls
+                        // the whole opening balance devaluación - a gain the shop
+                        // never had.
+                        {
+                          ...draft,
+                          openingBalanceBs: value,
+                          openingBalanceUsd: bsToUsd(value),
+                        }
                       : { ...draft, openingBalanceUsd: value },
                   );
                 }}

@@ -32,6 +32,7 @@ export function ProfileDialog({
   const [newEmail, setNewEmail] = useState("");
   const [emailMsg, setEmailMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -44,6 +45,7 @@ export function ProfileDialog({
     setNameMsg(null);
     setNewEmail("");
     setEmailMsg(null);
+    setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
     setPassMsg(null);
@@ -75,9 +77,10 @@ export function ProfileDialog({
       setPassMsg({ type: "err", text: "Las contraseñas no coinciden" });
       return;
     }
-    const result = await updateOwnPassword(newPassword);
+    const result = await updateOwnPassword(currentPassword, newPassword);
     if (result.success) {
       setPassMsg({ type: "ok", text: "Contraseña actualizada" });
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } else {
@@ -176,6 +179,15 @@ export function ProfileDialog({
             </Label>
 
             <div className="space-y-2">
+              {/* The current password is required server-side (re-auth in
+                  updateOwnPassword), so an unattended session can't be
+                  hijacked into a new password. */}
+              <Input
+                type={showPass ? "text" : "password"}
+                placeholder="Contraseña actual"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
               <div className="relative">
                 <Input
                   type={showPass ? "text" : "password"}
@@ -205,7 +217,9 @@ export function ProfileDialog({
               <Button
                 onClick={handleUpdatePassword}
                 disabled={
-                  newPassword.length < 6 || newPassword !== confirmPassword
+                  !currentPassword ||
+                  newPassword.length < 6 ||
+                  newPassword !== confirmPassword
                 }
                 className="w-full"
               >

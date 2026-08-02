@@ -3,7 +3,7 @@ import { Search, Plus, SlidersHorizontal } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { ProductCard } from "./product-card";
-import { useApp, InventoryItem } from "../context/app-context";
+import { useApp, InventoryItem, foldText } from "../context/app-context";
 import { useAuth } from "../context/auth-context";
 import { useNavigate } from "react-router-dom";
 import {
@@ -55,19 +55,19 @@ export function SearchView({ onEditItem: _onEditItem, onDeleteItem: _onDeleteIte
   // (substring, case-insensitive) against the relevant field(s) instead of
   // requiring an exact/equal match - every token must match somewhere.
   const filteredItems = useMemo(() => {
-    const tokens = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const tokens = foldText(searchTerm.trim()).split(/\s+/).filter(Boolean);
     return items.filter((item) => {
       if (tokens.length > 0) {
         const haystacks =
           filterBy === "name"
-            ? [item.name.toLowerCase()]
+            ? [foldText(item.name)]
             : filterBy === "barcode"
-              ? [item.barcode.toLowerCase()]
+              ? [foldText(item.barcode)]
               : [
-                  item.name.toLowerCase(),
-                  item.barcode.toLowerCase(),
-                  (item.brand || "").toLowerCase(),
-                  (item.type || "").toLowerCase(),
+                  foldText(item.name),
+                  foldText(item.barcode),
+                  foldText(item.brand || ""),
+                  foldText(item.type || ""),
                 ];
         const matches = tokens.every((token) =>
           haystacks.some((field) => field.includes(token)),

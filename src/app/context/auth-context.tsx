@@ -6,6 +6,7 @@ import {
   ReactNode,
 } from "react";
 import { supabase } from "../services/supabase";
+import { idbSet } from "../utils/localdb";
 
 export type UserRole = "admin" | "seller";
 
@@ -25,7 +26,7 @@ interface AuthContextType {
   currentUser: User | null;
   users: User[];
   login: (email: string, password: string) => Promise<Result>;
-  logout: () => void;
+  logout: () => Promise<void>;
   registerUser: (
     name: string,
     email: string,
@@ -47,7 +48,10 @@ interface AuthContextType {
   // Self-service profile management
   updateOwnName: (name: string) => Promise<Result>;
   requestEmailChange: (newEmail: string) => Promise<Result>;
-  updateOwnPassword: (newPassword: string) => Promise<Result>;
+  updateOwnPassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<Result>;
   loaded: boolean;
 }
 
@@ -174,8 +178,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { success: true };
   };
 
-  const logout = () => {
-    supabase.auth.signOut();
+  // Shared-till logout: the next login may be a different person, so besides
+  // ending the session this wipes everything the device kept readable - the
+  // open cart and saved carts (or seller B closes seller A's sale as their
+  // own) and the IndexedDB caches (catalogue with buying prices, movement
+  // history, ledger). The outbox keys stay untouched: queued writes replay
+  // only under the session that created them (see offlineStore), so wiping
+  // them would destroy unsynced sales.
+  // ponytail: cache key names duplicated from offlineStore, which owns them;
+  // a clearCaches() helper there is the right home for this list.
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      // Server-side revocation failed (offline till); the local wipe below
+      // must happen anyway.
+      console.warn("No se pudo cerrar la sesión en el servidor", e);
+    }
+    localStorage.removeItem("xinventory-active-cart");
+    localStorage.removeItem("savedCarts");
+    for (const key of ["items", "item_history", "finance_entries", "finance_catalog"]) {
+      try {
+        // undefined reads back as a cache miss; every consumer falls back on
+        // its own empty shape.
+        await idbSet(key, undefined);
+      } catch {
+        // No IndexedDB (private mode) - then no cache was ever written.
+      }
+    }
+    // The providers above the login screen stay mounted, so the cart, item
+    // and ledger state also live on in React memory; a reload is the one
+    // reliable way to drop all of it.
+    window.location.reload();
   };
 
   const registerUser = async (
@@ -258,15 +292,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { success: true };
   };
 
-  // Updates the password directly via the active session - no email/OTP
-  // round-trip needed since the session already proves identity.
-  const updateOwnPassword = async (newPassword: string): Promise<Result> => {
+  // A session alone must not be enough to change the password: Supabase's
+  // "secure password change" is off by default, so an unattended logged-in
+  // till would otherwise be a one-minute account takeover. Re-proving the
+  // current password (a fresh sign-in with the same account) closes that.
+  const updateOwnPassword = async (
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<Result> => {
     if (!currentUser) return { success: false, error: "No autenticado" };
     if (newPassword.length < 6)
       return {
         success: false,
         error: "La contraseña debe tener al menos 6 caracteres",
       };
+    const { error: reauthError } = await supabase.auth.signInWithPassword({
+      email: currentUser.email,
+      password: currentPassword,
+    });
+    if (reauthError)
+      return { success: false, error: "La contraseña actual es incorrecta" };
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { success: false, error: error.message };
     return { success: true };

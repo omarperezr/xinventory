@@ -9,6 +9,7 @@
   "scripts": {
     "build": "npm run typecheck && vite build",
     "dev": "vite",
+    "test": "node src/app/utils/excelImport.test.ts && node src/app/services/finance-analytics.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

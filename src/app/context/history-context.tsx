@@ -65,6 +65,32 @@ function effectiveUnitPrice(item: TransactionItem): number {
   return item.sellingPrice;
 }
 
+// Applies a return to an already-loaded sale, recomputing the effective totals
+// the same way refreshTransactions does. Used when the return was queued and
+// the server cannot be re-read.
+function withReturn(
+  tx: Transaction,
+  itemId: string,
+  quantity: number,
+): Transaction {
+  const items = tx.items.map((i) =>
+    i.id === itemId
+      ? {
+          ...i,
+          quantityReturned: Math.min(i.cartQuantity, i.quantityReturned + quantity),
+        }
+      : i,
+  );
+  // Both loaded values are the same rate scaled by the same factor, so their
+  // ratio is still the blended tax rate from sale time.
+  const taxRate = tx.subtotal > 0 ? tx.tax / tx.subtotal : 0;
+  const subtotal = items.reduce(
+    (s, it) => s + effectiveUnitPrice(it) * (it.cartQuantity - it.quantityReturned),
+    0,
+  );
+  return { ...tx, items, subtotal, tax: subtotal * taxRate, total: subtotal * (1 + taxRate) };
+}
+
 interface HistoryContextType {
   transactions: Transaction[];
   addTransaction: (
@@ -311,7 +337,20 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
         itemId,
         quantity,
       );
-      await refreshTransactions();
+      if (queued) {
+        // There is no connection, so refreshTransactions would fail silently
+        // and the dialog would keep offering the full quantity: a second tap
+        // queues a second txi.return and both replay, doubling
+        // quantity_returned and restocking twice (the server bound only
+        // rejects a total above what was sold, and two partials pass it).
+        // ponytail: in memory only - reopening offline empties the sales list
+        // entirely (there is no transaction cache), so nothing is returnable.
+        setTransactions((prev) =>
+          prev.map((t) => (t.id === transactionId ? withReturn(t, itemId, quantity) : t)),
+        );
+      } else {
+        await refreshTransactions();
+      }
       await refreshData();
       if (queued) {
         toast.success("Devolución guardada localmente (sin conexión)");

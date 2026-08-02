@@ -17,4 +17,16 @@ server {
   location / {
     try_files $uri /index.html;
   }
+
+  # The shell must be revalidated on every load. With nginx's defaults it only
+  # carries Last-Modified, and heuristic freshness (10% of the file's age) lets
+  # a browser — and the service worker's network-first navigation, which honors
+  # the HTTP cache — pin a returning user to the previous build for days: stale
+  # HTML asks for the old hashed chunks and the old sw.js, so the update never
+  # fires. Everything under /assets/ keeps its cache; those names change per
+  # build. Both `/` (via the index directive) and the fallback above land here
+  # as internal redirects, so they get the header too.
+  location = /index.html {
+    add_header Cache-Control "no-cache";
+  }
 }

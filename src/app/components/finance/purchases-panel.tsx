@@ -5,7 +5,7 @@
 // the server refuses rather than letting stock go negative.
 
 import { useState } from "react";
-import { PackageOpen, RotateCcw, Truck } from "lucide-react";
+import { HandCoins, PackageOpen, RotateCcw, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -46,6 +46,7 @@ export function PurchasesPanel({
   const { purchases, purchaseLines, purchaseReturns } = useFinance();
   const { accountName, payeeName } = useLookup(accounts, categories, payees);
   const [returning, setReturning] = useState<Purchase | undefined>();
+  const [settling, setSettling] = useState<Purchase | undefined>();
 
   const totalBought = purchases.reduce(
     (s, p) => s + p.goodsUsd + p.freightUsd,
@@ -120,18 +121,30 @@ export function PurchasesPanel({
       key: "actions",
       header: "",
       align: "right",
-      width: "6rem",
+      width: "11rem",
       render: (row) =>
         isAdmin ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 text-meta"
-            onClick={() => setReturning(row)}
-          >
-            <RotateCcw className="w-3 h-3 mr-1" />
-            Devolver
-          </Button>
+          <div className="flex items-center justify-end gap-1">
+            {row.paymentStatus === "pending" && (
+              <Button
+                size="sm"
+                className="h-8 text-meta"
+                onClick={() => setSettling(row)}
+              >
+                <HandCoins className="w-3 h-3 mr-1" />
+                Pagar
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-meta"
+              onClick={() => setReturning(row)}
+            >
+              <RotateCcw className="w-3 h-3 mr-1" />
+              Devolver
+            </Button>
+          </div>
         ) : null,
     },
   ];
@@ -194,7 +207,116 @@ export function PurchasesPanel({
           onOpenChange={(value) => !value && setReturning(undefined)}
         />
       )}
+
+      {settling && (
+        <SettleDialog
+          purchase={settling}
+          money={money}
+          open={!!settling}
+          onOpenChange={(value) => !value && setSettling(undefined)}
+        />
+      )}
     </div>
+  );
+}
+
+// Paying a supplier that was left on credit. The purchase only recorded the
+// debt; this is where the money actually leaves a pot, so the pot has to be
+// named - the compra itself usually has none, because nothing was paid the day
+// it arrived.
+function SettleDialog({
+  purchase,
+  money,
+  open,
+  onOpenChange,
+}: {
+  purchase: Purchase;
+  money: (usd: number) => string;
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
+}) {
+  const { accounts, settlePurchase } = useFinance();
+  const [accountId, setAccountId] = useState(purchase.accountId ?? "none");
+  const [occurredOn, setOccurredOn] = useState(todayIso());
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (accountId === "none") {
+      toast.error("Elige de qué cuenta salió el dinero");
+      return;
+    }
+    setSaving(true);
+    try {
+      await settlePurchase(purchase, accountId, occurredOn);
+      onOpenChange(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Pagar al proveedor</DialogTitle>
+          <DialogDescription>
+            Marca la compra como pagada y descuenta {money(purchase.totalUsd)} de
+            la cuenta que elijas.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="settle-account">Sale de</Label>
+            <Select value={accountId} onValueChange={setAccountId}>
+              <SelectTrigger id="settle-account">
+                <SelectValue placeholder="Elegir cuenta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Elegir…</SelectItem>
+                {accounts
+                  .filter((a) => a.active)
+                  .map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="settle-date">Fecha del pago</Label>
+            <Input
+              id="settle-date"
+              type="date"
+              value={occurredOn}
+              onChange={(e) => setOccurredOn(e.target.value)}
+            />
+            {purchase.paidIn === "BS" && (
+              <p className="text-meta text-gray-500 mt-1">
+                Los bolívares se valoran a la tasa de hoy: lo que se debía en
+                dólares no cambia, pero pagarlo tarde cuesta los bolívares de
+                hoy.
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancelar
+            </Button>
+            <Button className="flex-1" disabled={saving} onClick={handleSave}>
+              Registrar pago
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

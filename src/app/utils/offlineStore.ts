@@ -2,6 +2,7 @@
 // tables. Unlike a REST backend, there is no server to proxy requests
 // through here - queued operations are replayed by calling the Supabase
 // SDK directly once connectivity returns.
+import { toast } from "sonner";
 import { supabase } from "../services/supabase";
 import type { ItemHistoryRecord, UnitType } from "../context/app-context";
 import { idbGet, idbSet } from "./localdb";
@@ -9,6 +10,10 @@ import { idbGet, idbSet } from "./localdb";
 const ITEMS_KEY = "items";
 const HISTORY_KEY = "item_history";
 const OUTBOX_KEY = "outbox";
+// Ops that can never be replayed are moved here instead of being deleted.
+const OUTBOX_FAILED_KEY = "outbox_failed";
+// The op currently being replayed, written before the call goes out.
+const INFLIGHT_KEY = "outbox_inflight";
 const FINANCE_ENTRIES_KEY = "finance_entries";
 const FINANCE_CATALOG_KEY = "finance_catalog";
 
@@ -368,27 +373,101 @@ export function isOnline(): boolean {
   return typeof navigator === "undefined" || navigator.onLine;
 }
 
-// True for errors that mean "couldn't reach the server" (so the op should
-// stay queued and be retried), as opposed to errors the server actively
-// returned (a real rejection - e.g. constraint violation - which should be
-// dropped rather than retried forever).
+// Server-reported conditions that say "not now" rather than "no": retrying
+// the same payload later is the right answer. The presence of a `code` alone
+// cannot decide this - PostgREST reports an unreachable database and an
+// expired JWT with codes too, and dropping those loses every queued write.
+const RETRY_CODES = new Set([
+  "PGRST001", // could not connect to the database
+  "PGRST002", // schema cache not loaded (server still coming up)
+  "PGRST301", // JWT expired - the SDK refreshes it and the next pass works
+  "08000",
+  "08003",
+  "08006", // connection exception / failure
+  "40001",
+  "40P01", // serialization failure, deadlock
+  "53300", // too many connections
+  "57014", // statement timeout
+  "57P03", // cannot connect now, server starting up
+]);
+
+// What a failed fetch reads like across browsers (and the SDK's own aborts),
+// which is all supabase-js gives us: it reports those with an empty code.
+const NETWORK_MESSAGE =
+  /failed to fetch|networkerror|network request failed|load failed|abort|timeout/i;
+
+type Verdict =
+  | "unreachable" // the request never left the device - retry forever
+  | "transient" // the server answered "not now", or we could not tell - retry, bounded
+  | "rejected"; // the server understood and refused - retrying changes nothing
+
+function classify(error: unknown): Verdict {
+  if (!isOnline()) return "unreachable";
+  if (!error || typeof error !== "object") return "rejected";
+  const code = String((error as { code?: unknown }).code ?? "");
+  if (code) return RETRY_CODES.has(code) ? "transient" : "rejected";
+  // Codeless: a failed fetch, or something the SDK threw before sending. Only
+  // the message separates them, and an unrecognised one is retried under the
+  // attempt budget rather than assumed to be either.
+  const message = String((error as { message?: unknown }).message ?? "");
+  return NETWORK_MESSAGE.test(message) ? "unreachable" : "transient";
+}
+
+// True when the op should stay queued rather than be surfaced to the caller.
 function isNetworkError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  // A `code` means the server answered and rejected the operation.
-  return !("code" in error) || !(error as { code?: unknown }).code;
+  return classify(error) !== "rejected";
 }
 
-async function getOutbox(): Promise<OutboxOp[]> {
-  return (await idbGet<OutboxOp[]>(OUTBOX_KEY)) || [];
+/** The queue envelope. `userId` scopes replay to the session that created the
+ *  op; `opId` is what the in-flight marker points at. Both are optional so
+ *  ops queued by an older build still drain. */
+type QueuedOp = OutboxOp & { userId?: string; opId?: string };
+
+async function sessionUserId(): Promise<string | undefined> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user?.id;
 }
 
-async function setOutbox(ops: OutboxOp[]): Promise<void> {
+// The caches are best-effort: losing one costs a refetch. Only the outbox
+// writes below propagate a storage failure to the caller.
+async function cacheSet(key: string, value: unknown): Promise<void> {
+  try {
+    await idbSet(key, value);
+  } catch (e) {
+    console.warn("No se pudo escribir el caché local", key, e);
+  }
+}
+
+async function getOutbox(): Promise<QueuedOp[]> {
+  return (await idbGet<QueuedOp[]>(OUTBOX_KEY)) || [];
+}
+
+async function setOutbox(ops: QueuedOp[]): Promise<void> {
   await idbSet(OUTBOX_KEY, ops);
 }
 
+// Callers build item_history rows without a `date`, which online is right: the
+// column takes the database's now(), and now() is when the movement happened.
+// Queued, that default fires at FLUSH time, so a sale or adjustment made on
+// Saturday and synced on Monday reads Monday in the product's history. The
+// queue is where the two diverge, so this is where the row is stamped.
+function stampHistoryDate(op: OutboxOp): OutboxOp {
+  const date = new Date().toISOString();
+  const stamp = (h: HistoryRow): HistoryRow => (h.date ? h : { ...h, date });
+  if ("historyRow" in op && op.historyRow) return { ...op, historyRow: stamp(op.historyRow) };
+  if ("historyRows" in op) return { ...op, historyRows: op.historyRows.map(stamp) };
+  return op;
+}
+
+// Throws when the queue could not be persisted: the write is lost, and the
+// caller must say so instead of reporting "guardado localmente".
 async function enqueue(op: OutboxOp): Promise<void> {
   const ops = await getOutbox();
-  ops.push(op);
+  ops.push({
+    ...stampHistoryDate(op),
+    userId: await sessionUserId(),
+    opId: crypto.randomUUID(),
+  });
   await setOutbox(ops);
 }
 
@@ -404,19 +483,51 @@ export async function getOutboxCount(): Promise<number> {
 // and only two screens need it: the table shows a single "last movement" date
 // (which items.updated_at already provides) and the history dialog needs one
 // item at a time, loaded on demand by fetchItemHistory below.
+// Server rows do not know about the moves that are still queued. A refetch
+// that lands while one is waiting - the flush stopped on a transient error, or
+// the op belongs to another session - would otherwise restore the pre-sale
+// quantity: the seller sees the stock back on the shelf, rings the sale again,
+// and both deltas replay. Every refetch goes through here, so every caller
+// (the sync widget, the `online` handler, refreshData) is covered at once.
+//
+// ponytail: only the quantity-moving ops, which is where the double-sale bug
+// lives. A queued item.create still vanishes from a refetch until it replays.
+function withPendingDeltas(rows: ItemRow[], ops: QueuedOp[]): ItemRow[] {
+  const deltas = new Map<string, number>();
+  const add = (id: string, d: number) => deltas.set(id, (deltas.get(id) ?? 0) + d);
+  for (const op of ops) {
+    if (op.kind === "stock.delta") add(op.itemId, op.delta);
+    else if (op.kind === "txi.return") add(op.itemId, op.qty);
+    else if (op.kind === "purchase.post")
+      for (const line of op.lines) if (line.item_id) add(line.item_id, line.quantity);
+  }
+  if (deltas.size === 0) return rows;
+  return rows.map((r) =>
+    deltas.has(r.id)
+      ? { ...r, quantity: Math.max(0, (r.quantity ?? 0) + deltas.get(r.id)!) }
+      : r,
+  );
+}
+
 export async function fetchInventory(): Promise<{
   itemRows: ItemRow[];
   offline: boolean;
 }> {
   if (isOnline()) {
     try {
+      // Read before the query, so it describes the request we are about to
+      // make: an empty result from a request that carried no session is RLS,
+      // not an empty catalogue (app-context fetches before auth), and it must
+      // not replace a populated offline cache.
+      const authed = !!(await sessionUserId());
       const { data: itemRows, error } = await supabase
         .from("items")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      await idbSet(ITEMS_KEY, itemRows || []);
-      return { itemRows: itemRows || [], offline: false };
+      const rows = withPendingDeltas(itemRows || [], await getOutbox());
+      if (rows.length || authed) await cacheSet(ITEMS_KEY, rows);
+      return { itemRows: rows, offline: false };
     } catch {
       // fall through to cache
     }
@@ -449,12 +560,12 @@ export async function fetchItemHistory(itemId: string): Promise<HistoryRow[]> {
 
 async function patchCachedItems(mutate: (rows: ItemRow[]) => ItemRow[]): Promise<void> {
   const rows = (await idbGet<ItemRow[]>(ITEMS_KEY)) || [];
-  await idbSet(ITEMS_KEY, mutate(rows));
+  await cacheSet(ITEMS_KEY, mutate(rows));
 }
 
 async function patchCachedHistory(mutate: (rows: HistoryRow[]) => HistoryRow[]): Promise<void> {
   const rows = (await idbGet<HistoryRow[]>(HISTORY_KEY)) || [];
-  await idbSet(HISTORY_KEY, mutate(rows));
+  await cacheSet(HISTORY_KEY, mutate(rows));
 }
 
 export async function createItem(row: ItemRow, historyRow: HistoryRow): Promise<{ queued: boolean }> {
@@ -589,7 +700,15 @@ export async function applyStockDelta(
       throw error;
     }
   }
-  await enqueue({ kind: "stock.delta", itemId, delta, historyRow });
+  await enqueue({
+    kind: "stock.delta",
+    itemId,
+    delta,
+    // Minted here because the drain writes this row only after the RPC
+    // returns: its id is the one thing a crashed replay can ask the server
+    // about to find out whether the move already landed.
+    historyRow: historyRow && { ...historyRow, id: historyRow.id ?? crypto.randomUUID() },
+  });
   return { queued: true };
 }
 
@@ -634,6 +753,7 @@ export async function fetchFinanceCatalog(): Promise<{
 }> {
   if (isOnline()) {
     try {
+      const authed = !!(await sessionUserId());
       const [accounts, categories, payees, recurring, allocations] =
         await Promise.all([
           supabase.from("finance_accounts").select("*").order("sort_order"),
@@ -657,7 +777,10 @@ export async function fetchFinanceCatalog(): Promise<{
         recurring: recurring.data || [],
         allocations: allocations.data || [],
       };
-      await idbSet(FINANCE_CATALOG_KEY, catalog);
+      // Same pre-auth guard as fetchInventory: an all-empty catalog may just
+      // be RLS answering a request that carried no session.
+      if (authed || Object.values(catalog).some((rows) => rows.length))
+        await cacheSet(FINANCE_CATALOG_KEY, catalog);
       return { catalog, offline: false };
     } catch {
       // fall through to cache
@@ -681,6 +804,7 @@ export async function fetchFinanceEntries(
 ): Promise<{ rows: FinanceEntryRow[]; hasMore: boolean; offline: boolean }> {
   if (isOnline()) {
     try {
+      const authed = !!(await sessionUserId());
       const { data, error } = await supabase
         .from("finance_entries")
         .select("*")
@@ -691,7 +815,8 @@ export async function fetchFinanceEntries(
       if (error) throw error;
       const all = data || [];
       const rows = all.slice(0, limit);
-      await idbSet(FINANCE_ENTRIES_KEY, rows);
+      // Same pre-auth guard as fetchInventory.
+      if (rows.length || authed) await cacheSet(FINANCE_ENTRIES_KEY, rows);
       return { rows, hasMore: all.length > limit, offline: false };
     } catch {
       // fall through to cache
@@ -705,7 +830,7 @@ async function patchCachedEntries(
   mutate: (rows: FinanceEntryRow[]) => FinanceEntryRow[],
 ): Promise<void> {
   const rows = (await idbGet<FinanceEntryRow[]>(FINANCE_ENTRIES_KEY)) || [];
-  await idbSet(FINANCE_ENTRIES_KEY, mutate(rows));
+  await cacheSet(FINANCE_ENTRIES_KEY, mutate(rows));
 }
 
 export async function createFinanceEntry(
@@ -875,7 +1000,7 @@ export async function fetchItemSuppliers(): Promise<ItemSupplierRow[]> {
 }
 
 // Replays queued ops in order against Supabase. Stops at the first network
-// error (so it can be retried later); drops ops the server actively rejects.
+// error (so it can be retried later); parks ops the server actively rejects.
 export async function flushOutbox(): Promise<void> {
   if (!isOnline() || flushing) return;
   flushing = true;
@@ -886,16 +1011,180 @@ export async function flushOutbox(): Promise<void> {
   }
 }
 
+/** What was in flight when the app last stopped. */
+type Inflight = { opId?: string; returnedBefore?: number };
+
+// The two replays whose RPCs are not idempotent: sending one twice moves stock
+// twice. Everything else is an upsert, a delete or carries a device-minted id.
+function isGuarded(op: QueuedOp): boolean {
+  return !!op.opId && (op.kind === "stock.delta" || op.kind === "txi.return");
+}
+
+// Reads whatever the crash check below will compare against, before the call
+// that changes it.
+async function inflightMark(op: QueuedOp): Promise<Inflight> {
+  if (op.kind !== "txi.return") return { opId: op.opId };
+  const { data, error } = await supabase
+    .from("transaction_items")
+    .select("quantity_returned")
+    .eq("transaction_id", op.transactionId)
+    .eq("item_id", op.itemId)
+    .maybeSingle();
+  if (error) throw error;
+  return { opId: op.opId, returnedBefore: data?.quantity_returned ?? 0 };
+}
+
+// Whether the op that was in flight when the app died actually landed. Only
+// the server can say, and these are the witnesses a client can read.
+//
+// ponytail: a "no" is not proof it did not land - the stock RPC leaves no
+// client-visible trace until the history row that follows it, so a crash
+// between those two still replays the delta. Airtight needs an idempotency key
+// on the RPC itself, which is server side.
+async function alreadyApplied(op: QueuedOp, mark: Inflight): Promise<boolean> {
+  if (op.kind === "txi.return") {
+    const { data, error } = await supabase
+      .from("transaction_items")
+      .select("quantity_returned")
+      .eq("transaction_id", op.transactionId)
+      .eq("item_id", op.itemId)
+      .maybeSingle();
+    if (error) throw error;
+    return (data?.quantity_returned ?? 0) >= (mark.returnedBefore ?? 0) + op.qty;
+  }
+  if (op.kind === "stock.delta" && op.historyRow?.id) {
+    const { data, error } = await supabase
+      .from("item_history")
+      .select("id")
+      .eq("id", op.historyRow.id)
+      .maybeSingle();
+    if (error) throw error;
+    return !!data;
+  }
+  return false;
+}
+
+// How many passes a head op gets before it is parked. Only failures that are
+// not plain connectivity count, so a device with no signal keeps its queue for
+// as long as it needs.
+// ponytail: in memory, so the budget restarts with the app - enough to unpin a
+// live session, not to retire a permanently poisoned op across reloads.
+const MAX_TRANSIENT_ATTEMPTS = 25;
+let stuckOpKey = "";
+let stuckAttempts = 0;
+
+function countAttempt(op: QueuedOp): number {
+  const key = op.opId ?? op.kind;
+  if (stuckOpKey !== key) {
+    stuckOpKey = key;
+    stuckAttempts = 0;
+  }
+  return ++stuckAttempts;
+}
+
+// Parked, never deleted: a queued write the server refused still has to be
+// recoverable by hand, and this toast is the only sign the user gets that one
+// left the queue without landing.
+async function parkOp(op: QueuedOp, error: unknown): Promise<void> {
+  console.error("Operación offline descartada", op, error);
+  try {
+    const failed = (await idbGet<unknown[]>(OUTBOX_FAILED_KEY)) || [];
+    await idbSet(OUTBOX_FAILED_KEY, [
+      ...failed,
+      {
+        op,
+        at: new Date().toISOString(),
+        error: (error as { message?: string })?.message ?? String(error),
+      },
+    ]);
+  } catch (e) {
+    console.error("No se pudo archivar la operación descartada", e);
+  }
+  toast.error(`Un cambio pendiente no se pudo sincronizar (${op.kind})`, {
+    description: "Quedó archivado en este dispositivo; verifica los datos.",
+    duration: 8000,
+  });
+}
+
+// Returns false when the queue could not be updated: draining must stop then,
+// or the op that just succeeded replays on the next pass.
+async function removeOp(index: number): Promise<boolean> {
+  try {
+    // Re-read first: ops enqueued while this one was in flight must survive.
+    // Only this function removes, and enqueue only appends, so earlier
+    // indexes still point at the same ops.
+    const current = await getOutbox();
+    current.splice(index, 1);
+    await setOutbox(current);
+    return true;
+  } catch (e) {
+    console.error("No se pudo actualizar la cola offline", e);
+    toast.error("No se pudo actualizar la cola local de cambios", {
+      description: "Cierra y vuelve a abrir la aplicación antes de seguir.",
+      duration: 8000,
+    });
+    return false;
+  }
+}
+
+// Another user's ops stay queued - only their session can replay them - but
+// the pending counter would otherwise sit at a number that never goes down.
+let foreignWarnedFor: string | null = null;
+function warnForeignOps(count: number, userId: string | undefined): void {
+  if (foreignWarnedFor === (userId ?? "")) return;
+  foreignWarnedFor = userId ?? "";
+  toast.warning(`${count} cambio(s) pendiente(s) de otro usuario`, {
+    description: "Se sincronizarán cuando esa persona inicie sesión aquí.",
+    duration: 8000,
+  });
+}
+
 async function drainOutbox(): Promise<void> {
-  // The queue is re-read every round and re-read again before the head is
+  const userId = await sessionUserId();
+  const mark = await idbGet<Inflight>(INFLIGHT_KEY);
+
+  // The queue is re-read every round and re-read again before the op is
   // dropped. Holding one in-memory copy across an await loses every op the
   // user enqueues while a replay is in flight: the write-back would persist a
   // slice taken before those ops existed.
   for (;;) {
     const ops = await getOutbox();
-    if (ops.length === 0) return;
-    const op = ops[0];
+    // Ops replay only under the session that created them. On a shared tablet
+    // an admin's edits sent with a seller's JWT are rejected by RLS and lost,
+    // and a seller's edits sent with an admin's JWT walk past the guards that
+    // exist to stop them.
+    const index = ops.findIndex((o) => !o.userId || o.userId === userId);
+    if (index === -1) {
+      if (ops.length) warnForeignOps(ops.length, userId);
+      return;
+    }
+    const op = ops[index];
     let error: unknown = null;
+
+    if (op.opId && mark?.opId === op.opId) {
+      // This op was in flight when the app died. Ask the server whether it
+      // landed instead of moving stock a second time.
+      let applied: boolean;
+      try {
+        applied = await alreadyApplied(op, mark);
+      } catch {
+        return; // could not ask - leave it queued and try again later
+      }
+      if (applied) {
+        if (!(await removeOp(index))) return;
+        continue;
+      }
+    }
+
+    if (isGuarded(op)) {
+      // Written before the call goes out, so the window above is detectable.
+      try {
+        await idbSet(INFLIGHT_KEY, await inflightMark(op));
+      } catch (e) {
+        console.error("No se pudo registrar la operación en curso", e);
+        return;
+      }
+    }
 
     try {
       switch (op.kind) {
@@ -993,10 +1282,14 @@ async function drainOutbox(): Promise<void> {
       error = e;
     }
 
-    if (error && isNetworkError(error)) return; // retry later
-    // Success, or a real rejection we just drop. Re-read first: ops enqueued
-    // while this one was in flight must survive.
-    const current = await getOutbox();
-    await setOutbox(current.slice(1));
+    if (error) {
+      const verdict = classify(error);
+      if (verdict === "unreachable") return; // retry later, as often as needed
+      if (verdict === "transient" && countAttempt(op) < MAX_TRANSIENT_ATTEMPTS)
+        return;
+      // A real rejection, or one we retried until the budget ran out.
+      await parkOp(op, error);
+    }
+    if (!(await removeOp(index))) return;
   }
 }

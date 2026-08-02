@@ -71,7 +71,21 @@ export async function fetchVenezuelaConversionRates(): Promise<{
   const eurRates = rates.filter((r) => r.rateCurrency?.code === "EUR");
   if (usdRates.length === 0 || eurRates.length === 0) return null;
 
-  const usd = parseFloat(Math.max(...usdRates.map((r) => r.baseValue)).toFixed(2));
-  const eur = parseFloat(Math.max(...eurRates.map((r) => r.baseValue)).toFixed(2));
+  // Same guard as fetchUsdtRate: a null or garbage baseValue would make
+  // Math.max yield 0 or NaN, which the caller persists as a real rate
+  // (0/NaN are not nullish) and the BCV lens then shows Bs 0.00 / Bs NaN
+  // for the whole session. Returning null keeps the previous rate instead.
+  const best = (list: ConversionRate[]): number | null => {
+    const values = list
+      .map((r) => Number(r.baseValue))
+      .filter((v) => Number.isFinite(v) && v > 0);
+    return values.length > 0
+      ? parseFloat(Math.max(...values).toFixed(2))
+      : null;
+  };
+
+  const usd = best(usdRates);
+  const eur = best(eurRates);
+  if (usd === null || eur === null) return null;
   return { usd, eur };
 }

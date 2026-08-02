@@ -24,10 +24,17 @@ import {
 export interface ReportData {
   transactions: Transaction[];
   symbol: string;
+  /** For money already charged: converts at the rate the period was sold at. */
   convert: (usd: number) => number;
+  /** For stock on hand and projections, which are priced at today's rate. */
+  convertNow: (usd: number) => number;
   periodLabel: string;
   metrics: PeriodMetrics;
   previousMetrics: PeriodMetrics;
+  /** False when the loaded history does not cover the previous window, in which
+   *  case every "Anterior" and "Variación" cell has to say so instead of
+   *  printing a number derived from half a period. */
+  previousCovered: boolean;
   products: ProductStat[];
   categories: GroupStat[];
   brands: GroupStat[];
@@ -70,8 +77,13 @@ const ALERT_LABEL: Record<Alert["level"], string> = {
 };
 
 export function exportReportPdf(data: ReportData) {
-  const { symbol, convert, metrics: m, previousMetrics: p, inventory } = data;
+  const { symbol, convert, convertNow, metrics: m, previousMetrics: p, inventory } = data;
   const money_ = (usd: number) => money(symbol, convert, usd);
+  const moneyNow = (usd: number) => money(symbol, convertNow, usd);
+  // The previous window is only reported when the history reaches into it.
+  const was = (text: string) => (data.previousCovered ? text : "—");
+  const vs = (current: number, previous: number) =>
+    data.previousCovered ? change(current, previous) : "—";
   const doc = new jsPDF();
   const generatedAt = format(new Date(), "PPP p");
   const next = () => doc.lastAutoTable.finalY + 8;
@@ -82,26 +94,39 @@ export function exportReportPdf(data: ReportData) {
   doc.setTextColor(120);
   doc.text(`Período: ${data.periodLabel}`, 14, 25);
   doc.text(`Generado: ${generatedAt}`, 14, 30);
+  if (!data.previousCovered) {
+    doc.text(
+      "El período anterior no está completo en el historial cargado: sin comparación.",
+      14,
+      35,
+    );
+  }
   doc.setTextColor(0);
 
   autoTable(doc, {
-    startY: 37,
+    startY: data.previousCovered ? 37 : 42,
     head: [["Indicador", "Período", "Anterior", "Variación"]],
     body: [
-      ["Ingresos", money_(m.revenue), money_(p.revenue), change(m.revenue, p.revenue)],
-      ["Costo de la mercancía", money_(m.cost), money_(p.cost), change(m.cost, p.cost)],
-      ["Ganancia neta", money_(m.profit), money_(p.profit), change(m.profit, p.profit)],
-      ["Margen", pct(m.margin), pct(p.margin), `${(m.margin - p.margin).toFixed(1)} pts`],
+      ["Ingresos", money_(m.revenue), was(money_(p.revenue)), vs(m.revenue, p.revenue)],
+      ["Impuesto cobrado", money_(m.tax), was(money_(p.tax)), vs(m.tax, p.tax)],
+      ["Costo de la mercancía", money_(m.cost), was(money_(p.cost)), vs(m.cost, p.cost)],
+      ["Ganancia neta", money_(m.profit), was(money_(p.profit)), vs(m.profit, p.profit)],
+      [
+        "Margen",
+        pct(m.margin),
+        was(pct(p.margin)),
+        was(`${(m.margin - p.margin).toFixed(1)} pts`),
+      ],
       [
         "Transacciones",
         String(m.transactions),
-        String(p.transactions),
-        change(m.transactions, p.transactions),
+        was(String(p.transactions)),
+        vs(m.transactions, p.transactions),
       ],
-      ["Ticket promedio", money_(m.avgTicket), money_(p.avgTicket), change(m.avgTicket, p.avgTicket)],
-      ["Unidades vendidas", String(m.units), String(p.units), change(m.units, p.units)],
-      ["Devoluciones", `${m.returnedUnits} u (${pct(m.returnRate)})`, `${p.returnedUnits} u`, "—"],
-      ["Descuentos otorgados", money_(m.discountGiven), money_(p.discountGiven), pct(m.discountRate)],
+      ["Ticket promedio", money_(m.avgTicket), was(money_(p.avgTicket)), vs(m.avgTicket, p.avgTicket)],
+      ["Unidades vendidas", String(m.units), was(String(p.units)), vs(m.units, p.units)],
+      ["Devoluciones", `${m.returnedUnits} u (${pct(m.returnRate)})`, was(`${p.returnedUnits} u`), "—"],
+      ["Descuentos otorgados", money_(m.discountGiven), was(money_(p.discountGiven)), pct(m.discountRate)],
     ],
     theme: "striped",
     headStyles: { fillColor: BRAND },
@@ -206,9 +231,9 @@ export function exportReportPdf(data: ReportData) {
     body: [
       ["Productos en catálogo", String(inventory.skus)],
       ["Unidades en stock", String(inventory.units)],
-      ["Valor al costo", money_(inventory.costValue)],
-      ["Valor a precio de venta", money_(inventory.retailValue)],
-      ["Ganancia potencial", money_(inventory.potentialProfit)],
+      ["Valor al costo", moneyNow(inventory.costValue)],
+      ["Valor a precio de venta", moneyNow(inventory.retailValue)],
+      ["Ganancia potencial", moneyNow(inventory.potentialProfit)],
       ["Rotación del período", `${inventory.turnover.toFixed(2)}x`],
       [
         "Días de inventario",
@@ -237,11 +262,11 @@ export function exportReportPdf(data: ReportData) {
         String(r.quantity),
         r.velocity.toFixed(2),
         String(r.suggestedQty),
-        money_(r.purchaseCost),
-        money_(r.expectedProfit),
+        moneyNow(r.purchaseCost),
+        moneyNow(r.expectedProfit),
       ]),
       foot: [
-        ["Total", "", "", "", money_(plan.totalCost), money_(plan.expectedProfit)],
+        ["Total", "", "", "", moneyNow(plan.totalCost), moneyNow(plan.expectedProfit)],
       ],
       theme: "striped",
       headStyles: { fillColor: BRAND },
@@ -254,9 +279,9 @@ export function exportReportPdf(data: ReportData) {
     startY: next(),
     head: [["Proyección", "Valor"]],
     body: [
-      ["Próximos 7 días", money_(data.forecast.next7)],
-      ["Próximos 30 días", money_(data.forecast.next30)],
-      ["Ganancia esperada 30 días", money_(data.forecast.expectedProfit30)],
+      ["Próximos 7 días", moneyNow(data.forecast.next7)],
+      ["Próximos 30 días", moneyNow(data.forecast.next30)],
+      ["Ganancia esperada 30 días", moneyNow(data.forecast.expectedProfit30)],
       [
         "Método",
         data.forecast.method === "trend"
@@ -290,8 +315,13 @@ export function exportReportPdf(data: ReportData) {
 }
 
 export function exportReportExcel(data: ReportData) {
-  const { convert, metrics: m, previousMetrics: p, inventory } = data;
+  const { convert, convertNow, metrics: m, previousMetrics: p, inventory } = data;
   const c = (usd: number) => Number(convert(usd).toFixed(2));
+  const cNow = (usd: number) => Number(convertNow(usd).toFixed(2));
+  // The previous window is only reported when the history reaches into it.
+  const was = (value: string | number) => (data.previousCovered ? value : "—");
+  const vs = (current: number, previous: number) =>
+    data.previousCovered ? Number(change(current, previous).replace("%", "")) || 0 : "—";
   const wb = XLSX.utils.book_new();
   const sheet = (name: string, rows: (string | number)[][]) =>
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
@@ -300,23 +330,32 @@ export function exportReportExcel(data: ReportData) {
     ["Reporte de gestión"],
     ["Período", data.periodLabel],
     ["Generado", format(new Date(), "PPP p")],
+    ...(data.previousCovered
+      ? []
+      : [
+          [
+            "Nota",
+            "El período anterior no está completo en el historial cargado: sin comparación.",
+          ],
+        ]),
     [],
     ["Indicador", "Período", "Anterior", "Variación %"],
-    ["Ingresos", c(m.revenue), c(p.revenue), Number(change(m.revenue, p.revenue).replace("%", "")) || 0],
-    ["Costo de la mercancía", c(m.cost), c(p.cost), Number(change(m.cost, p.cost).replace("%", "")) || 0],
-    ["Ganancia neta", c(m.profit), c(p.profit), Number(change(m.profit, p.profit).replace("%", "")) || 0],
-    ["Margen %", Number(m.margin.toFixed(1)), Number(p.margin.toFixed(1)), Number((m.margin - p.margin).toFixed(1))],
-    ["Transacciones", m.transactions, p.transactions, Number(change(m.transactions, p.transactions).replace("%", "")) || 0],
-    ["Ticket promedio", c(m.avgTicket), c(p.avgTicket), Number(change(m.avgTicket, p.avgTicket).replace("%", "")) || 0],
-    ["Unidades", m.units, p.units, Number(change(m.units, p.units).replace("%", "")) || 0],
-    ["Unidades devueltas", m.returnedUnits, p.returnedUnits, ""],
-    ["Tasa de devolución %", Number(m.returnRate.toFixed(1)), Number(p.returnRate.toFixed(1)), ""],
-    ["Descuentos otorgados", c(m.discountGiven), c(p.discountGiven), ""],
-    ["Días con ventas", m.activeDays, p.activeDays, ""],
+    ["Ingresos", c(m.revenue), was(c(p.revenue)), vs(m.revenue, p.revenue)],
+    ["Impuesto cobrado", c(m.tax), was(c(p.tax)), vs(m.tax, p.tax)],
+    ["Costo de la mercancía", c(m.cost), was(c(p.cost)), vs(m.cost, p.cost)],
+    ["Ganancia neta", c(m.profit), was(c(p.profit)), vs(m.profit, p.profit)],
+    ["Margen %", Number(m.margin.toFixed(1)), was(Number(p.margin.toFixed(1))), was(Number((m.margin - p.margin).toFixed(1)))],
+    ["Transacciones", m.transactions, was(p.transactions), vs(m.transactions, p.transactions)],
+    ["Ticket promedio", c(m.avgTicket), was(c(p.avgTicket)), vs(m.avgTicket, p.avgTicket)],
+    ["Unidades", m.units, was(p.units), vs(m.units, p.units)],
+    ["Unidades devueltas", m.returnedUnits, was(p.returnedUnits), ""],
+    ["Tasa de devolución %", Number(m.returnRate.toFixed(1)), was(Number(p.returnRate.toFixed(1))), ""],
+    ["Descuentos otorgados", c(m.discountGiven), was(c(p.discountGiven)), ""],
+    ["Días con ventas", m.activeDays, was(p.activeDays), ""],
     [],
-    ["Proyección 7 días", c(data.forecast.next7)],
-    ["Proyección 30 días", c(data.forecast.next30)],
-    ["Ganancia esperada 30 días", c(data.forecast.expectedProfit30)],
+    ["Proyección 7 días", cNow(data.forecast.next7)],
+    ["Proyección 30 días", cNow(data.forecast.next30)],
+    ["Ganancia esperada 30 días", cNow(data.forecast.expectedProfit30)],
     ["Método de proyección", data.forecast.method === "trend" ? "Tendencia" : "Promedio"],
   ]);
 
@@ -393,11 +432,12 @@ export function exportReportExcel(data: ReportData) {
   sheet("Marcas", groupRows(data.brands, "Marca"));
 
   sheet("Vendedores", [
-    ["Vendedor", "Ventas", "Ingresos", "Costo", "Ganancia", "Margen %", "Ticket promedio", "Unidades", "U/venta", "Descuentos", "Peso %"],
+    ["Vendedor", "Ventas", "Ingresos", "Impuesto", "Costo", "Ganancia", "Margen %", "Ticket promedio", "Unidades", "U/venta", "Descuentos", "Peso %"],
     ...data.sellers.map((s) => [
       s.seller,
       s.transactions,
       c(s.revenue),
+      c(s.tax),
       c(s.cost),
       c(s.profit),
       Number(s.margin.toFixed(1)),
@@ -442,10 +482,10 @@ export function exportReportExcel(data: ReportData) {
       r.type,
       r.brand,
       r.quantity,
-      c(r.buyingPrice),
-      c(r.sellingPrice),
-      c(r.costValue),
-      c(r.retailValue),
+      cNow(r.buyingPrice),
+      cNow(r.sellingPrice),
+      cNow(r.costValue),
+      cNow(r.retailValue),
       Number(r.velocity.toFixed(3)),
       Number.isFinite(r.daysOfStock) ? Number(r.daysOfStock.toFixed(1)) : "",
       r.daysSinceLastSale ?? "",
@@ -464,13 +504,13 @@ export function exportReportExcel(data: ReportData) {
       Number(r.velocity.toFixed(3)),
       Number.isFinite(r.daysOfStock) ? Number(r.daysOfStock.toFixed(1)) : "",
       r.suggestedQty,
-      c(r.purchaseCost),
-      c(r.expectedRevenue),
-      c(r.expectedProfit),
+      cNow(r.purchaseCost),
+      cNow(r.expectedRevenue),
+      cNow(r.expectedProfit),
       r.stockoutDate ? format(r.stockoutDate, "yyyy-MM-dd") : "",
     ]),
     [],
-    ["Total", "", "", "", "", c(plan.totalCost), "", c(plan.expectedProfit), ""],
+    ["Total", "", "", "", "", cNow(plan.totalCost), "", cNow(plan.expectedProfit), ""],
   ]);
 
   sheet("Transacciones", [

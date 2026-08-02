@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useApp } from "../context/app-context";
+import { toast } from "sonner";
+import { isReferenceLens, useApp } from "../context/app-context";
 import { Input } from "./ui/input";
 
 type EntryCurrency = "USD" | "BS";
@@ -23,15 +24,27 @@ interface MoneyInputProps {
   compact?: boolean;
 }
 
+// Venezuelan keyboards type comma decimals ("4,50"). A type="number" field
+// never lets us see them - Firefox reports badInput as an empty value, so the
+// blur would silently reset a price the seller believes was changed. The
+// field is therefore plain text and the comma is normalized here. Number()
+// rather than parseFloat, so trailing garbage ("4,5x") errors out instead of
+// silently truncating the amount.
+const parseAmount = (raw: string): number => {
+  const normalized = raw.trim().replace(",", ".");
+  return normalized === "" ? NaN : Number(normalized);
+};
+
 /**
  * Money entry with an explicit USD/Bs toggle.
  *
- * Deliberately ignores the app's display-currency lens. The lens can be a
- * reference rate (BCV/EUR) that we do NOT consider the real worth of a
- * bolivar, so entering money through it would book the amount at the wrong
- * value. Bolivares here always convert at the honest rate, and because
- * bsToUsd/usdToBs are exact inverses, focusing and blurring without typing can
- * never alter the stored price.
+ * Deliberately ignores the app's display-currency lens for conversion, and
+ * disables itself entirely while a reference lens (BCV/EUR) is active: those
+ * rates are not what we consider the real worth of a bolivar, so a figure
+ * read off a reference screen and retyped here would book at the honest rate
+ * as a different value. Bolivares here always convert at the honest rate, and
+ * because bsToUsd/usdToBs are exact inverses, focusing and blurring without
+ * typing can never alter the stored price.
  */
 export function MoneyInput({
   valueUsd,
@@ -43,23 +56,30 @@ export function MoneyInput({
   showPreview,
   compact,
 }: MoneyInputProps) {
-  const { bsToUsd, usdToBs, honestRateKey } = useApp();
+  const { bsToUsd, usdToBs, honestRate, currency } = useApp();
   const [entry, setEntry] = useState<EntryCurrency>("USD");
   const [text, setText] = useState("");
   // Only a real edit may write. Without this, any focus/blur would commit a
   // recomputed value - historically the source of silent price drift.
   const dirty = useRef(false);
 
+  // Blocked, not just discouraged: same rule as the Pagar button in
+  // total-view. Guarding in the shared field covers every money entry
+  // built on it at once.
+  const lensBlocked = isReferenceLens(currency);
+  const isDisabled = disabled || lensBlocked;
+
   const toDisplay = (usd: number) => (entry === "USD" ? usd : usdToBs(usd));
   const toUsd = (amount: number) => (entry === "USD" ? amount : bsToUsd(amount));
 
-  // Resync whenever the underlying value or the entry basis changes, but never
-  // while the user is mid-edit.
+  // Resync whenever the underlying value, the entry basis, or the honest rate
+  // itself changes (a background rate sync must not leave a mounted Bs field
+  // quoting bolivares at the old rate), but never while the user is mid-edit.
   useEffect(() => {
     if (dirty.current) return;
     setText(toDisplay(valueUsd).toFixed(2));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [valueUsd, entry, honestRateKey]);
+  }, [valueUsd, entry, honestRate]);
 
   const reset = () => {
     dirty.current = false;
@@ -68,8 +88,11 @@ export function MoneyInput({
 
   const commit = () => {
     if (!dirty.current) return;
-    const parsed = parseFloat(text);
+    const parsed = parseAmount(text);
     if (!Number.isFinite(parsed) || parsed < 0) {
+      // Say why the edit did not stick: a silent reset reads as a saved
+      // price, and the sale then closes at the old one.
+      if (text.trim() !== "") toast.error(`Monto inválido: "${text.trim()}"`);
       reset();
       return;
     }
@@ -88,7 +111,7 @@ export function MoneyInput({
     onCommitUsd(rounded);
   };
 
-  const parsedPreview = parseFloat(text);
+  const parsedPreview = parseAmount(text);
   const previewUsd = Number.isFinite(parsedPreview) ? toUsd(parsedPreview) : null;
 
   return (
@@ -102,13 +125,11 @@ export function MoneyInput({
             {entry === "USD" ? "$" : "Bs"}
           </span>
           <Input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
             inputMode="decimal"
             enterKeyHint="done"
             aria-label={`${label} en ${entry === "USD" ? "dólares" : "bolívares"}`}
-            disabled={disabled}
+            disabled={isDisabled}
             autoFocus={autoFocus}
             value={text}
             onChange={(e) => {
@@ -131,7 +152,7 @@ export function MoneyInput({
         </div>
         <button
           type="button"
-          disabled={disabled}
+          disabled={isDisabled}
           aria-label={`Cambiar entrada a ${entry === "USD" ? "bolívares" : "dólares"}`}
           aria-pressed={entry === "BS"}
           onClick={() => {
@@ -145,6 +166,13 @@ export function MoneyInput({
           {entry === "USD" ? "USD" : "Bs"}
         </button>
       </div>
+
+      {lensBlocked && (
+        <p className="text-xs text-amber-700 mt-1">
+          Estás viendo una tasa de referencia. Cambia a USD o Bs para ingresar
+          montos.
+        </p>
+      )}
 
       {showPreview && previewUsd !== null && (
         <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-2">

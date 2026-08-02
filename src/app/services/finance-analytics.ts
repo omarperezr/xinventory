@@ -27,6 +27,7 @@ import type {
   Allocation,
   CategoryNature,
   FinanceAccount,
+  FinanceBalances,
   FinanceCategory,
   FinanceEntry,
   FinancePayee,
@@ -35,6 +36,8 @@ import type {
   PurchaseReturn,
   RecurringRule,
 } from "../context/finance-context";
+// Explicit extension so the runnable check next to this file can be executed
+// straight by node, which does not resolve extensionless specifiers.
 import {
   buildCatalog,
   buildLines,
@@ -42,7 +45,7 @@ import {
   previousRange,
   transactionsInRange,
   type DateRange,
-} from "./report-analytics";
+} from "./report-analytics.ts";
 
 /** Days in an average month. Ranges are normalized through this so a 17-day
  *  window can still be compared against a monthly budget or a monthly rent. */
@@ -96,6 +99,11 @@ export interface FinanceInput {
   range: DateRange;
   /** Bolivares per dollar of real worth, for valuing bolivar balances today. */
   honestRate: number;
+  /** Cumulative totals over the whole ledger and the whole sales history. The
+   *  arrays above are pages, so the balances cannot be summed from them. Null
+   *  when the server could not be reached: the balances then fall back to those
+   *  pages and the screen flags them as partial. */
+  balances: FinanceBalances | null;
 }
 
 export interface ProfitAndLoss {
@@ -195,6 +203,9 @@ export interface Obligation {
   description: string;
   payeeName: string | null;
   categoryName: string | null;
+  /** The pot it was recorded against. Settling it must keep that pot, or the
+   *  balance it was charged to stays overstated. */
+  accountId: string | null;
   amountUsd: number;
   dueOn: string | null;
   daysUntilDue: number | null;
@@ -396,8 +407,9 @@ function normalizeMethod(value: string): string {
     .replace(/[̀-ͯ]/g, "");
 }
 
-function routeSalePayments(
-  transactions: Transaction[],
+/** Puts per-method takings in the pot the admin declared for that method. */
+function routeMethodTotals(
+  totals: Iterable<[string, number]>,
   accounts: FinanceAccount[],
 ): {
   byAccount: Map<string, number>;
@@ -415,20 +427,42 @@ function routeSalePayments(
   const unassignedMethods = new Set<string>();
   let unassigned = 0;
 
-  for (const tx of transactions) {
-    const payments: PaymentRecord[] = tx.payments ?? [];
-    for (const payment of payments) {
-      const accountId = byMethod.get(normalizeMethod(payment.method || ""));
-      if (accountId) {
-        byAccount.set(accountId, (byAccount.get(accountId) ?? 0) + payment.amount);
-      } else {
-        unassigned += payment.amount;
-        if (payment.method) unassignedMethods.add(payment.method);
-      }
+  for (const [method, amount] of totals) {
+    const accountId = byMethod.get(normalizeMethod(method));
+    if (accountId) {
+      byAccount.set(accountId, (byAccount.get(accountId) ?? 0) + amount);
+    } else {
+      unassigned += amount;
+      if (method) unassignedMethods.add(method);
     }
   }
 
   return { byAccount, unassigned, unassignedMethods: [...unassignedMethods] };
+}
+
+function routeSalePayments(
+  transactions: Transaction[],
+  accounts: FinanceAccount[],
+): ReturnType<typeof routeMethodTotals> {
+  const kept = new Map<string, number>();
+
+  for (const tx of transactions) {
+    const payments: PaymentRecord[] = tx.payments ?? [];
+    // A payment records the money the customer HANDED OVER, which is not what
+    // the drawer keeps: change goes straight back out, and a returned sale is
+    // refunded. tx.total is already net of returns, so crediting the raw
+    // tender would leave the shop $2 richer on paper for every $20 note taken
+    // against an $18 sale, and $100 richer for every sale returned in full.
+    const tendered = payments.reduce((sum, p) => sum + p.amount, 0);
+    const share = tendered > 0 ? Math.min(tendered, Math.max(0, tx.total)) / tendered : 0;
+
+    for (const payment of payments) {
+      const method = payment.method || "";
+      kept.set(method, (kept.get(method) ?? 0) + payment.amount * share);
+    }
+  }
+
+  return routeMethodTotals(kept, accounts);
 }
 
 function computeAccounts(
@@ -436,41 +470,82 @@ function computeAccounts(
   entries: FinanceEntry[],
   salesByAccount: Map<string, number>,
   honestRate: number,
+  cumulative: FinanceBalances | null,
+  /** Counter takings in bolivares at the rate each sale stamped. Null when the
+   *  server totals are missing, in which case today's rate is all there is. */
+  salesBsByAccount: Map<string, number> | null,
 ): AccountBalance[] {
   const rate = honestRate > 0 ? honestRate : 1;
+  const cumulativeById = new Map(
+    (cumulative?.accounts ?? []).map((a) => [a.accountId, a]),
+  );
 
   return accounts.map((account) => {
     let inflowUsd = 0;
     let outflowUsd = 0;
     let bs = account.openingBalanceBs;
 
-    for (const entry of entries) {
-      if (entry.status !== "paid") continue;
+    if (cumulative) {
+      // Every movement ever recorded, counted by the server. An account that
+      // never moved has no row.
+      const totals = cumulativeById.get(account.id);
+      inflowUsd = totals?.inflowUsd ?? 0;
+      outflowUsd = totals?.outflowUsd ?? 0;
+      bs +=
+        (totals?.inflowBs ?? 0) -
+        (totals?.outflowBs ?? 0) +
+        ((totals?.inflowUsdAtRate ?? 0) - (totals?.outflowUsdAtRate ?? 0)) * rate;
+    } else {
+      // No server totals: the loaded window is all there is, and the screen
+      // says the balances are partial.
+      for (const entry of entries) {
+        if (entry.status !== "paid") continue;
 
-      const isDestination =
-        entry.accountId === account.id
-          ? entry.kind === "income"
-          : entry.kind === "transfer" && entry.counterAccountId === account.id;
-      const isSource =
-        entry.accountId === account.id &&
-        (entry.kind === "expense" || entry.kind === "transfer");
+        const isDestination =
+          entry.accountId === account.id
+            ? entry.kind === "income"
+            : entry.kind === "transfer" && entry.counterAccountId === account.id;
+        const isSource =
+          entry.accountId === account.id &&
+          (entry.kind === "expense" || entry.kind === "transfer");
 
-      if (!isDestination && !isSource) continue;
+        if (!isDestination && !isSource) continue;
 
-      if (isDestination) {
-        inflowUsd += entry.amountUsd;
-        if (entry.paidIn === "BS" && entry.amountBs) bs += entry.amountBs;
-      } else {
-        outflowUsd += entry.amountUsd;
-        if (entry.paidIn === "BS" && entry.amountBs) bs -= entry.amountBs;
+        // A bolivar pot holds bolivares whatever the movement was denominated
+        // in: dollars moved into the drawer arrive as bolivares. Valued at the
+        // rate the row stamped when it was written, and only at today's rate
+        // when the row genuinely stamped none - a dollar movement usually does
+        // not. Using today's rate on a row that carries its own would restate
+        // last year's deposit at this year's bolivar, inventing bolivares that
+        // were never in the drawer and hiding what holding them cost.
+        const movementBs =
+          entry.paidIn === "BS" && entry.amountBs
+            ? entry.amountBs
+            : entry.amountUsd * (entry.rateUsed ?? rate);
+
+        if (isDestination) {
+          inflowUsd += entry.amountUsd;
+          bs += movementBs;
+        } else {
+          outflowUsd += entry.amountUsd;
+          bs -= movementBs;
+        }
       }
     }
 
     const salesInflowUsd = salesByAccount.get(account.id) ?? 0;
     inflowUsd += salesInflowUsd;
-    // Counter takings in a bolivar pot arrive as bolivares, valued at today's
-    // rate: the sale was priced in dollars and paid in bolivares at that rate.
-    if (account.basis === "BS") bs += salesInflowUsd * rate;
+    // Counter takings in a bolivar pot arrive as bolivares, at the rate each
+    // sale stamped. Only when the server totals are missing is today's rate
+    // used instead, which overstates what is sitting in the pot and hides the
+    // devaluation on old takings - the screen says the balances are partial in
+    // that case. The dollar worth is unaffected either way: the rate cancels
+    // against `bs / rate`.
+    if (account.basis === "BS") {
+      bs += salesBsByAccount
+        ? (salesBsByAccount.get(account.id) ?? 0)
+        : salesInflowUsd * rate;
+    }
 
     const balanceUsd = account.openingBalanceUsd + inflowUsd - outflowUsd;
     const worthNowUsd = account.basis === "BS" ? bs / rate : balanceUsd;
@@ -523,12 +598,33 @@ export function dueOccurrences(
   rules: RecurringRule[],
   entries: FinanceEntry[],
   today = new Date(),
+  /** Every posted occurrence, counted server-side over the whole ledger. When
+   *  present it replaces the page entirely, and the window floor below is not
+   *  needed: an occurrence can then be judged however old it is. */
+  postedPeriods?: { recurringId: string; periodKey: string }[] | null,
 ): DueOccurrence[] {
   const posted = new Set(
-    entries
-      .filter((e) => e.recurringId && e.periodKey)
-      .map((e) => `${e.recurringId}:${e.periodKey}`),
+    postedPeriods
+      ? postedPeriods.map((p) => `${p.recurringId}:${p.periodKey}`)
+      : entries
+          .filter((e) => e.recurringId && e.periodKey)
+          .map((e) => `${e.recurringId}:${e.periodKey}`),
   );
+
+  // Without the server's list, `entries` is the newest page of the ledger, not
+  // the ledger. Older than its oldest day, "no matching row" stops meaning
+  // "never posted" and starts meaning "posted outside the page", so proposing
+  // those occurrences tells the shop to pay an obligation it already settled.
+  // Only the window the page actually covers can be judged. An empty page means
+  // an empty ledger - the fetch falls back to the cache rather than to nothing -
+  // so a new shop still sees its first occurrences.
+  const oldestLoaded = postedPeriods
+    ? null
+    : entries.reduce<string | null>(
+        (min, e) => (min === null || e.occurredOn < min ? e.occurredOn : min),
+        null,
+      );
+  const floorTime = oldestLoaded ? parseDay(oldestLoaded).getTime() : -Infinity;
 
   const todayTime = parseDay(toIso(today)).getTime();
   const out: DueOccurrence[] = [];
@@ -546,6 +642,7 @@ export function dueOccurrences(
       const time = date.getTime();
       if (time > todayTime) break;
       if (endsOn !== null && time > endsOn) break;
+      if (time < floorTime) continue;
 
       const periodKey = toIso(date);
       if (posted.has(`${rule.id}:${periodKey}`)) continue;
@@ -586,6 +683,7 @@ export function buildFinanceReport(input: FinanceInput): FinanceReport {
     items,
     range,
     honestRate,
+    balances,
   } = input;
 
   const categoryById = new Map(categories.map((c) => [c.id, c]));
@@ -634,13 +732,25 @@ export function buildFinanceReport(input: FinanceInput): FinanceReport {
 
   // --- Category breakdown ---------------------------------------------------
 
+  // Bucketed by the movement's own direction, not only by its category: money
+  // coming in with no category, or filed under a category declared as expense,
+  // would otherwise be added to the spend breakdown and reported as money the
+  // shop spent. The row still carries the plain category id, so nothing
+  // downstream has to know about the composite key.
+  const spendKey = (entry: FinanceEntry): string =>
+    `${entry.kind === "income" ? "income" : "expense"}|${entry.categoryId ?? ""}`;
+  const splitKey = (key: string) => ({
+    kind: (key.startsWith("income|") ? "income" : "expense") as "income" | "expense",
+    id: key.slice(key.indexOf("|") + 1),
+  });
+
   const spendByCategory = new Map<string, { amount: number; entries: number }>();
   const prevByCategory = new Map<string, number>();
 
   for (const entry of rangeEntries) {
     if (entry.status !== "paid" || entry.kind === "transfer") continue;
     if (refundEntryIds.has(entry.id)) continue;
-    const key = entry.categoryId ?? "";
+    const key = spendKey(entry);
     const bucket = spendByCategory.get(key) ?? { amount: 0, entries: 0 };
     bucket.amount += entry.amountUsd;
     bucket.entries += 1;
@@ -649,21 +759,20 @@ export function buildFinanceReport(input: FinanceInput): FinanceReport {
   for (const entry of prevEntries) {
     if (entry.status !== "paid" || entry.kind === "transfer") continue;
     if (refundEntryIds.has(entry.id)) continue;
-    const key = entry.categoryId ?? "";
+    const key = spendKey(entry);
     prevByCategory.set(key, (prevByCategory.get(key) ?? 0) + entry.amountUsd);
   }
 
   const totalByKind = { income: 0, expense: 0 };
-  for (const [id, bucket] of spendByCategory) {
-    const kind = categoryById.get(id)?.kind ?? "expense";
-    totalByKind[kind] += bucket.amount;
+  for (const [key, bucket] of spendByCategory) {
+    totalByKind[splitKey(key).kind] += bucket.amount;
   }
 
   const budgetFactor = range.days / AVG_MONTH_DAYS;
   const categorySpend: CategorySpend[] = [...spendByCategory.entries()].map(
-    ([id, bucket]) => {
+    ([key, bucket]) => {
+      const { kind, id } = splitKey(key);
       const category = categoryById.get(id);
-      const kind = category?.kind ?? "expense";
       const budgetForRange =
         category?.monthlyBudgetUsd != null
           ? category.monthlyBudgetUsd * budgetFactor
@@ -675,7 +784,7 @@ export function buildFinanceReport(input: FinanceInput): FinanceReport {
         kind,
         nature: category?.nature ?? "other",
         amount: bucket.amount,
-        previousAmount: prevByCategory.get(id) ?? 0,
+        previousAmount: prevByCategory.get(key) ?? 0,
         sharePct: total > 0 ? (bucket.amount / total) * 100 : 0,
         budgetForRange,
         budgetUsedPct:
@@ -692,13 +801,35 @@ export function buildFinanceReport(input: FinanceInput): FinanceReport {
 
   // Balances are cumulative: every movement ever recorded, not just the range,
   // because "how much is in the drawer" is not a question about a date filter.
+  // Neither `entries` nor `transactions` holds every movement - both are pages -
+  // so the totals come from the server and only fall back to the pages offline.
   const paidEntries = entries.filter((e) => e.status === "paid");
-  const routedAll = routeSalePayments(transactions, accounts);
+  const routedAll = balances
+    ? routeMethodTotals(
+        balances.methods.map((m): [string, number] => [m.method, m.keptUsd]),
+        accounts,
+      )
+    : routeSalePayments(transactions, accounts);
+  // The bolivares the counter actually took, each sale at the rate it stamped.
+  // Routed through the same declaration as the dollars, so a method lands in
+  // one pot in both currencies. Takings from sales written before the rate was
+  // stamped come back as dollars and are valued at today's rate here.
+  const salesBsByAccount = balances
+    ? routeMethodTotals(
+        balances.methods.map((m): [string, number] => [
+          m.method,
+          m.keptBs + m.keptUsdAtRate * (honestRate > 0 ? honestRate : 1),
+        ]),
+        accounts,
+      ).byAccount
+    : null;
   const accountBalances = computeAccounts(
     accounts,
     paidEntries,
     routedAll.byAccount,
     honestRate,
+    balances,
+    salesBsByAccount,
   );
 
   const routedRange = routeSalePayments(rangeTxs, accounts);
@@ -784,8 +915,15 @@ export function buildFinanceReport(input: FinanceInput): FinanceReport {
     monthlySalesNeeded,
     dailySalesNeeded,
     currentDailySales,
+    // A requirement of zero is already met. A shop with no fixed costs has not
+    // failed to cover them, and reading 0/0 as "0% covered" is what puts a
+    // break-even warning on a period that never owed anything.
     coveragePct:
-      dailySalesNeeded > 0 ? (currentDailySales / dailySalesNeeded) * 100 : 0,
+      dailySalesNeeded > 0
+        ? (currentDailySales / dailySalesNeeded) * 100
+        : fixedMonthly > 0
+          ? 0
+          : 100,
     // Without a positive margin no amount of selling covers the fixed costs,
     // and reporting a break-even figure would be a lie.
     reachable: grossMarginRatio > 0,
@@ -818,6 +956,7 @@ export function buildFinanceReport(input: FinanceInput): FinanceReport {
       categoryName: entry.categoryId
         ? (categoryById.get(entry.categoryId)?.name ?? null)
         : null,
+      accountId: entry.accountId,
       amountUsd: entry.amountUsd,
       dueOn: entry.dueOn,
       daysUntilDue,
@@ -1012,7 +1151,12 @@ export function buildFinanceReport(input: FinanceInput): FinanceReport {
 
   // --- Alerts ---------------------------------------------------------------
 
-  const occurrences = dueOccurrences(recurring, entries);
+  const occurrences = dueOccurrences(
+    recurring,
+    entries,
+    undefined,
+    balances?.postedPeriods,
+  );
   const alerts = buildAlerts({
     pnl,
     previousPnl,

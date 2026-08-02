@@ -219,6 +219,42 @@ export interface PurchaseReturn {
   notes: string;
 }
 
+/**
+ * Cumulative money, straight from the server. The ledger and the sales history
+ * are both loaded a page at a time, so a balance summed from what the browser
+ * holds is short by everything that fell outside the window - which is not a
+ * rounding difference, it is old inflows going missing while old outflows stay.
+ * Null when the RPC could not be reached; the report then degrades to the
+ * window and the screen says the balances are partial.
+ */
+export interface FinanceBalances {
+  accounts: {
+    accountId: string;
+    inflowUsd: number;
+    outflowUsd: number;
+    /** Bolivares as stamped when they moved. */
+    inflowBs: number;
+    outflowBs: number;
+    /** Dollars that stamped no rate, valued at today's honest rate on arrival. */
+    inflowUsdAtRate: number;
+    outflowUsdAtRate: number;
+  }[];
+  /** Counter takings the drawer kept, by payment method as typed. Which pot a
+   *  method lands in is the admin's declaration, so the routing stays client-side. */
+  methods: {
+    method: string;
+    keptUsd: number;
+    /** Bolivares as stamped by each sale. */
+    keptBs: number;
+    /** Takings from sales that stamped no rate, for today's rate to value. */
+    keptUsdAtRate: number;
+  }[];
+  /** Every recurring occurrence already posted, over the whole ledger rather
+   *  than the loaded page - otherwise an obligation settled months ago falls
+   *  out of the window and the screen asks the shop to pay it again. */
+  postedPeriods: { recurringId: string; periodKey: string }[] | null;
+}
+
 export interface ItemSupplier {
   id: string;
   itemId: string;
@@ -479,6 +515,54 @@ function mapItemSupplier(row: ItemSupplierRow): ItemSupplier {
   };
 }
 
+/** The finance_balances RPC answers with an untyped JSON document. Read it
+ *  through checks instead of asserting a shape: a partial read here would be a
+ *  wrong balance, and a wrong balance is worse than an honest missing one. */
+function mapBalances(data: unknown): FinanceBalances | null {
+  if (!data || typeof data !== "object") return null;
+  const { accounts, methods, posted_periods: periods } = data as {
+    accounts?: unknown;
+    methods?: unknown;
+    posted_periods?: unknown;
+  };
+  if (!Array.isArray(accounts) || !Array.isArray(methods)) return null;
+  return {
+    accounts: accounts.map((row: Record<string, unknown>) => ({
+      accountId: String(row.account_id ?? ""),
+      inflowUsd: num(row.inflow_usd),
+      outflowUsd: num(row.outflow_usd),
+      inflowBs: num(row.inflow_bs),
+      outflowBs: num(row.outflow_bs),
+      inflowUsdAtRate: num(row.inflow_usd_at_rate),
+      outflowUsdAtRate: num(row.outflow_usd_at_rate),
+    })),
+    methods: methods.map((row: Record<string, unknown>) => ({
+      method: String(row.method ?? ""),
+      keptUsd: num(row.kept_usd),
+      keptBs: num(row.kept_bs),
+      keptUsdAtRate: num(row.kept_usd_at_rate),
+    })),
+    // Null, not [], when an instance still on the previous function answers
+    // without the key: an empty list would read as "nothing has ever been
+    // posted" and the screen would propose every occurrence since the anchor.
+    postedPeriods: Array.isArray(periods)
+      ? periods.map((row: Record<string, unknown>) => ({
+          recurringId: String(row.recurring_id ?? ""),
+          periodKey: String(row.period_key ?? ""),
+        }))
+      : null,
+  };
+}
+
+async function loadBalances(): Promise<FinanceBalances | null> {
+  try {
+    const { data, error } = await supabase.rpc("finance_balances");
+    return error ? null : mapBalances(data);
+  } catch {
+    return null;
+  }
+}
+
 /** Categories are matched on exact name by the database's uniqueness rule, so
  *  they are normalized the same way inventory text is. */
 function normalizeName(value: string): string {
@@ -504,6 +588,8 @@ interface FinanceContextType {
   recurring: RecurringRule[];
   allocations: Allocation[];
   entries: FinanceEntry[];
+  /** Null when the server could not be reached: balances are then window-only. */
+  balances: FinanceBalances | null;
   purchases: Purchase[];
   purchaseLines: PurchaseLine[];
   purchaseReturns: PurchaseReturn[];
@@ -539,6 +625,12 @@ interface FinanceContextType {
     input: PurchaseInput,
     lines: PurchaseLineInput[],
     user: string,
+  ) => Promise<void>;
+  /** Marks a credit purchase as paid and lets the money actually leave a pot. */
+  settlePurchase: (
+    purchase: Purchase,
+    accountId: string | null,
+    occurredOn: string,
   ) => Promise<void>;
   returnPurchase: (
     purchaseId: string,
@@ -578,6 +670,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [recurring, setRecurring] = useState<RecurringRule[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [entries, setEntries] = useState<FinanceEntry[]>([]);
+  const [balances, setBalances] = useState<FinanceBalances | null>(null);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [purchaseLines, setPurchaseLines] = useState<PurchaseLine[]>([]);
   const [purchaseReturns, setPurchaseReturns] = useState<PurchaseReturn[]>([]);
@@ -606,6 +699,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setAllocations(catalog.allocations.map(mapAllocation));
 
       const ledgerOffline = await loadLedger(pageSize);
+      setBalances(ledgerOffline ? null : await loadBalances());
 
       // Purchases are an admin screen and need their lines to say anything, so
       // they are not cached for offline reading. A failure here must not stop
@@ -703,6 +797,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     try {
       const { queued } = await offlineStore.createFinanceEntry(row);
       setEntries((prev) => [mapEntry(row), ...prev]);
+      // The balances are counted server-side, so a write has to re-ask or the
+      // drawer would not move until the next reload. A queued write is not
+      // there to be counted yet: drop to the window and say so.
+      setBalances(queued ? null : await loadBalances());
       toast.success(
         queued ? "Movimiento guardado localmente (sin conexión)" : "Movimiento registrado",
       );
@@ -730,10 +828,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       paidIn: input.paidIn ?? current.paidIn,
       amountBs: input.amountBs,
     };
-    // Re-stamp only when the money itself changed. Editing a note must not
-    // silently re-value an old expense at today's rate.
+    // Re-stamp only when the money itself changed. The form resends every field
+    // on save, so this compares against what is stored rather than against what
+    // was sent: editing a note must not re-value an old expense at today's rate.
     const moneyChanged =
-      input.amountUsd !== undefined || input.paidIn !== undefined;
+      merged.amountUsd !== current.amountUsd ||
+      merged.paidIn !== current.paidIn ||
+      (input.amountBs !== undefined && input.amountBs !== current.amountBs);
     const rate = moneyChanged
       ? withRate(merged)
       : {
@@ -744,6 +845,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         };
 
     const row: Partial<FinanceEntryRow> = {
+      kind: input.kind,
       status: input.status,
       occurred_on: input.occurredOn,
       due_on: input.dueOn,
@@ -769,7 +871,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await offlineStore.updateFinanceEntry(id, row);
+      const { queued } = await offlineStore.updateFinanceEntry(id, row);
+      setBalances(queued ? null : await loadBalances());
       setEntries((prev) =>
         prev.map((e) =>
           e.id === id
@@ -793,7 +896,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const deleteEntry = async (id: string) => {
     try {
-      await offlineStore.deleteFinanceEntry(id);
+      const { queued } = await offlineStore.deleteFinanceEntry(id);
+      setBalances(queued ? null : await loadBalances());
       setEntries((prev) => prev.filter((e) => e.id !== id));
       toast.success("Movimiento eliminado");
     } catch (e) {
@@ -853,9 +957,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       toast.success(label);
     } catch (e) {
       console.error(e);
-      // The foreign keys are ON DELETE SET NULL, so this is almost always a
-      // permission problem rather than a reference one.
-      toast.error("No se pudo eliminar. Archívalo en su lugar.");
+      // 23503 is the foreign key: something already recorded still names this
+      // definition, and the schema refuses to delete it out from under a past
+      // movement. Say that plainly - the loaded page may not even show the
+      // movement in question, so "no está en uso" is not something the screen
+      // can conclude on its own.
+      const referenced = (e as { code?: string })?.code === "23503";
+      toast.error(
+        referenced
+          ? "No se puede eliminar: hay movimientos registrados con esto. Archívalo en su lugar."
+          : "No se pudo eliminar. Archívalo en su lugar.",
+      );
     }
   }
 
@@ -1075,6 +1187,68 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * A credit purchase actually paid.
+   *
+   * `post_purchase` already wrote the debt as a PENDING expense entry, and the
+   * balances only count paid ones - so settling flips that same entry rather
+   * than adding a second. Two entries would charge the shop twice for one
+   * invoice, and leaving the first pending forever is what kept "por pagar a
+   * proveedores" growing after the supplier was paid in cash.
+   *
+   * The bolivares are re-stamped here, at today's honest rate: the money leaves
+   * the drawer now, so a bolivar debt paid two months late costs what it costs
+   * today, not what it cost on the invoice. The purchase row keeps its own
+   * stamp - what the goods cost is not being restated.
+   */
+  const settlePurchase = async (
+    purchase: Purchase,
+    accountId: string | null,
+    occurredOn: string,
+  ) => {
+    if (purchase.paymentStatus !== "pending") return;
+    // Both halves have to land together, and the purchases screen only loads
+    // online anyway, so there is nothing to gain from queueing half of it.
+    if (!requireOnline()) return;
+
+    const paidInBs = purchase.paidIn === "BS";
+    const amountBs = paidInBs ? usdToBs(purchase.totalUsd) : null;
+    if (amountBs !== null && !Number.isFinite(amountBs)) {
+      toast.error("Verifica las tasas de cambio antes de registrar el pago");
+      return;
+    }
+
+    try {
+      // Zero-total purchases (fully covered by supplier credit) carry no entry:
+      // there was never any money to move. The money goes first, so a failure
+      // leaves the debt visible instead of a paid purchase nobody paid for.
+      if (purchase.entryId) {
+        await offlineStore.updateFinanceEntry(purchase.entryId, {
+          status: "paid",
+          account_id: accountId,
+          occurred_on: occurredOn,
+          paid_in: purchase.paidIn,
+          amount_bs: amountBs,
+          rate_used: paidInBs ? honestRate : null,
+          rate_key: paidInBs ? honestRateKey : null,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo registrar la salida de dinero");
+      return;
+    }
+
+    await upsert<PurchaseRow>(
+      "purchases",
+      { payment_status: "paid" },
+      purchase.id,
+      "Compra pagada. El dinero salió de la cuenta.",
+    );
+    await refreshFinance();
+  };
+
   const returnPurchase = async (
     purchaseId: string,
     lines: PurchaseReturnLineInput[],
@@ -1174,6 +1348,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         recurring,
         allocations,
         entries,
+        balances,
         purchases,
         purchaseLines,
         purchaseReturns,
@@ -1197,6 +1372,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         saveAllocation,
         deleteAllocation,
         createPurchase,
+        settlePurchase,
         returnPurchase,
         linkSupplier,
         unlinkSupplier,

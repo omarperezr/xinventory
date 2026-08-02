@@ -181,7 +181,7 @@ interface AppContextType {
   importItems: (
     rows: Omit<InventoryItem, "id" | "history" | "images" | "currency">[],
     user: string,
-  ) => Promise<{ created: number; updated: number }>;
+  ) => Promise<{ created: number; updated: number; duplicates: number }>;
 
   // Currency - prices are stored in USD; rates convert USD -> Bs for display
   currency: DisplayCurrency;
@@ -252,6 +252,18 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 // uppercase, trimmed, internal whitespace collapsed to single spaces.
 function normalizeText(value: string): string {
   return value.trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+/**
+ * Lowercases and strips accents, for matching only — never for storage.
+ * Product names are stored with their accents ("AZÚCAR"), and a phone keyboard
+ * types "azucar", so a search that only lowercases finds nothing.
+ */
+export function foldText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
 }
 
 function normalizeItemText<T extends { name: string; barcode: string; type: string; brand: string }>(
@@ -333,16 +345,40 @@ function loadActiveCart(): PersistedActiveCart {
   }
 }
 
+// Last rates seen from the server. Without this an offline boot starts on the
+// hardcoded fallbacks below, and in a country where the honest rate is in the
+// hundreds that values a bolivar payment at several times what was handed over.
+const RATES_KEY = "xinventory-rates";
+const FALLBACK_RATES: Rates = { USD: 36.5, EUR: 39.2, USDT: 36.5 };
+
+function storedRates(): { rates: Rates; honest: RateKey } {
+  try {
+    const raw = localStorage.getItem(RATES_KEY);
+    if (!raw) return { rates: FALLBACK_RATES, honest: "USDT" };
+    const parsed = JSON.parse(raw) as Partial<Rates> & { honest?: RateKey };
+    const rate = (key: RateKey) => {
+      const value = Number(parsed[key]);
+      return Number.isFinite(value) && value > 0 ? value : FALLBACK_RATES[key];
+    };
+    return {
+      rates: { USD: rate("USD"), EUR: rate("EUR"), USDT: rate("USDT") },
+      honest: parsed.honest === "USD" || parsed.honest === "EUR" ? parsed.honest : "USDT",
+    };
+  } catch {
+    return { rates: FALLBACK_RATES, honest: "USDT" };
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   // Inventory State
   const [items, setItems] = useState<InventoryItem[]>([]);
 
   // Currency State
   const [currency, setCurrency] = useState<DisplayCurrency>("USD");
-  const [rates, setRates] = useState<Rates>({ USD: 36.5, EUR: 39.2, USDT: 36.5 });
+  const [rates, setRates] = useState<Rates>(storedRates().rates);
   // Which rate defines the real worth of a bolivar. Configurable per business;
   // Binance P2P (USDT) is the usual answer in Venezuela.
-  const [honestRateKey, setHonestRateKey] = useState<RateKey>("USDT");
+  const [honestRateKey, setHonestRateKey] = useState<RateKey>(storedRates().honest);
   const [syncingRates, setSyncingRates] = useState(false);
   // Read by syncRatesFromProviders, which runs from effects and callbacks that
   // would otherwise close over stale rate values.
@@ -352,8 +388,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   honestRateKeyRef.current = honestRateKey;
   // Guard against a zero/NaN rate silently producing Infinity prices.
   const rawHonestRate = rates[honestRateKey];
-  const honestRate =
-    Number.isFinite(rawHonestRate) && rawHonestRate > 0 ? rawHonestRate : 1;
+  const honestRateValid = Number.isFinite(rawHonestRate) && rawHonestRate > 0;
+  const honestRate = honestRateValid ? rawHonestRate : 1;
 
   // Cart State - the in-progress cart is restored from localStorage so a
   // refresh or offline reload doesn't lose it (savedCarts below are
@@ -431,6 +467,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem("savedCarts", JSON.stringify(savedCarts));
   }, [savedCarts]);
+
+  useEffect(() => {
+    localStorage.setItem(RATES_KEY, JSON.stringify({ ...rates, honest: honestRateKey }));
+  }, [rates, honestRateKey]);
 
   useEffect(() => {
     const active: PersistedActiveCart = { cartItems, currentPayments, transactionNotes };
@@ -527,6 +567,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
           : undefined;
 
+    // Stock moves as a DELTA through the RPC, never as the absolute number the
+    // form is holding: that number was read when the dialog opened, so writing
+    // it back erases every sale made in between - and when the write is queued
+    // offline it erases them hours later. An item missing from the loaded list
+    // has no baseline to diff against, so its quantity is left alone.
+    const quantityDelta = oldItem ? updatedItem.quantity - oldItem.quantity : 0;
+
     try {
       const { queued } = await offlineStore.updateItem(
         updatedItem.id,
@@ -535,7 +582,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           barcode: updatedItem.barcode,
           buying_price_usd: updatedItem.buyingPrice,
           selling_price_usd: updatedItem.sellingPrice,
-          quantity: updatedItem.quantity,
           unit: updatedItem.unit,
           includes_taxes: updatedItem.includesTaxes,
           discount: updatedItem.discount || 0,
@@ -545,8 +591,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           notes: updatedItem.notes || "",
           updated_at: new Date().toISOString(),
         },
-        historyRow,
+        // The history row belongs to whichever write actually happened: a
+        // stock change is recorded by the delta below.
+        quantityDelta === 0 ? historyRow : undefined,
       );
+
+      if (quantityDelta !== 0) {
+        await offlineStore.applyStockDelta(updatedItem.id, quantityDelta, historyRow);
+      }
 
       // Apply the edit locally instead of refetching. The server timestamp is
       // authoritative, but an approximation is fine for the display column.
@@ -665,8 +717,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const toInsert: ImportRow[] = [];
     const toUpdate: { id: string; data: ImportRow }[] = [];
 
+    // Collapse repeats WITHIN the sheet first, last row winning. A barcode
+    // listed twice would otherwise carry the same id into the upsert twice
+    // ("cannot affect row a second time" aborts the whole import) or insert
+    // the same product twice, since barcode has no unique constraint.
+    const bySheetBarcode = new Map<string, ImportRow>();
     for (const raw of rows) {
       const normalized = normalizeItemText({ ...raw, images: [] as string[] });
+      bySheetBarcode.set(normalized.barcode, normalized);
+    }
+    const duplicates = rows.length - bySheetBarcode.size;
+
+    for (const normalized of bySheetBarcode.values()) {
       const existing = byBarcode.get(normalized.barcode);
       if (existing) {
         toUpdate.push({ id: existing.id, data: normalized });
@@ -699,6 +761,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Batched as a single upsert keyed on id (the PK), instead of one
       // UPDATE round-trip per row - N sequential requests would otherwise
       // make large imports painfully slow.
+      //
+      // ponytail: this writes quantity ABSOLUTELY, unlike every other stock
+      // path, because a spreadsheet import is a recount: the sheet is the
+      // admin's assertion of what is on the shelf. The cost is that sales rung
+      // between exporting the sheet and importing it are overwritten. Import
+      // when the shop is closed; route through deltas if that stops being true.
       if (toUpdate.length > 0) {
         const { error } = await supabase.from("items").upsert(
           toUpdate.map(({ id, data }) => ({
@@ -735,7 +803,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       await refreshData();
-      return { created: toInsert.length, updated: toUpdate.length };
+      return { created: toInsert.length, updated: toUpdate.length, duplicates };
     } catch (e) {
       console.error(e);
       toast.error("Error al importar productos");
@@ -819,8 +887,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // A bolivar figure is worth whatever the honest rate says, no matter which
   // rate produced it. Provider A quoting at BCV and provider B quoting at the
   // parallel rate are not different conversions; A is simply a cheaper deal.
-  const bsToUsd = (amountInBs: number) => amountInBs / honestRate;
-  const usdToBs = (amountInUsd: number) => amountInUsd * honestRate;
+  // A rate of 1 is not a usable fallback: it books a Bs 4,000 payment as $4,000
+  // and quotes a $10 item at Bs 10. Both directions therefore refuse to answer
+  // while the honest rate is unusable. Callers already check for a finite
+  // amount, so entry turns into "verifica las tasas de cambio", and a display
+  // reading "Bs NaN" is a failure someone reports - unlike a plausible figure
+  // off by two orders of magnitude, which someone charges.
+  const bsToUsd = (amountInBs: number) =>
+    honestRateValid ? amountInBs / honestRate : NaN;
+  const usdToBs = (amountInUsd: number) =>
+    honestRateValid ? amountInUsd * honestRate : NaN;
 
   // Display lens (read-only - not the inverse of bsToUsd)
   // Every non-USD lens renders bolivares; they differ only in which rate was

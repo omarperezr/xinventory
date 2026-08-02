@@ -134,6 +134,8 @@ export function ObligationsPanel({
                 accountId: row.accountId,
                 payeeId: row.payeeId,
                 occurredOn: row.periodKey,
+                recurringId: row.ruleId,
+                periodKey: row.periodKey,
                 title: row.ruleName,
               });
               setDialogOpen(true);
@@ -205,7 +207,7 @@ export function ObligationsPanel({
             size="sm"
             variant="outline"
             className="h-8 text-meta"
-            onClick={() => settleEntry(row.id, null, todayIso())}
+            onClick={() => settleEntry(row.id, row.accountId, todayIso())}
           >
             {kind === "payable" ? "Pagué" : "Me pagaron"}
           </Button>

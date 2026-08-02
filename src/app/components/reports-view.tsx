@@ -92,7 +92,8 @@ function readTransactionTotal(data: unknown): number | undefined {
 
 export function ReportsView() {
   const { transactions, hasMore, loadingMore, loadMore } = useHistory();
-  const { formatPrice, items, convertPrice, currencySymbol } = useApp();
+  const { formatPrice, items, convertPrice, currencySymbol, currency, honestRate } =
+    useApp();
 
   const [tab, setTab] = useState<TabKey>("resumen");
   const [period, setPeriod] = useState<PeriodKey>("30d");
@@ -104,9 +105,11 @@ export function ReportsView() {
   );
 
   // The expensive part: one pass over every loaded sale and line item.
+  // `!hasMore` tells it the browser holds the entire history, which is what
+  // separates "the previous period was empty" from "we never loaded it".
   const report = useMemo(
-    () => buildReport(transactions, items, range),
-    [transactions, items, range],
+    () => buildReport(transactions, items, range, undefined, !hasMore),
+    [transactions, items, range, hasMore],
   );
 
   // How many sales the database has in this range, regardless of how many the
@@ -130,17 +133,62 @@ export function ReportsView() {
     };
   }, [range.from.getTime(), range.to.getTime(), transactions.length]);
 
+  // What a past sale cost in bolivares was fixed by the rate stamped on it, so
+  // today's rate must not restate it. The loaded Transaction drops that column,
+  // so read it back for the range.
+  const [rateByTx, setRateByTx] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("transactions")
+      .select("id, honest_rate")
+      .gte("date", range.from.toISOString())
+      .lte("date", range.to.toISOString())
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return;
+        setRateByTx(new Map(data.map((r) => [r.id, Number(r.honest_rate) || 0])));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [range.from.getTime(), range.to.getTime(), transactions.length]);
+
+  // One rate for the period, weighted by what each sale brought in, because the
+  // panels convert plain USD aggregates and cannot ask per sale: revenue then
+  // converts to exactly the bolivares charged, sale by sale. Sales with no
+  // snapshot (history predating the column, sales queued offline) use today's.
+  const periodRate = useMemo(() => {
+    let usd = 0;
+    let bs = 0;
+    for (const t of report.rangeTransactions) {
+      usd += t.total;
+      bs += t.total * (rateByTx.get(t.id) || honestRate);
+    }
+    return usd > 0 ? bs / usd : honestRate;
+  }, [report.rangeTransactions, rateByTx, honestRate]);
+
   const loadedCount = report.metrics.transactions;
   const isPartial = serverCount !== null && serverCount > loadedCount;
 
   const money = (usd: number) => formatPrice(usd);
   const moneyCompact = (usd: number) => `${currencySymbol} ${compact(convertPrice(usd))}`;
 
+  // Only the honest bolivar lens is money that was really charged; the BCV, EUR
+  // and USDT lenses are "what this looks like at that rate today" by definition.
+  const convertPast = (usd: number) =>
+    currency === "BS" ? usd * periodRate : convertPrice(usd);
+  const moneyPast = (usd: number) => `${currencySymbol} ${convertPast(usd).toFixed(2)}`;
+  const moneyPastCompact = (usd: number) =>
+    `${currencySymbol} ${compact(convertPast(usd))}`;
+
+  // Inventario prices what is on the shelf now and Proyección what has not been
+  // sold yet; every other panel prices sales that already happened.
+  const past = tab !== "inventario" && tab !== "proyeccion";
   const panelProps = {
     report,
-    money,
-    moneyCompact,
-    convert: convertPrice,
+    money: past ? moneyPast : money,
+    moneyCompact: past ? moneyPastCompact : moneyCompact,
+    convert: past ? convertPast : convertPrice,
     symbol: currencySymbol,
   };
 
@@ -149,10 +197,12 @@ export function ReportsView() {
   const buildReportData = (): ReportData => ({
     transactions: report.rangeTransactions,
     symbol: currencySymbol,
-    convert: convertPrice,
+    convert: convertPast,
+    convertNow: convertPrice,
     periodLabel: `${format(range.from, "dd/MM/yyyy")} — ${format(range.to, "dd/MM/yyyy")}`,
     metrics: report.metrics,
     previousMetrics: report.previousMetrics,
+    previousCovered: report.previousCovered,
     products: report.products,
     categories: report.categories,
     brands: report.brands,
@@ -264,13 +314,28 @@ export function ReportsView() {
           </div>
         )}
 
-        {/* Say it out loud when the local window does not cover the range. */}
-        {isPartial && (
+        {/* Say it out loud when the local window does not cover the range, or
+            the one before it: the comparison reads from the same loaded page,
+            which routinely stops short of the previous window even when the
+            selected range is complete. */}
+        {(isPartial || !report.previousCovered) && (
           <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <Info className="w-3.5 h-3.5 flex-shrink-0" />
             <span>
-              El período tiene {serverCount} ventas registradas y el navegador
-              tiene {loadedCount}. Los reportes muestran solo las cargadas.
+              {isPartial && (
+                <>
+                  El período tiene {serverCount} ventas registradas y el
+                  navegador tiene {loadedCount}. Los reportes muestran solo las
+                  cargadas.{" "}
+                </>
+              )}
+              {!report.previousCovered && (
+                <>
+                  El período anterior ({format(report.previous.from, "dd/MM/yyyy")}{" "}
+                  — {format(report.previous.to, "dd/MM/yyyy")}) no está cargado
+                  completo, así que se omite la comparación contra él.
+                </>
+              )}
             </span>
             {hasMore && (
               <Button
