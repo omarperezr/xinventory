@@ -164,7 +164,7 @@ export function NewPostDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Agregar post</DialogTitle>
           <DialogDescription>
@@ -197,7 +197,7 @@ export function NewPostDialog({
                   key={url}
                   src={url}
                   alt=""
-                  className="h-20 rounded-md border border-gray-200 object-cover"
+                  className="h-20 rounded-md border border-border object-cover"
                 />
               ))}
             </div>
@@ -271,12 +271,12 @@ export function NewPostDialog({
             </>
           )}
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button onClick={handleSave} disabled={saving || !selected}>
-              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
               Agregar al calendario
             </Button>
           </div>

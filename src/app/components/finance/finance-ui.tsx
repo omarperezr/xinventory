@@ -14,8 +14,6 @@ import type {
   FinanceCategory,
   FinancePayee,
 } from "../../context/finance-context";
-import { SERIES, STATUS } from "../reports/report-ui";
-
 export interface FinancePanelProps {
   report: FinanceReport;
   /** Full precision, e.g. "$ 1234.56". */
@@ -90,22 +88,16 @@ export const ALLOCATION_BASIS_LABEL: Record<string, string> = {
   net_profit: "Utilidad neta",
 };
 
-/** Colour by what the movement does to the money, never by category identity -
- *  the palette has six safe slots and a shop can have thirty categories. */
-export function kindColor(kind: EntryKind): string {
-  if (kind === "income") return STATUS.good;
-  if (kind === "expense") return STATUS.critical;
-  return SERIES[0];
-}
-
 export function KindBadge({ kind }: { kind: EntryKind }) {
   const styles: Record<EntryKind, string> = {
-    income: "bg-green-50 text-green-700",
-    expense: "bg-red-50 text-red-700",
-    transfer: "bg-blue-50 text-blue-700",
+    income: "bg-primary-soft text-primary-soft-foreground",
+    expense: "bg-destructive-soft text-destructive-soft-foreground",
+    transfer: "bg-secondary text-secondary-foreground",
   };
   return (
-    <span className={`text-meta px-1.5 py-0.5 rounded-full font-medium ${styles[kind]}`}>
+    <span
+      className={`text-meta px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${styles[kind]}`}
+    >
       {KIND_LABEL[kind]}
     </span>
   );
@@ -120,22 +112,24 @@ export function StatusBadge({
 }) {
   if (status === "paid") {
     return (
-      <span className="text-meta px-1.5 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600">
+      <span className="text-meta px-2 py-0.5 rounded-full font-semibold bg-primary-soft text-primary-soft-foreground">
         Pagado
       </span>
     );
   }
   if (status === "void") {
     return (
-      <span className="text-meta px-1.5 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500">
+      <span className="text-meta px-2 py-0.5 rounded-full font-semibold bg-secondary text-muted-foreground">
         Anulado
       </span>
     );
   }
   return (
     <span
-      className={`text-meta px-1.5 py-0.5 rounded-full font-medium ${
-        overdue ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"
+      className={`text-meta px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${
+        overdue
+          ? "bg-destructive-soft text-destructive-soft-foreground"
+          : "bg-pending-soft text-pending"
       }`}
     >
       {overdue ? "Vencido" : "Pendiente"}
@@ -162,24 +156,27 @@ export function PnlRow({
 }) {
   return (
     <div
-      className={`flex items-baseline justify-between gap-3 py-1.5 ${
-        emphasis ? "border-t border-gray-200 mt-1 pt-2" : ""
+      className={`flex items-baseline justify-between gap-3 py-2 ${
+        emphasis ? "border-t border-border mt-1 pt-2.5" : ""
       }`}
     >
       <div className={`min-w-0 ${indent ? "pl-4" : ""}`}>
         <span
-          className={`text-xs md:text-sm ${
-            emphasis ? "font-semibold text-gray-900" : "text-gray-600"
+          className={`text-sm md:text-base ${
+            emphasis ? "font-bold text-foreground" : "text-muted-foreground"
           }`}
         >
           {label}
         </span>
-        {hint && <p className="text-meta text-gray-500 leading-tight">{hint}</p>}
+        {hint && (
+          <p className="text-meta text-muted-foreground leading-tight">{hint}</p>
+        )}
       </div>
       <span
-        className={`tabular-nums whitespace-nowrap ${
-          emphasis ? "text-sm md:text-base font-semibold" : "text-xs md:text-sm"
-        } ${negative ? "text-red-700" : emphasis ? "text-gray-900" : "text-gray-700"}`}
+        data-money
+        className={`whitespace-nowrap ${
+          emphasis ? "text-base md:text-lg font-bold" : "text-sm md:text-base font-semibold"
+        } ${negative ? "text-destructive" : "text-foreground"}`}
       >
         {value}
       </span>
@@ -194,25 +191,22 @@ export function AlertList({
 }) {
   if (alerts.length === 0) {
     return (
-      <p className="text-xs text-gray-500 py-4 text-center">
+      <p className="text-base text-muted-foreground py-6 text-center">
         Nada que atender. Las cuentas están al día.
       </p>
     );
   }
   const tone: Record<string, string> = {
-    critical: "bg-red-50 border-red-200 text-red-900",
-    warning: "bg-amber-50 border-amber-200 text-amber-900",
-    info: "bg-blue-50 border-blue-200 text-blue-900",
+    critical: "bg-destructive-soft text-destructive-soft-foreground",
+    warning: "bg-pending-soft text-pending",
+    info: "bg-secondary text-secondary-foreground",
   };
   return (
     <ul className="space-y-2">
       {alerts.map((alert) => (
-        <li
-          key={alert.id}
-          className={`border rounded-lg px-3 py-2 ${tone[alert.level]}`}
-        >
-          <p className="text-xs font-medium">{alert.title}</p>
-          <p className="text-meta mt-0.5 leading-snug">{alert.detail}</p>
+        <li key={alert.id} className={`rounded-lg px-3.5 py-2.5 ${tone[alert.level]}`}>
+          <p className="text-sm font-bold">{alert.title}</p>
+          <p className="text-sm mt-0.5 leading-snug opacity-90">{alert.detail}</p>
         </li>
       ))}
     </ul>

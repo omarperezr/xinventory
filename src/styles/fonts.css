@@ -1,9 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+/* Atkinson Hyperlegible Next — designed by the Braille Institute for maximum
+   character distinction at low vision. Self-hosted (offline-first PWA: a CDN
+   font is a font that vanishes at the counter). Variable weight 200–800. */
+@import '@fontsource-variable/atkinson-hyperlegible-next/index.css';
+
 /* Display fonts for the Redes Sociales post composer (canvas). Anton is the
    oblique slogan face; Montserrat carries labels and sublines. Keep in sync
-   with FONT names used in src/app/services/social-composer.ts. */
-@import url('https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@600;700&display=swap');
+   with FONT names used in src/app/services/social-composer.ts.
+   Self-hosted for the same reason as the UI face above. */
+@import '@fontsource/anton/index.css';
+@import '@fontsource/montserrat/600.css';
+@import '@fontsource/montserrat/700.css';
 
 body {
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Atkinson Hyperlegible Next Variable', 'Atkinson Hyperlegible',
+    system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }

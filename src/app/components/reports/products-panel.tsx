@@ -12,7 +12,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  Award,
   Layers,
   Percent,
   Tag,
@@ -26,25 +25,28 @@ import {
   DataTable,
   EmptyNote,
   INK,
+  Kpi,
+  KpiRow,
   MeterBar,
   PanelProps,
   SectionCard,
   SERIES,
-  StatTile,
   STATUS,
 } from "./report-ui";
 import type { GroupStat, ProductStat } from "../../services/report-analytics";
 
+// ok = primary-soft (class A carries the business), warn = pending-soft
+// (class B), critical = destructive-soft (class C - the tail worth reviewing).
 const ABC_STYLE: Record<string, string> = {
-  A: "bg-green-50 text-green-700 border-green-200",
-  B: "bg-blue-50 text-blue-700 border-blue-200",
-  C: "bg-gray-50 text-gray-500 border-gray-200",
+  A: "bg-primary-soft text-primary-soft-foreground",
+  B: "bg-pending-soft text-pending",
+  C: "bg-destructive-soft text-destructive-soft-foreground",
 };
 
 function AbcBadge({ abc }: { abc: string }) {
   return (
     <span
-      className={`inline-block text-meta font-semibold border rounded px-1 ${ABC_STYLE[abc]}`}
+      className={`inline-flex items-center justify-center size-5 rounded-full text-meta font-bold ${ABC_STYLE[abc]}`}
       title={
         abc === "A"
           ? "Clase A: aporta el primer 80% de la ganancia"
@@ -97,11 +99,11 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
       render: (p) => (
         <span className="flex items-center gap-1.5 min-w-0">
           <AbcBadge abc={p.abc} />
-          <span className="font-medium text-gray-900 truncate max-w-[150px] md:max-w-[220px]">
+          <span className="font-medium text-foreground truncate max-w-[150px] md:max-w-[220px]">
             {p.name}
           </span>
           {!p.inCatalog && (
-            <span className="text-meta text-gray-500 flex-shrink-0">(eliminado)</span>
+            <span className="text-meta text-muted-foreground flex-shrink-0">(eliminado)</span>
           )}
         </span>
       ),
@@ -126,7 +128,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
       header: "Ganancia",
       align: "right",
       render: (p) => (
-        <span className={p.profit < 0 ? "text-red-700 font-medium" : "text-gray-900"}>
+        <span className={p.profit < 0 ? "text-destructive font-medium" : "text-foreground"}>
           {money(p.profit)}
         </span>
       ),
@@ -137,7 +139,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
       header: "Margen",
       align: "right",
       render: (p) => (
-        <span className={p.margin < 0 ? "text-red-700 font-medium" : "text-gray-900"}>
+        <span className={p.margin < 0 ? "text-destructive font-medium" : "text-foreground"}>
           {p.margin.toFixed(0)}%
         </span>
       ),
@@ -160,10 +162,10 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
         <span
           className={
             p.priceRealization < 90
-              ? "text-amber-700"
+              ? "text-pending"
               : p.priceRealization > 105
-                ? "text-green-700"
-                : "text-gray-900"
+                ? "text-primary-soft-foreground"
+                : "text-foreground"
           }
           title={`Precio de lista ${money(p.listPrice)}`}
         >
@@ -179,11 +181,11 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
       secondary: true,
       render: (p) =>
         p.returnedUnits > 0 ? (
-          <span className="text-amber-700">
+          <span className="text-pending">
             {p.returnedUnits} ({p.returnRate.toFixed(0)}%)
           </span>
         ) : (
-          <span className="text-gray-300">—</span>
+          <span className="text-muted-foreground/50">—</span>
         ),
       sortValue: (p) => p.returnRate,
     },
@@ -192,7 +194,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
       header: "Stock",
       align: "right",
       render: (p) => (
-        <span className={p.inStock === 0 ? "text-red-700 font-medium" : "text-gray-900"}>
+        <span className={p.inStock === 0 ? "text-destructive font-medium" : "text-foreground"}>
           {p.inStock}
         </span>
       ),
@@ -206,7 +208,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
       header: label,
       render: (g) => (
         <div className="min-w-[120px]">
-          <span className="font-medium text-gray-900 truncate block max-w-[160px]">
+          <span className="font-medium text-foreground truncate block max-w-[160px]">
             {g.key}
           </span>
           <div className="mt-1">
@@ -257,31 +259,24 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3">
-        <StatTile
+      <KpiRow>
+        <Kpi
           label="Producto estrella"
-          value={
-            <span className="text-sm md:text-base block truncate">
-              {star?.name ?? "—"}
-            </span>
-          }
+          value={star?.name ?? "—"}
           hint={star ? `${money(star.profit)} de ganancia` : undefined}
-          icon={<Award className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Productos vendidos"
           value={products.length.toLocaleString()}
           hint={`${classA.length} generan el 80% de la ganancia`}
-          icon={<Boxes className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Precio realizado"
           value={weightedRealization === null ? "—" : `${weightedRealization.toFixed(0)}%`}
           hint="del precio de lista, ponderado"
           tone={weightedRealization !== null && weightedRealization < 90 ? "warning" : "default"}
-          icon={<Tag className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Vendidos bajo costo"
           value={belowCost.length.toLocaleString()}
           hint={
@@ -290,14 +285,13 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
               : "ninguno"
           }
           tone={belowCost.length ? "critical" : "good"}
-          icon={<TrendingDown className="w-3.5 h-3.5 text-gray-300" />}
         />
-      </div>
+      </KpiRow>
 
       <SectionCard
         title="Concentración de la ganancia (Pareto)"
         subtitle="Productos ordenados de mayor a menor aporte. La línea muestra el acumulado."
-        icon={<Percent className="w-4 h-4 text-primary" />}
+        icon={<Percent className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         {pareto.length >= 3 ? (
           <>
@@ -315,7 +309,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
                     value: "Productos ordenados por ganancia",
                     position: "insideBottom",
                     offset: -2,
-                    style: { fontSize: 10, fill: INK.muted },
+                    style: { fontSize: 12, fill: INK.muted },
                   }}
                 />
                 <YAxis
@@ -341,7 +335,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
                   label={{
                     value: "80%",
                     position: "right",
-                    style: { fontSize: 10, fill: INK.secondary },
+                    style: { fontSize: 12, fill: INK.secondary },
                   }}
                 />
                 <Line
@@ -361,21 +355,21 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
                 { cls: "B", list: classB, note: "hasta el 95%" },
                 { cls: "C", list: classC, note: "el 5% final" },
               ].map(({ cls, list, note }) => (
-                <div key={cls} className="border border-gray-200 rounded-lg p-2.5">
+                <div key={cls} className="border border-border rounded-lg p-2.5">
                   <div className="flex items-center gap-1.5 mb-1">
                     <AbcBadge abc={cls} />
-                    <span className="text-xs font-medium text-gray-900">
+                    <span className="text-sm font-medium text-foreground">
                       {list.length} producto(s)
                     </span>
                   </div>
-                  <p className="text-meta text-gray-500">{note}</p>
-                  <p className="text-[11px] text-gray-700 mt-1 tabular-nums">
+                  <p className="text-meta text-muted-foreground">{note}</p>
+                  <p className="text-sm text-muted-foreground mt-1 tabular-nums">
                     {money(list.reduce((s, p) => s + p.profit, 0))}
                   </p>
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-gray-500 mt-3">
+            <p className="text-sm text-muted-foreground mt-3">
               Los productos de clase A son los que nunca deberían faltar en
               estante. Los de clase C ocupan capital y espacio a cambio de poco:
               conviene revisar si vale la pena reponerlos.
@@ -389,7 +383,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
       <SectionCard
         title="Detalle por producto"
         subtitle="Toca una columna para reordenar. «% de lista» compara el precio cobrado con el de catálogo."
-        icon={<Boxes className="w-4 h-4 text-primary" />}
+        icon={<Boxes className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         <DataTable
           columns={productColumns}
@@ -405,7 +399,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
         <SectionCard
           title="Por categoría"
           subtitle="Dónde se concentra el negocio"
-          icon={<Layers className="w-4 h-4 text-primary" />}
+          icon={<Layers className="w-4 h-4 text-primary" aria-hidden="true" />}
         >
           <DataTable
             columns={groupColumns("Categoría")}
@@ -419,7 +413,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
         <SectionCard
           title="Por marca"
           subtitle="Qué proveedor sostiene las ventas"
-          icon={<Tag className="w-4 h-4 text-primary" />}
+          icon={<Tag className="w-4 h-4 text-primary" aria-hidden="true" />}
         >
           <DataTable
             columns={groupColumns("Marca")}
@@ -435,7 +429,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
         <SectionCard
           title="Dónde se va el descuento"
           subtitle="Diferencia entre el precio de lista y lo que realmente se cobró"
-          icon={<Tag className="w-4 h-4 text-amber-500" />}
+          icon={<Tag className="w-4 h-4 text-pending" aria-hidden="true" />}
         >
           {heavyDiscount.length > 0 ? (
             <DataTable
@@ -444,7 +438,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
                   key: "name",
                   header: "Producto",
                   render: (p: ProductStat) => (
-                    <span className="font-medium text-gray-900 truncate block max-w-[160px]">
+                    <span className="font-medium text-foreground truncate block max-w-[160px]">
                       {p.name}
                     </span>
                   ),
@@ -469,7 +463,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
                   header: "Cedido",
                   align: "right",
                   render: (p: ProductStat) => (
-                    <span className="text-amber-700">{money(p.discountGiven)}</span>
+                    <span className="text-pending">{money(p.discountGiven)}</span>
                   ),
                   sortValue: (p: ProductStat) => p.discountGiven,
                 },
@@ -489,7 +483,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
         <SectionCard
           title="Devoluciones por producto"
           subtitle="Una tasa alta suele indicar un problema de calidad o de expectativa"
-          icon={<TrendingDown className="w-4 h-4 text-amber-500" />}
+          icon={<TrendingDown className="w-4 h-4 text-pending" aria-hidden="true" />}
         >
           {withReturns.length > 0 ? (
             <DataTable
@@ -498,7 +492,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
                   key: "name",
                   header: "Producto",
                   render: (p: ProductStat) => (
-                    <span className="font-medium text-gray-900 truncate block max-w-[160px]">
+                    <span className="font-medium text-foreground truncate block max-w-[160px]">
                       {p.name}
                     </span>
                   ),
@@ -516,7 +510,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
                   header: "Tasa",
                   align: "right",
                   render: (p: ProductStat) => (
-                    <span className={p.returnRate >= 15 ? "text-red-700" : "text-gray-900"}>
+                    <span className={p.returnRate >= 15 ? "text-destructive" : "text-foreground"}>
                       {p.returnRate.toFixed(0)}%
                     </span>
                   ),

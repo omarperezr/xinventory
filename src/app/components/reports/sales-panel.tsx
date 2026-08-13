@@ -20,7 +20,6 @@ import {
   CalendarDays,
   Clock,
   Layers,
-  Undo2,
   Users,
 } from "lucide-react";
 import {
@@ -30,16 +29,18 @@ import {
   DataTable,
   EmptyNote,
   INK,
+  Kpi,
+  KpiRow,
   Legend,
   MeterBar,
   PanelProps,
   SectionCard,
   Segmented,
   SERIES,
-  StatTile,
   Swatch,
 } from "./report-ui";
 import type { PaymentStat, SellerStat } from "../../services/report-analytics";
+import { formatMoneyValue } from "../../context/app-context";
 
 export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps) {
   const [breakdown, setBreakdown] = useState<"composicion" | "unidades">("composicion");
@@ -84,7 +85,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
       key: "seller",
       header: "Vendedor",
       render: (s) => (
-        <span className="font-medium text-gray-900 truncate block max-w-[140px]">
+        <span className="font-medium text-foreground truncate block max-w-[140px]">
           {s.seller}
         </span>
       ),
@@ -132,7 +133,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
       header: "Margen",
       align: "right",
       render: (s) => (
-        <span className={s.margin < 0 ? "text-red-700" : "text-gray-900"}>
+        <span className={s.margin < 0 ? "text-destructive" : "text-foreground"}>
           {s.margin.toFixed(0)}%
         </span>
       ),
@@ -159,7 +160,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
       key: "method",
       header: "Método",
       render: (p) => (
-        <span className="flex items-center gap-1.5 text-gray-900">
+        <span className="flex items-center gap-1.5 text-foreground">
           <Swatch color={p.fill} />
           {p.method}
         </span>
@@ -192,40 +193,36 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3">
-        <StatTile
+      <KpiRow>
+        <Kpi
           label="Mejor día de la semana"
           value={bestDay && bestDay.avgRevenue > 0 ? bestDay.label : "—"}
           hint={bestDay ? `${money(bestDay.avgRevenue)} en promedio` : undefined}
-          icon={<CalendarDays className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Hora pico"
           value={peakHour && peakHour.revenue > 0 ? peakHour.label : "—"}
           hint={peakHour ? `${peakHour.transactions} venta(s)` : undefined}
-          icon={<Clock className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Devoluciones"
           value={`${m.returnRate.toFixed(1)}%`}
           hint={`${m.returnedUnits} u · ${moneyCompact(m.returnedValue)}`}
           tone={m.returnRate > 10 ? "warning" : "default"}
           higherIsBetter={false}
-          icon={<Undo2 className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Descuentos otorgados"
           value={moneyCompact(m.discountGiven)}
           hint={`${m.discountRate.toFixed(1)}% del precio de lista`}
           tone={m.discountRate > 10 ? "warning" : "default"}
-          icon={<Banknote className="w-3.5 h-3.5 text-gray-300" />}
         />
-      </div>
+      </KpiRow>
 
       <SectionCard
         title="Composición de las ventas"
         subtitle="Cuánto de cada período se fue en costo y cuánto quedó como ganancia"
-        icon={<Layers className="w-4 h-4 text-primary" />}
+        icon={<Layers className="w-4 h-4 text-primary" aria-hidden="true" />}
         actions={
           <Segmented
             value={breakdown}
@@ -276,7 +273,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
                   content={
                     <ChartTooltip
                       format={(v, key) =>
-                        key === "Unidades" ? `${v} u` : v.toFixed(2)
+                        key === "Unidades" ? `${v} u` : formatMoneyValue(v)
                       }
                     />
                   }
@@ -322,7 +319,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
         <SectionCard
           title="Rendimiento por día de la semana"
           subtitle="Promedio por ocurrencia, no suma - así un lunes de más no infla el resultado"
-          icon={<CalendarDays className="w-4 h-4 text-primary" />}
+          icon={<CalendarDays className="w-4 h-4 text-primary" aria-hidden="true" />}
         >
           {report.metrics.transactions > 0 ? (
             <>
@@ -351,7 +348,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
                   <Tooltip
                     cursor={{ fill: "rgba(0,0,0,0.03)" }}
                     content={
-                      <ChartTooltip format={(v: number) => v.toFixed(2)} />
+                      <ChartTooltip format={(v: number) => formatMoneyValue(v)} />
                     }
                   />
                   <Bar
@@ -364,10 +361,10 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
                 </BarChart>
               </ResponsiveContainer>
               {bestDay && worstDay && bestDay.avgRevenue > 0 && (
-                <p className="text-[11px] text-gray-500 mt-2">
-                  <strong className="text-gray-700">{bestDay.label}</strong> rinde{" "}
+                <p className="text-sm text-muted-foreground mt-2">
+                  <strong className="text-foreground">{bestDay.label}</strong> rinde{" "}
                   {money(bestDay.avgRevenue)} en promedio y{" "}
-                  <strong className="text-gray-700">{worstDay.label}</strong>{" "}
+                  <strong className="text-foreground">{worstDay.label}</strong>{" "}
                   {money(worstDay.avgRevenue)}.
                   {report.metrics.transactions < 30 &&
                     " Con pocas ventas aún, tómalo como indicio, no como norma."}
@@ -382,7 +379,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
         <SectionCard
           title="Ventas por hora del día"
           subtitle="Para decidir horarios de atención y refuerzo de personal"
-          icon={<Clock className="w-4 h-4 text-primary" />}
+          icon={<Clock className="w-4 h-4 text-primary" aria-hidden="true" />}
         >
           {activeHours.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
@@ -411,7 +408,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
                 />
                 <Tooltip
                   cursor={{ fill: "rgba(0,0,0,0.03)" }}
-                  content={<ChartTooltip format={(v: number) => v.toFixed(2)} />}
+                  content={<ChartTooltip format={(v: number) => formatMoneyValue(v)} />}
                 />
                 <Bar
                   dataKey="valor"
@@ -431,7 +428,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
       <SectionCard
         title="Rendimiento por vendedor"
         subtitle="Toca una columna para reordenar"
-        icon={<Users className="w-4 h-4 text-primary" />}
+        icon={<Users className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         <DataTable
           columns={sellerColumns}
@@ -444,7 +441,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
       <SectionCard
         title="Métodos de pago"
         subtitle="El total de cada venta se reparte entre sus métodos, así el vuelto entregado no infla el efectivo"
-        icon={<Banknote className="w-4 h-4 text-primary" />}
+        icon={<Banknote className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         {paymentData.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
@@ -467,7 +464,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
                   ))}
                 </Pie>
                 <Tooltip
-                  content={<ChartTooltip nameKey="method" format={(v: number) => v.toFixed(2)} />}
+                  content={<ChartTooltip nameKey="method" format={(v: number) => formatMoneyValue(v)} />}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -480,7 +477,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
                 maxHeight="14rem"
               />
               {report.paymentCoverage.unrecordedTransactions > 0 && (
-                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 mt-2">
+                <p className="text-sm text-pending bg-pending-soft border border-pending-strong/40 rounded-md px-2 py-1.5 mt-2">
                   {report.paymentCoverage.unrecordedTransactions} venta(s) por{" "}
                   {money(report.paymentCoverage.unrecorded)} se cerraron sin
                   registrar el pago, así que no aparecen en esta mezcla.
@@ -496,7 +493,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
       <SectionCard
         title="Concentración de clientes por ticket"
         subtitle="Qué parte de los ingresos viene de las ventas grandes"
-        icon={<Layers className="w-4 h-4 text-primary" />}
+        icon={<Layers className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         <TicketConcentration report={report} money={money} />
       </SectionCard>
@@ -540,14 +537,14 @@ function TicketConcentration({
     <div className="space-y-3">
       {rows.map((r, i) => (
         <div key={r.label}>
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-gray-700">
+          <div className="flex items-center justify-between text-sm mb-1">
+            <span className="text-muted-foreground">
               {r.label}
-              <span className="text-gray-500 ml-1.5">{r.count} venta(s)</span>
+              <span className="text-muted-foreground ml-1.5">{r.count} venta(s)</span>
             </span>
-            <span className="font-medium text-gray-900 tabular-nums">
+            <span className="font-medium text-foreground tabular-nums">
               {money(r.sum)}
-              <span className="text-gray-500 font-normal ml-1.5">
+              <span className="text-muted-foreground font-normal ml-1.5">
                 {r.share.toFixed(0)}%
               </span>
             </span>

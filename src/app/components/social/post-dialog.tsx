@@ -127,7 +127,7 @@ export function PostDialog({ post, open, onOpenChange }: PostDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{post.itemName}</DialogTitle>
           <DialogDescription>
@@ -143,7 +143,7 @@ export function PostDialog({ post, open, onOpenChange }: PostDialogProps) {
                 <img
                   src={url}
                   alt={`Imagen ${i + 1}`}
-                  className="h-56 rounded-lg border border-gray-200"
+                  className="h-56 rounded-lg border border-border"
                 />
                 <Button
                   size="icon"
@@ -152,13 +152,13 @@ export function PostDialog({ post, open, onOpenChange }: PostDialogProps) {
                   onClick={() => handleDownload(url, i)}
                   aria-label="Descargar imagen"
                 >
-                  <Download className="w-4 h-4" />
+                  <Download className="size-4" aria-hidden="true" />
                 </Button>
               </div>
             ))}
             {composing && (
-              <div className="h-56 w-40 shrink-0 rounded-lg border border-dashed border-gray-300 flex items-center justify-center text-gray-400">
-                <Loader2 className="w-5 h-5 animate-spin" />
+              <div className="h-56 w-40 shrink-0 rounded-lg border border-dashed border-border-strong flex items-center justify-center text-muted-foreground">
+                <Loader2 className="size-5 animate-spin" aria-hidden="true" />
               </div>
             )}
           </div>
@@ -167,7 +167,7 @@ export function PostDialog({ post, open, onOpenChange }: PostDialogProps) {
             <div className="flex items-center justify-between">
               <Label htmlFor="social-caption">Descripción</Label>
               <Button variant="ghost" size="sm" onClick={handleCopyCaption}>
-                <Copy className="w-3.5 h-3.5 mr-1.5" />
+                <Copy className="size-3.5" aria-hidden="true" />
                 Copiar
               </Button>
             </div>
@@ -211,7 +211,7 @@ export function PostDialog({ post, open, onOpenChange }: PostDialogProps) {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
             {dirty && (
               <Button onClick={handleSave} disabled={busy}>
                 Guardar cambios
@@ -249,7 +249,7 @@ export function PostDialog({ post, open, onOpenChange }: PostDialogProps) {
             )}
             <Button
               variant="ghost"
-              className="text-red-600 ml-auto"
+              className="ml-auto text-destructive hover:bg-destructive-soft hover:text-destructive"
               disabled={busy}
               onClick={async () => {
                 if (await act(() => deletePost(post.id))) {
@@ -258,7 +258,7 @@ export function PostDialog({ post, open, onOpenChange }: PostDialogProps) {
                 }
               }}
             >
-              <Trash2 className="w-4 h-4 mr-1.5" />
+              <Trash2 className="size-4" aria-hidden="true" />
               Eliminar
             </Button>
           </div>

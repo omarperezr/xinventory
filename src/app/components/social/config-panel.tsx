@@ -81,7 +81,7 @@ export function ConfigPanel() {
   return (
     <div className="max-w-2xl space-y-6">
       <section className="space-y-4">
-        <h2 className="font-medium">Identidad</h2>
+        <h2 className="font-bold text-foreground">Identidad</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="social-name">Nombre del negocio</Label>
@@ -98,7 +98,7 @@ export function ConfigPanel() {
                 <img
                   src={draft.logoUrl}
                   alt="Logo"
-                  className="h-10 rounded bg-gray-900 p-1"
+                  className="h-10 rounded bg-foreground p-1"
                 />
               )}
               <label className="inline-flex">
@@ -111,9 +111,9 @@ export function ConfigPanel() {
                 <Button variant="outline" size="sm" asChild disabled={uploading}>
                   <span>
                     {uploading ? (
-                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                     ) : (
-                      <Upload className="w-4 h-4 mr-1.5" />
+                      <Upload className="size-4" aria-hidden="true" />
                     )}
                     Subir
                   </span>
@@ -125,7 +125,7 @@ export function ConfigPanel() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-medium">Estilo</h2>
+        <h2 className="font-bold text-foreground">Estilo</h2>
         <div className="space-y-1.5">
           <Label htmlFor="social-prompt">Prompt de estilo</Label>
           <Textarea
@@ -135,7 +135,7 @@ export function ConfigPanel() {
             rows={6}
             placeholder="Dirección creativa para la IA: tono, qué resaltar, reglas (sin precios, claims honestos, español de Venezuela)…"
           />
-          <p className="text-xs text-meta">
+          <p className="text-sm text-muted-foreground">
             Se envía junto a los datos del producto en cada generación de
             textos y mejora de fotos.
           </p>
@@ -143,7 +143,7 @@ export function ConfigPanel() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-medium">Inteligencia artificial</h2>
+        <h2 className="font-bold text-foreground">Inteligencia artificial</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Proveedor</Label>
@@ -178,7 +178,7 @@ export function ConfigPanel() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-medium">Cadencia</h2>
+        <h2 className="font-bold text-foreground">Cadencia</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="social-cadence">Generar cada (días)</Label>
@@ -237,7 +237,7 @@ export function ConfigPanel() {
             ))}
           </div>
         </div>
-        <p className="text-xs text-meta">
+        <p className="text-sm text-muted-foreground">
           La tanda corre sola cuando pasan los días configurados (revisión
           diaria a las 7:00 am). Un post por día a la hora indicada, empezando
           el día siguiente. Al cerrar cada semana se eliminan los posts
@@ -246,7 +246,7 @@ export function ConfigPanel() {
       </section>
 
       <Button onClick={handleSave} disabled={saving}>
-        {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+        {saving && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
         Guardar configuración
       </Button>
     </div>

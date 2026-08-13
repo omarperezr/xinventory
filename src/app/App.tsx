@@ -83,12 +83,12 @@ function AppContent() {
   if (!loaded) {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center gap-4">
-        <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg">
-          <Package className="w-6 h-6 text-white" strokeWidth={1.5} />
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-primary shadow-raised">
+          <Package className="size-7 text-white" strokeWidth={2} aria-hidden="true" />
         </div>
-        <div className="flex items-center gap-2 text-gray-500 text-sm">
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
           <Spinner />
-          Cargando...
+          Cargando…
         </div>
       </div>
     );
@@ -198,11 +198,13 @@ function AppContent() {
       <InventoryHeader />
       <OfflineSync />
 
-      <main className="max-w-7xl mx-auto px-4 md:px-8 py-4 md:py-8">
+      {/* Mobile bottom padding clears the fixed tab bar + home indicator. */}
+      <main className="max-w-7xl mx-auto px-4 md:px-8 pt-4 md:pt-8 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:pb-8">
         <Suspense
           fallback={
-            <div className="flex items-center justify-center py-20 text-gray-500 text-sm">
-              Cargando...
+            <div className="flex items-center justify-center gap-2 py-20 text-muted-foreground text-sm">
+              <Spinner />
+              Cargando…
             </div>
           }
         >
@@ -249,12 +251,12 @@ function AppContent() {
                   currentUser?.role === "admin" ? (
                     <ReportsView />
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-20">
-                      <div className="text-red-500 font-medium text-lg mb-2">
-                        Acceso Restringido
-                      </div>
-                      <p className="text-gray-500 text-sm">
-                        Solo los administradores pueden ver los reportes.
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                      <p className="text-lg font-bold text-foreground mb-1">
+                        Solo para administradores
+                      </p>
+                      <p className="text-[0.9375rem] text-muted-foreground">
+                        Pídele a tu administrador que te muestre los reportes.
                       </p>
                     </div>
                   )
@@ -270,12 +272,12 @@ function AppContent() {
                   currentUser?.role === "admin" ? (
                     <SocialView />
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-20">
-                      <div className="text-red-500 font-medium text-lg mb-2">
-                        Acceso Restringido
-                      </div>
-                      <p className="text-gray-500 text-sm">
-                        Solo los administradores pueden gestionar redes sociales.
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                      <p className="text-lg font-bold text-foreground mb-1">
+                        Solo para administradores
+                      </p>
+                      <p className="text-[0.9375rem] text-muted-foreground">
+                        Las redes sociales las maneja tu administrador.
                       </p>
                     </div>
                   )

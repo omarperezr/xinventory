@@ -54,18 +54,26 @@ function DialogContent({
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
+      {/* Phones get a bottom sheet (thumb-reachable, familiar from WhatsApp);
+          sm+ keeps the centered dialog. One component, every dialog upgraded. */}
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] max-h-[90vh] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-xl border p-6 shadow-lg duration-200 sm:max-w-lg",
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed z-50 grid w-full gap-4 overflow-y-auto border shadow-raised duration-200",
+          "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl border-b-0 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8",
+          "sm:inset-x-auto sm:bottom-auto sm:top-[50%] sm:left-[50%] sm:max-w-lg sm:max-h-[90vh] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-xl sm:border-b sm:p-6 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=closed]:slide-out-to-bottom-0",
           className,
         )}
         {...props}
       >
+        <div
+          aria-hidden="true"
+          className="mx-auto -mt-1 h-1.5 w-10 shrink-0 rounded-full bg-border-strong sm:hidden"
+        />
         {children}
-        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
+        <DialogPrimitive.Close className="focus-visible:ring-ring/40 absolute top-3 right-3 flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-[3px] focus-visible:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5">
           <XIcon />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">Cerrar</span>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPortal>
@@ -76,7 +84,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+      className={cn("flex flex-col gap-1.5 text-left", className)}
       {...props}
     />
   );
@@ -102,7 +110,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+      className={cn("text-xl leading-tight font-bold", className)}
       {...props}
     />
   );

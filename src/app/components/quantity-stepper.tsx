@@ -60,8 +60,8 @@ export function QuantityStepper({
   const atMin = value <= min;
   const btn =
     size === "sm"
-      ? "h-9 w-9 min-w-9 flex-shrink-0"
-      : "h-11 w-11 min-w-11 flex-shrink-0";
+      ? "h-10 w-10 min-w-10 flex-shrink-0"
+      : "h-12 w-12 min-w-12 flex-shrink-0";
 
   return (
     <div className={`flex items-center gap-1 ${block ? "w-full" : ""}`}>
@@ -70,9 +70,9 @@ export function QuantityStepper({
         aria-label={`Disminuir ${label}`}
         disabled={atMin}
         onClick={() => onChange(value - 1)}
-        className={`${btn} flex items-center justify-center rounded-md text-gray-700 hover:bg-gray-200 disabled:opacity-40 disabled:hover:bg-transparent`}
+        className={`${btn} flex items-center justify-center rounded-lg bg-secondary text-foreground hover:bg-accent disabled:opacity-40 disabled:hover:bg-secondary`}
       >
-        <Minus className="w-4 h-4" aria-hidden="true" />
+        <Minus className="w-5 h-5" aria-hidden="true" />
       </button>
       <Input
         type="number"
@@ -93,16 +93,17 @@ export function QuantityStepper({
             (e.target as HTMLInputElement).blur();
           }
         }}
-        className={`text-center ${block ? "flex-1 min-w-0 px-1" : "w-16"} ${size === "sm" ? "h-9" : "h-11"}`}
+        data-money
+        className={`text-center font-semibold ${block ? "flex-1 min-w-0 px-1" : "w-16"} ${size === "sm" ? "h-10" : "h-12"}`}
       />
       <button
         type="button"
         aria-label={`Aumentar ${label}`}
         disabled={atMax}
         onClick={() => onChange(value + 1)}
-        className={`${btn} flex items-center justify-center rounded-md text-gray-700 hover:bg-gray-200 disabled:opacity-40 disabled:hover:bg-transparent`}
+        className={`${btn} flex items-center justify-center rounded-lg bg-secondary text-foreground hover:bg-accent disabled:opacity-40 disabled:hover:bg-secondary`}
       >
-        <Plus className="w-4 h-4" aria-hidden="true" />
+        <Plus className="w-5 h-5" aria-hidden="true" />
       </button>
     </div>
   );

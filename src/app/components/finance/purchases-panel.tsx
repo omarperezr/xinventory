@@ -5,7 +5,11 @@
 // the server refuses rather than letting stock go negative.
 
 import { useState } from "react";
-import { HandCoins, PackageOpen, RotateCcw, Truck } from "lucide-react";
+import {
+  HandCoins,
+  RotateCcw,
+  Truck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -25,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { Column, DataTable, SectionCard, StatTile } from "../reports/report-ui";
+import { Column, DataTable, SectionCard, Kpi, KpiRow } from "../reports/report-ui";
 import {
   Purchase,
   PurchaseReturnLineInput,
@@ -34,6 +38,7 @@ import {
 } from "../../context/finance-context";
 import { useAuth } from "../../context/auth-context";
 import { FinancePanelProps, formatDay, useLookup } from "./finance-ui";
+import { formatMoneyValue } from "../../context/app-context";
 
 export function PurchasesPanel({
   money,
@@ -64,7 +69,7 @@ export function PurchasesPanel({
       width: "5.5rem",
       sortValue: (row) => row.occurredOn,
       render: (row) => (
-        <span className="text-gray-600 whitespace-nowrap">
+        <span className="text-muted-foreground whitespace-nowrap">
           {formatDay(row.occurredOn)}
         </span>
       ),
@@ -78,10 +83,10 @@ export function PurchasesPanel({
         const returnedUnits = lines.reduce((s, l) => s + l.quantityReturned, 0);
         return (
           <div className="min-w-0">
-            <p className="font-medium text-gray-900 truncate">
+            <p className="font-semibold text-foreground truncate">
               {payeeName(row.supplierId)}
             </p>
-            <p className="text-meta text-gray-500 truncate">
+            <p className="text-sm text-muted-foreground truncate">
               {lines.length} línea(s)
               {row.invoiceNumber ? ` · factura ${row.invoiceNumber}` : ""}
               {returnedUnits > 0 ? ` · ${returnedUnits} devuelta(s)` : ""}
@@ -95,7 +100,7 @@ export function PurchasesPanel({
       header: "Pagado desde",
       secondary: true,
       render: (row) => (
-        <span className="text-gray-600">{accountName(row.accountId)}</span>
+        <span className="text-muted-foreground">{accountName(row.accountId)}</span>
       ),
     },
     {
@@ -104,13 +109,13 @@ export function PurchasesPanel({
       align: "right",
       sortValue: (row) => row.totalUsd,
       render: (row) => (
-        <div>
-          <span className="font-semibold text-gray-900">{money(row.totalUsd)}</span>
+        <div data-money>
+          <span className="font-bold text-foreground">{money(row.totalUsd)}</span>
           {row.paymentStatus === "pending" && (
-            <p className="text-meta text-amber-700">por pagar</p>
+            <p className="text-meta font-semibold text-pending">por pagar</p>
           )}
           {row.freightUsd > 0 && (
-            <p className="text-meta text-gray-500">
+            <p className="text-meta text-muted-foreground">
               incl. {money(row.freightUsd)} flete
             </p>
           )}
@@ -128,20 +133,18 @@ export function PurchasesPanel({
             {row.paymentStatus === "pending" && (
               <Button
                 size="sm"
-                className="h-8 text-meta"
-                onClick={() => setSettling(row)}
+                    onClick={() => setSettling(row)}
               >
-                <HandCoins className="w-3 h-3 mr-1" />
+                <HandCoins aria-hidden="true" />
                 Pagar
               </Button>
             )}
             <Button
               size="sm"
               variant="outline"
-              className="h-8 text-meta"
-              onClick={() => setReturning(row)}
+                onClick={() => setReturning(row)}
             >
-              <RotateCcw className="w-3 h-3 mr-1" />
+              <RotateCcw aria-hidden="true" />
               Devolver
             </Button>
           </div>
@@ -151,43 +154,39 @@ export function PurchasesPanel({
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile
+      <KpiRow>
+        <Kpi
           label="Comprado"
           value={money(totalBought)}
           hint={`${purchases.length} compra(s) cargadas`}
-          icon={<Truck className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Por pagar a proveedores"
           value={money(owed)}
           tone={owed > 0 ? "warning" : "good"}
-          icon={<PackageOpen className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Devuelto"
           value={money(returned)}
           hint={`${purchaseReturns.length} devolución(es)`}
-          icon={<RotateCcw className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Compra promedio"
           value={money(purchases.length > 0 ? totalBought / purchases.length : 0)}
-          icon={<Truck className="w-4 h-4 text-gray-400" />}
         />
-      </div>
+      </KpiRow>
 
       <SectionCard
         title="Compras"
         subtitle="Cada una subió stock, actualizó costos y registró la salida de dinero"
-        icon={<Truck className="w-4 h-4 text-primary" />}
         actions={
           isAdmin ? (
-            <Button size="sm" className="text-xs" onClick={onNewPurchase}>
+            <Button size="sm" onClick={onNewPurchase}>
               Nueva compra
             </Button>
           ) : null
         }
+        icon={<Truck className="size-5 text-primary" aria-hidden="true" />}
       >
         <DataTable
           columns={columns}
@@ -256,7 +255,7 @@ function SettleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Pagar al proveedor</DialogTitle>
           <DialogDescription>
@@ -265,8 +264,8 @@ function SettleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div>
+        <div className="space-y-5">
+          <div className="space-y-2">
             <Label htmlFor="settle-account">Sale de</Label>
             <Select value={accountId} onValueChange={setAccountId}>
               <SelectTrigger id="settle-account">
@@ -285,7 +284,7 @@ function SettleDialog({
             </Select>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="settle-date">Fecha del pago</Label>
             <Input
               id="settle-date"
@@ -294,7 +293,7 @@ function SettleDialog({
               onChange={(e) => setOccurredOn(e.target.value)}
             />
             {purchase.paidIn === "BS" && (
-              <p className="text-meta text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Los bolívares se valoran a la tasa de hoy: lo que se debía en
                 dólares no cambia, pero pagarlo tarde cuesta los bolívares de
                 hoy.
@@ -382,7 +381,7 @@ function ReturnDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Devolver al proveedor</DialogTitle>
           <DialogDescription>
@@ -391,17 +390,19 @@ function ReturnDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+        <div className="space-y-5">
+          <ul className="divide-y divide-border border border-border rounded-lg overflow-hidden">
             {lines.map((line) => {
               const max = line.quantity - line.quantityReturned;
               return (
                 <li key={line.id} className="flex items-center gap-3 px-3 py-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-gray-900 truncate">{line.name}</p>
-                    <p className="text-meta text-gray-500">
-                      {max} disponible(s) de {line.quantity} · costo{" "}
-                      {line.landedUnitCostUsd.toFixed(2)} $
+                    <p className="text-base font-semibold text-foreground truncate">
+                      {line.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground" data-money>
+                      {max} disponible(s) de {line.quantity} · costo $
+                      {formatMoneyValue(line.landedUnitCostUsd)}
                     </p>
                   </div>
                   <Input
@@ -419,7 +420,8 @@ function ReturnDialog({
                         ),
                       }))
                     }
-                    className="w-20 h-9 text-right"
+                    className="w-24 text-right"
+                    data-money
                     aria-label={`Cantidad a devolver de ${line.name}`}
                   />
                 </li>
@@ -427,8 +429,8 @@ function ReturnDialog({
             })}
           </ul>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
               <Label htmlFor="return-settlement">Cómo se salda</Label>
               <Select
                 value={settlement}
@@ -446,7 +448,7 @@ function ReturnDialog({
               </Select>
             </div>
             {settlement === "cash" && (
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="return-account">Entra a</Label>
                 <Select value={accountId} onValueChange={setAccountId}>
                   <SelectTrigger id="return-account">
@@ -467,7 +469,7 @@ function ReturnDialog({
             )}
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="return-reason">Motivo</Label>
             <Input
               id="return-reason"
@@ -477,7 +479,7 @@ function ReturnDialog({
             />
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="return-notes">Notas</Label>
             <Textarea
               id="return-notes"
@@ -487,10 +489,13 @@ function ReturnDialog({
             />
           </div>
 
-          <div className="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-sm">
-            <span className="text-gray-600">Total a devolver</span>
-            <span className="font-semibold text-gray-900 tabular-nums">
-              $ {total.toFixed(2)}
+          <div
+            className="flex items-center justify-between rounded-xl bg-canvas px-4 py-3"
+            data-money
+          >
+            <span className="text-base text-muted-foreground">Total a devolver</span>
+            <span className="text-xl font-bold text-foreground">
+              {`$ ${formatMoneyValue(total)}`}
             </span>
           </div>
 

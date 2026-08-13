@@ -5,8 +5,11 @@
 // with one supplier per item you can only see what you paid, never what you
 // could have paid.
 
-import { Building2, Coins, TrendingDown } from "lucide-react";
-import { Column, DataTable, SectionCard, StatTile } from "../reports/report-ui";
+import {
+  Building2,
+  TrendingDown,
+} from "lucide-react";
+import { Column, DataTable, SectionCard, Kpi, KpiRow } from "../reports/report-ui";
 import type {
   SupplierPrice,
   SupplierStanding,
@@ -27,8 +30,8 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
       sortValue: (row) => row.name,
       render: (row) => (
         <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">{row.name}</p>
-          <p className="text-meta text-gray-500">
+          <p className="font-semibold text-foreground truncate">{row.name}</p>
+          <p className="text-sm text-muted-foreground">
             {row.purchases} compra(s) · última {formatDay(row.lastPurchaseOn)}
           </p>
         </div>
@@ -40,7 +43,7 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
       align: "right",
       sortValue: (row) => row.purchasedUsd,
       render: (row) => (
-        <span className="font-semibold text-gray-900">{money(row.purchasedUsd)}</span>
+        <span className="font-bold text-foreground" data-money>{money(row.purchasedUsd)}</span>
       ),
     },
     {
@@ -50,7 +53,7 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
       secondary: true,
       sortValue: (row) => row.returnedUsd,
       render: (row) => (
-        <span className="text-gray-600">
+        <span className="text-muted-foreground" data-money>
           {row.returnedUsd > 0 ? money(row.returnedUsd) : "—"}
         </span>
       ),
@@ -61,7 +64,10 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
       align: "right",
       sortValue: (row) => row.owedUsd,
       render: (row) => (
-        <span className={row.owedUsd > 0 ? "text-amber-800 font-medium" : "text-gray-400"}>
+        <span
+          data-money
+          className={row.owedUsd > 0 ? "text-pending font-semibold" : "text-muted-foreground"}
+        >
           {row.owedUsd > 0 ? money(row.owedUsd) : "—"}
         </span>
       ),
@@ -72,7 +78,14 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
       align: "right",
       sortValue: (row) => row.creditUsd,
       render: (row) => (
-        <span className={row.creditUsd > 0 ? "text-green-700 font-medium" : "text-gray-400"}>
+        <span
+          data-money
+          className={
+            row.creditUsd > 0
+              ? "text-primary-soft-foreground font-semibold"
+              : "text-muted-foreground"
+          }
+        >
           {row.creditUsd > 0 ? money(row.creditUsd) : "—"}
         </span>
       ),
@@ -85,7 +98,7 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
       header: "Producto",
       sortValue: (row) => row.itemName,
       render: (row) => (
-        <p className="font-medium text-gray-900 truncate">{row.itemName}</p>
+        <p className="font-semibold text-foreground truncate">{row.itemName}</p>
       ),
     },
     {
@@ -94,8 +107,8 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
       sortValue: (row) => row.supplierName,
       render: (row) => (
         <div className="min-w-0">
-          <p className="text-gray-700 truncate">{row.supplierName}</p>
-          <p className="text-meta text-gray-500">
+          <p className="text-foreground truncate">{row.supplierName}</p>
+          <p className="text-meta text-muted-foreground">
             {formatDay(row.lastPurchasedOn)}
           </p>
         </div>
@@ -107,7 +120,7 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
       align: "right",
       sortValue: (row) => row.lastCostUsd,
       render: (row) => (
-        <span className="font-semibold text-gray-900">{money(row.lastCostUsd)}</span>
+        <span className="font-bold text-foreground" data-money>{money(row.lastCostUsd)}</span>
       ),
     },
     {
@@ -117,11 +130,11 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
       sortValue: (row) => row.premiumPct,
       render: (row) =>
         row.cheapest ? (
-          <span className="text-meta px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 font-medium">
+          <span className="text-meta px-2 py-0.5 rounded-full bg-primary-soft text-primary-soft-foreground font-semibold whitespace-nowrap">
             el más barato
           </span>
         ) : (
-          <span className="text-red-700 font-medium">
+          <span className="text-destructive font-semibold" data-money>
             +{row.premiumPct.toFixed(1)}%
           </span>
         ),
@@ -130,37 +143,33 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile
+      <KpiRow>
+        <Kpi
           label="Proveedores"
           value={String(suppliers.length)}
-          icon={<Building2 className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Les debo"
           value={money(totalOwed)}
           tone={totalOwed > 0 ? "warning" : "good"}
-          icon={<Coins className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Crédito a favor"
           value={money(totalCredit)}
           hint="De devoluciones sin usar"
           tone={totalCredit > 0 ? "good" : "default"}
-          icon={<Coins className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Productos con opción más barata"
           value={String(overpaying.length)}
           tone={overpaying.length > 0 ? "warning" : "good"}
-          icon={<TrendingDown className="w-4 h-4 text-gray-400" />}
         />
-      </div>
+      </KpiRow>
 
       <SectionCard
         title="Estado con cada proveedor"
         subtitle="Lo comprado, lo devuelto y quién le debe a quién"
-        icon={<Building2 className="w-4 h-4 text-primary" />}
+        icon={<Building2 className="size-5 text-primary" aria-hidden="true" />}
       >
         <DataTable
           columns={supplierColumns}
@@ -176,7 +185,7 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
       <SectionCard
         title="Comparación de precios"
         subtitle="Último costo pagado a cada proveedor por el mismo producto"
-        icon={<TrendingDown className="w-4 h-4 text-primary" />}
+        icon={<TrendingDown className="size-5 text-primary" aria-hidden="true" />}
       >
         <DataTable
           columns={priceColumns}
@@ -187,7 +196,7 @@ export function SuppliersPanel({ report, money }: FinancePanelProps) {
           maxHeight="26rem"
           pageSize={20}
         />
-        <p className="text-meta text-gray-500 mt-3">
+        <p className="text-sm text-muted-foreground mt-3">
           Se compara el último costo por proveedor, sin flete. Un proveedor más
           caro puede seguir conviniendo si entrega más rápido o fía.
         </p>

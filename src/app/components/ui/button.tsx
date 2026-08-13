@@ -5,29 +5,29 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "./utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all hover:brightness-110 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 disabled:hover:brightness-100 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-all active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-5 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-ring/40 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 aria-invalid:border-destructive",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-primary text-primary-foreground hover:bg-primary-hover",
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20",
         outline:
-          "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+          "border border-border-strong bg-white text-foreground hover:bg-secondary",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
+          "bg-secondary text-secondary-foreground hover:bg-accent",
+        soft: "bg-primary-soft text-primary-soft-foreground hover:bg-primary-soft/70",
+        ghost: "text-foreground hover:bg-secondary",
+        link: "text-primary underline underline-offset-4 hover:text-primary-hover",
       },
-      // Touch targets: this is a phone-first POS, so the default and icon
-      // sizes meet the 44px minimum. `sm` stays compact for dense desktop
-      // toolbars and should not be used for primary mobile actions.
+      // Phone-first POS for mixed-age staff: the default control is 48px.
+      // `sm` (40px) is for dense desktop toolbars, never primary mobile actions.
       size: {
-        default: "h-11 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-9 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-12 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-11 rounded-md",
+        default: "h-12 px-5 text-base has-[>svg]:px-4",
+        sm: "h-10 rounded-md gap-1.5 px-3 text-sm has-[>svg]:px-2.5 [&_svg:not([class*='size-'])]:size-4",
+        lg: "h-14 rounded-xl px-6 text-lg has-[>svg]:px-5",
+        icon: "size-12 rounded-lg",
+        "icon-sm": "size-10 rounded-md [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {

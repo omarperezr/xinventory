@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { isReferenceLens, useApp } from "../context/app-context";
+import {
+  formatMoneyValue,
+  isReferenceLens,
+  useApp,
+} from "../context/app-context";
 import { Input } from "./ui/input";
 
 type EntryCurrency = "USD" | "BS";
@@ -120,7 +124,7 @@ export function MoneyInput({
         <div className="relative flex-1">
           <span
             aria-hidden="true"
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none"
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base font-semibold text-muted-foreground pointer-events-none"
           >
             {entry === "USD" ? "$" : "Bs"}
           </span>
@@ -147,7 +151,8 @@ export function MoneyInput({
                 reset();
               }
             }}
-            className={`${compact ? "h-9" : "h-11"} pl-8 pr-2`}
+            data-money
+            className={`${compact ? "h-10" : "h-12"} pl-9 pr-3 font-semibold`}
           />
         </div>
         <button
@@ -161,29 +166,32 @@ export function MoneyInput({
             dirty.current = false;
             setEntry((c) => (c === "USD" ? "BS" : "USD"));
           }}
-          className={`${compact ? "h-9 min-w-9 px-1.5" : "h-11 min-w-11 px-2"} rounded-md border border-input bg-input-background text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50`}
+          className={`${compact ? "h-10 min-w-10 px-2" : "h-12 min-w-12 px-3"} rounded-lg border border-input bg-input-background text-sm font-semibold text-foreground transition-colors hover:bg-secondary disabled:opacity-50`}
         >
           {entry === "USD" ? "USD" : "Bs"}
         </button>
       </div>
 
       {lensBlocked && (
-        <p className="text-xs text-amber-700 mt-1">
+        <p className="text-sm text-pending mt-1.5">
           Estás viendo una tasa de referencia. Cambia a USD o Bs para ingresar
           montos.
         </p>
       )}
 
       {showPreview && previewUsd !== null && (
-        <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-2">
-          <span className={entry === "USD" ? "font-bold text-primary" : ""}>
-            $ {previewUsd.toFixed(2)}
+        <div
+          data-money
+          className="text-sm text-muted-foreground mt-1.5 flex flex-wrap items-baseline gap-x-2"
+        >
+          <span className={entry === "USD" ? "font-bold text-foreground" : ""}>
+            {`$ ${formatMoneyValue(previewUsd)}`}
           </span>
-          <span className="text-gray-300" aria-hidden="true">
-            |
+          <span className="text-border-strong" aria-hidden="true">
+            ·
           </span>
-          <span className={entry === "BS" ? "font-bold text-primary" : ""}>
-            Bs {usdToBs(previewUsd).toFixed(2)}
+          <span className={entry === "BS" ? "font-bold text-foreground" : ""}>
+            {`Bs ${formatMoneyValue(usdToBs(previewUsd))}`}
           </span>
         </div>
       )}

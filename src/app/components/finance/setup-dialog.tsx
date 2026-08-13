@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { useApp } from "../../context/app-context";
+import { formatMoneyValue, useApp } from "../../context/app-context";
 import {
   Allocation,
   CategoryNature,
@@ -71,7 +71,7 @@ export function SetupDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Configuración de finanzas</DialogTitle>
           <DialogDescription>
@@ -80,17 +80,17 @@ export function SetupDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div role="tablist" className="flex gap-1 bg-gray-100 p-1 rounded-lg overflow-x-auto">
+        <div role="tablist" className="flex gap-1 bg-secondary p-1 rounded-xl overflow-x-auto">
           {TABS.map((option) => (
             <button
               key={option.key}
               role="tab"
               aria-selected={tab === option.key}
               onClick={() => setTab(option.key)}
-              className={`flex-1 min-w-max min-h-10 px-3 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 h-11 min-w-max px-4 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                 tab === option.key
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "bg-white text-primary shadow-card"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {option.label}
@@ -124,24 +124,28 @@ function RowActions({
   archived: boolean;
 }) {
   return (
-    <div className="flex items-center gap-1 flex-shrink-0">
+    <div className="flex items-center gap-1 shrink-0">
       <button
         type="button"
         onClick={onArchive}
         aria-label={archived ? "Reactivar" : "Archivar"}
         title={archived ? "Reactivar" : "Archivar"}
-        className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
+        className="tap-target inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
       >
-        {archived ? <Check className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+        {archived ? (
+          <Check className="size-4" aria-hidden="true" />
+        ) : (
+          <Archive className="size-4" aria-hidden="true" />
+        )}
       </button>
       <button
         type="button"
         onClick={onDelete}
         aria-label="Eliminar"
         title="Eliminar (solo si nada lo usa)"
-        className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+        className="tap-target inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive"
       >
-        <Trash2 className="w-3.5 h-3.5" />
+        <Trash2 className="size-4" aria-hidden="true" />
       </button>
     </div>
   );
@@ -161,24 +165,24 @@ function FormShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/60">
+    <div className="border border-border rounded-xl p-4 space-y-4 bg-canvas">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-900">{title}</p>
+        <p className="text-base font-bold text-foreground">{title}</p>
         <button
           type="button"
           onClick={onCancel}
           aria-label="Cerrar formulario"
-          className="p-1 rounded-md hover:bg-gray-200 text-gray-500"
+          className="tap-target inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         >
-          <X className="w-4 h-4" />
+          <X className="size-5" aria-hidden="true" />
         </button>
       </div>
       {children}
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" className="flex-1" onClick={onCancel}>
+        <Button variant="outline" className="flex-1" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button size="sm" className="flex-1" onClick={onSave}>
+        <Button className="flex-1" onClick={onSave}>
           {saveLabel}
         </Button>
       </div>
@@ -245,22 +249,22 @@ function AccountsTab() {
   };
 
   return (
-    <div className="space-y-3">
-      <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+    <div className="space-y-4">
+      <ul className="divide-y divide-border border border-border rounded-xl">
         {accounts.map((account) => (
-          <li key={account.id} className="flex items-center gap-3 px-3 py-2">
+          <li key={account.id} className="flex items-center gap-3 px-3.5 py-3">
             <button
               type="button"
               onClick={() => startEdit(account)}
               className="flex-1 min-w-0 text-left"
             >
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-base font-semibold text-foreground truncate">
                 {account.name}
                 {!account.active && (
-                  <span className="text-meta text-gray-400 ml-2">archivada</span>
+                  <span className="text-meta font-semibold text-muted-foreground ml-2">archivada</span>
                 )}
               </p>
-              <p className="text-meta text-gray-500 truncate">
+              <p className="text-sm text-muted-foreground truncate">
                 {ACCOUNT_KIND_LABEL[account.kind]} ·{" "}
                 {account.basis === "BS" ? "bolívares" : "dólares"}
                 {account.paymentMethods.length > 0 &&
@@ -277,15 +281,15 @@ function AccountsTab() {
           </li>
         ))}
         {accounts.length === 0 && (
-          <li className="px-3 py-6 text-center text-xs text-gray-500">
+          <li className="px-4 py-10 text-center text-base text-muted-foreground">
             No hay cuentas. Crea la primera para poder registrar movimientos.
           </li>
         )}
       </ul>
 
       {editing === null ? (
-        <Button variant="outline" size="sm" onClick={() => startEdit("new")}>
-          <Plus className="w-4 h-4 mr-1.5" />
+        <Button variant="outline" onClick={() => startEdit("new")}>
+          <Plus aria-hidden="true" />
           Nueva cuenta
         </Button>
       ) : (
@@ -294,8 +298,8 @@ function AccountsTab() {
           onCancel={() => setEditing(null)}
           onSave={save}
         >
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="account-name">Nombre</Label>
               <Input
                 id="account-name"
@@ -304,7 +308,7 @@ function AccountsTab() {
                 placeholder="Banesco corriente"
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="account-kind">Tipo</Label>
               <Select
                 value={draft.kind}
@@ -326,8 +330,8 @@ function AccountsTab() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="account-basis">Moneda que guarda</Label>
               <Select
                 value={draft.basis}
@@ -351,13 +355,13 @@ function AccountsTab() {
                   <SelectItem value="USD">Dólares</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-meta text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1.5">
                 {editing !== "new" && hasMovements(draft.id)
                   ? "No se puede cambiar: la cuenta ya tiene movimientos."
                   : "Las cuentas en bolívares muestran cuánto valor pierden con la tasa."}
               </p>
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="account-opening">
                 Saldo inicial {draft.basis === "BS" ? "(Bs)" : "($)"}
               </Label>
@@ -392,7 +396,7 @@ function AccountsTab() {
             </div>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="account-methods">Métodos de cobro que caen aquí</Label>
             <Input
               id="account-methods"
@@ -400,7 +404,7 @@ function AccountsTab() {
               onChange={(e) => setMethods(e.target.value)}
               placeholder="Efectivo, Pago móvil, Zelle"
             />
-            <p className="text-meta text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1.5">
               Deben coincidir con los métodos que usan los vendedores al cobrar.
               Sin esto, el dinero de las ventas no se puede rastrear hasta un
               saldo.
@@ -443,26 +447,26 @@ function CategoriesTab() {
   };
 
   return (
-    <div className="space-y-3">
-      <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg max-h-72 overflow-y-auto">
+    <div className="space-y-4">
+      <ul className="divide-y divide-border border border-border rounded-xl max-h-80 overflow-y-auto">
         {categories.map((category) => (
-          <li key={category.id} className="flex items-center gap-3 px-3 py-2">
+          <li key={category.id} className="flex items-center gap-3 px-3.5 py-3">
             <button
               type="button"
               onClick={() => startEdit(category)}
               className="flex-1 min-w-0 text-left"
             >
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-base font-semibold text-foreground truncate">
                 {category.name}
                 {category.archived && (
-                  <span className="text-meta text-gray-400 ml-2">archivada</span>
+                  <span className="text-meta font-semibold text-muted-foreground ml-2">archivada</span>
                 )}
               </p>
-              <p className="text-meta text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 {category.kind === "income" ? "Ingreso" : "Gasto"} ·{" "}
                 {NATURE_LABEL[category.nature]}
                 {category.monthlyBudgetUsd != null &&
-                  ` · presupuesto $${category.monthlyBudgetUsd.toFixed(0)}/mes`}
+                  ` · presupuesto $${formatMoneyValue(category.monthlyBudgetUsd)}/mes`}
               </p>
             </button>
             <RowActions
@@ -477,8 +481,8 @@ function CategoriesTab() {
       </ul>
 
       {editing === null ? (
-        <Button variant="outline" size="sm" onClick={() => startEdit("new")}>
-          <Plus className="w-4 h-4 mr-1.5" />
+        <Button variant="outline" onClick={() => startEdit("new")}>
+          <Plus aria-hidden="true" />
           Nueva categoría
         </Button>
       ) : (
@@ -487,8 +491,8 @@ function CategoriesTab() {
           onCancel={() => setEditing(null)}
           onSave={save}
         >
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="category-name">Nombre</Label>
               <Input
                 id="category-name"
@@ -497,7 +501,7 @@ function CategoriesTab() {
                 placeholder="GASOLINA"
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="category-kind">Entra o sale</Label>
               <Select
                 value={draft.kind}
@@ -516,7 +520,7 @@ function CategoriesTab() {
             </div>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="category-nature">Qué tipo de dinero es</Label>
             <Select
               value={draft.nature}
@@ -535,18 +539,18 @@ function CategoriesTab() {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-meta text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1.5">
               {NATURE_HINT[draft.nature]}
             </p>
             {editing !== "new" && (
-              <p className="text-meta text-amber-700 mt-1">
+              <p className="text-sm text-pending mt-1.5">
                 Cambiar esto también cambia los reportes de períodos pasados,
                 porque el estado de resultados se arma con estos grupos.
               </p>
             )}
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="category-budget">Presupuesto mensual $ (opcional)</Label>
             <Input
               id="category-budget"
@@ -603,25 +607,25 @@ function PayeesTab() {
   };
 
   return (
-    <div className="space-y-3">
-      <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg max-h-72 overflow-y-auto">
+    <div className="space-y-4">
+      <ul className="divide-y divide-border border border-border rounded-xl max-h-80 overflow-y-auto">
         {payees.map((payee) => (
-          <li key={payee.id} className="flex items-center gap-3 px-3 py-2">
+          <li key={payee.id} className="flex items-center gap-3 px-3.5 py-3">
             <button
               type="button"
               onClick={() => startEdit(payee)}
               className="flex-1 min-w-0 text-left"
             >
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-base font-semibold text-foreground truncate">
                 {payee.name}
                 {!payee.active && (
-                  <span className="text-meta text-gray-400 ml-2">inactivo</span>
+                  <span className="text-meta font-semibold text-muted-foreground ml-2">inactivo</span>
                 )}
               </p>
-              <p className="text-meta text-gray-500 truncate">
+              <p className="text-sm text-muted-foreground truncate">
                 {PAYEE_KIND_LABEL[payee.kind]}
                 {payee.baseSalaryUsd
-                  ? ` · sueldo $${payee.baseSalaryUsd.toFixed(0)}`
+                  ? ` · sueldo $${formatMoneyValue(payee.baseSalaryUsd)}`
                   : ""}
                 {payee.phone ? ` · ${payee.phone}` : ""}
               </p>
@@ -634,7 +638,7 @@ function PayeesTab() {
           </li>
         ))}
         {payees.length === 0 && (
-          <li className="px-3 py-6 text-center text-xs text-gray-500">
+          <li className="px-4 py-10 text-center text-base text-muted-foreground">
             Sin contactos. Agrega proveedores y empleados para poder agrupar
             gastos y proponer la nómina.
           </li>
@@ -642,8 +646,8 @@ function PayeesTab() {
       </ul>
 
       {editing === null ? (
-        <Button variant="outline" size="sm" onClick={() => startEdit("new")}>
-          <Plus className="w-4 h-4 mr-1.5" />
+        <Button variant="outline" onClick={() => startEdit("new")}>
+          <Plus aria-hidden="true" />
           Nuevo contacto
         </Button>
       ) : (
@@ -652,8 +656,8 @@ function PayeesTab() {
           onCancel={() => setEditing(null)}
           onSave={save}
         >
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="payee-name">Nombre</Label>
               <Input
                 id="payee-name"
@@ -661,7 +665,7 @@ function PayeesTab() {
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="payee-kind">Qué es</Label>
               <Select
                 value={draft.kind}
@@ -683,8 +687,8 @@ function PayeesTab() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="payee-phone">Teléfono</Label>
               <Input
                 id="payee-phone"
@@ -692,7 +696,7 @@ function PayeesTab() {
                 onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="payee-rif">Cédula / RIF</Label>
               <Input
                 id="payee-rif"
@@ -704,8 +708,8 @@ function PayeesTab() {
           </div>
 
           {draft.kind === "employee" && (
-            <div className="grid md:grid-cols-2 gap-3">
-              <div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="payee-salary">Sueldo base $</Label>
                 <Input
                   id="payee-salary"
@@ -722,7 +726,7 @@ function PayeesTab() {
                   }
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="payee-cadence">Cada cuánto se paga</Label>
                 <Select
                   value={draft.payCadence ?? "none"}
@@ -798,23 +802,23 @@ function RecurringTab() {
   };
 
   return (
-    <div className="space-y-3">
-      <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg max-h-72 overflow-y-auto">
+    <div className="space-y-4">
+      <ul className="divide-y divide-border border border-border rounded-xl max-h-80 overflow-y-auto">
         {recurring.map((rule) => (
-          <li key={rule.id} className="flex items-center gap-3 px-3 py-2">
+          <li key={rule.id} className="flex items-center gap-3 px-3.5 py-3">
             <button
               type="button"
               onClick={() => startEdit(rule)}
               className="flex-1 min-w-0 text-left"
             >
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-base font-semibold text-foreground truncate">
                 {rule.name}
                 {!rule.active && (
-                  <span className="text-meta text-gray-400 ml-2">pausada</span>
+                  <span className="text-meta font-semibold text-muted-foreground ml-2">pausada</span>
                 )}
               </p>
-              <p className="text-meta text-gray-500">
-                ${rule.amountUsd.toFixed(2)} · {CADENCE_LABEL[rule.cadence]} · desde{" "}
+              <p className="text-sm text-muted-foreground">
+                ${formatMoneyValue(rule.amountUsd)} · {CADENCE_LABEL[rule.cadence]} · desde{" "}
                 {rule.anchorDate}
               </p>
             </button>
@@ -826,7 +830,7 @@ function RecurringTab() {
           </li>
         ))}
         {recurring.length === 0 && (
-          <li className="px-3 py-6 text-center text-xs text-gray-500">
+          <li className="px-4 py-10 text-center text-base text-muted-foreground">
             Sin reglas. Agrega el alquiler, los sueldos o el internet y el módulo
             te los recordará cada período.
           </li>
@@ -834,8 +838,8 @@ function RecurringTab() {
       </ul>
 
       {editing === null ? (
-        <Button variant="outline" size="sm" onClick={() => startEdit("new")}>
-          <Plus className="w-4 h-4 mr-1.5" />
+        <Button variant="outline" onClick={() => startEdit("new")}>
+          <Plus aria-hidden="true" />
           Nueva regla
         </Button>
       ) : (
@@ -844,8 +848,8 @@ function RecurringTab() {
           onCancel={() => setEditing(null)}
           onSave={save}
         >
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="rule-name">Nombre</Label>
               <Input
                 id="rule-name"
@@ -854,7 +858,7 @@ function RecurringTab() {
                 placeholder="Alquiler del local"
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="rule-amount">Monto $</Label>
               <Input
                 id="rule-amount"
@@ -869,8 +873,8 @@ function RecurringTab() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="rule-cadence">Cada cuánto</Label>
               <Select
                 value={draft.cadence}
@@ -890,7 +894,7 @@ function RecurringTab() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="rule-anchor">Primera vez</Label>
               <Input
                 id="rule-anchor"
@@ -901,8 +905,8 @@ function RecurringTab() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-3">
-            <div>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="rule-category">Categoría</Label>
               <Select
                 value={draft.categoryId ?? "none"}
@@ -925,7 +929,7 @@ function RecurringTab() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="rule-account">Cuenta</Label>
               <Select
                 value={draft.accountId ?? "none"}
@@ -948,7 +952,7 @@ function RecurringTab() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="rule-payee">Contacto</Label>
               <Select
                 value={draft.payeeId ?? "none"}
@@ -973,7 +977,7 @@ function RecurringTab() {
             </div>
           </div>
 
-          <p className="text-meta text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Nada se registra solo. Las ocurrencias vencidas aparecen en
             Obligaciones para que las confirmes con un clic.
           </p>
@@ -1015,19 +1019,19 @@ function AllocationsTab() {
   };
 
   return (
-    <div className="space-y-3">
-      <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+    <div className="space-y-4">
+      <ul className="divide-y divide-border border border-border rounded-xl">
         {allocations.map((allocation) => (
-          <li key={allocation.id} className="flex items-center gap-3 px-3 py-2">
+          <li key={allocation.id} className="flex items-center gap-3 px-3.5 py-3">
             <button
               type="button"
               onClick={() => startEdit(allocation)}
               className="flex-1 min-w-0 text-left"
             >
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-base font-semibold text-foreground truncate">
                 {allocation.name}
               </p>
-              <p className="text-meta text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 {allocation.percent}% de {ALLOCATION_BASIS_LABEL[allocation.basis]}
               </p>
             </button>
@@ -1041,7 +1045,7 @@ function AllocationsTab() {
           </li>
         ))}
         {allocations.length === 0 && (
-          <li className="px-3 py-6 text-center text-xs text-gray-500">
+          <li className="px-4 py-10 text-center text-base text-muted-foreground">
             Sin fondos. Ejemplo: «Reposición de inventario, 20% de la utilidad
             neta».
           </li>
@@ -1049,8 +1053,8 @@ function AllocationsTab() {
       </ul>
 
       {editing === null ? (
-        <Button variant="outline" size="sm" onClick={() => startEdit("new")}>
-          <Plus className="w-4 h-4 mr-1.5" />
+        <Button variant="outline" onClick={() => startEdit("new")}>
+          <Plus aria-hidden="true" />
           Nuevo fondo
         </Button>
       ) : (
@@ -1059,8 +1063,8 @@ function AllocationsTab() {
           onCancel={() => setEditing(null)}
           onSave={save}
         >
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="alloc-name">Nombre</Label>
               <Input
                 id="alloc-name"
@@ -1069,7 +1073,7 @@ function AllocationsTab() {
                 placeholder="Fondo de emergencia"
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="alloc-percent">Porcentaje</Label>
               <Input
                 id="alloc-percent"
@@ -1085,8 +1089,8 @@ function AllocationsTab() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="alloc-basis">Se calcula sobre</Label>
               <Select
                 value={draft.basis}
@@ -1106,7 +1110,7 @@ function AllocationsTab() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="alloc-account">Se guarda en</Label>
               <Select
                 value={draft.accountId ?? "none"}
@@ -1131,7 +1135,7 @@ function AllocationsTab() {
             </div>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="alloc-target">Meta $ (opcional)</Label>
             <Input
               id="alloc-target"
@@ -1148,7 +1152,7 @@ function AllocationsTab() {
             />
           </div>
 
-          <p className="text-meta text-gray-500">
+          <p className="text-sm text-muted-foreground">
             La regla dice cuánto debería apartarse. Para que cuente como
             apartado, registra un traslado a la cuenta del fondo y márcalo con
             este nombre.

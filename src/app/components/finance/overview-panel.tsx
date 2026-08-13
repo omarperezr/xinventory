@@ -19,24 +19,25 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Banknote,
-  Landmark,
   PiggyBank,
   Scale,
   Target,
-  Wallet,
 } from "lucide-react";
 import {
-  AXIS_TICK,
   ChartTooltip,
-  INK,
+  Kpi,
+  KpiRow,
   MeterBar,
   SectionCard,
-  StatTile,
-  STATUS,
-  SERIES,
   EmptyNote,
 } from "../reports/report-ui";
 import { AlertList, FinancePanelProps, PnlRow } from "./finance-ui";
+import { formatMoneyValue } from "../../context/app-context";
+
+// Rule of the palette: money green for the one accent, red only for state.
+const CHART = { income: "#0f7b4d", expense: "#c05252" } as const;
+const GRID = "#e3e8e6";
+const TICK = { fontSize: 12, fill: "#55625c" } as const;
 
 export function FinanceOverviewPanel({
   report,
@@ -61,38 +62,33 @@ export function FinanceOverviewPanel({
 
   return (
     <div className="space-y-4 md:space-y-5">
-      {/* Headline */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile
+      {/* Headline: the four figures the owner opens this screen for. */}
+      <KpiRow>
+        <Kpi
           label="Utilidad neta"
           value={money(pnl.netProfit)}
           delta={delta(pnl.netProfit, previousPnl.netProfit)}
           tone={pnl.netProfit >= 0 ? "good" : "critical"}
-          hint={`${pnl.netMarginPct.toFixed(1)}% de las ventas`}
-          icon={<Scale className="w-4 h-4 text-gray-400" />}
+          hint={`${pnl.netMarginPct.toFixed(1).replace(".", ",")}% de las ventas`}
         />
-        <StatTile
+        <Kpi
           label="Efectivo disponible"
           value={money(runway.cashUsd)}
           hint={
             runway.months === null
               ? "sin gastos registrados"
-              : `alcanza ${runway.months.toFixed(1)} mes(es)`
+              : `alcanza ${runway.months.toFixed(1).replace(".", ",")} mes(es)`
           }
-          tone={
-            runway.months !== null && runway.months < 2 ? "critical" : "default"
-          }
-          icon={<Wallet className="w-4 h-4 text-gray-400" />}
+          tone={runway.months !== null && runway.months < 2 ? "critical" : "default"}
         />
-        <StatTile
+        <Kpi
           label="Gastos del período"
           value={money(pnl.operatingExpenses)}
           delta={delta(pnl.operatingExpenses, previousPnl.operatingExpenses)}
           higherIsBetter={false}
           hint={`${money(pnl.fixedExpenses)} fijos`}
-          icon={<ArrowDownRight className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Por pagar"
           value={money(obligations.payablesUsd)}
           hint={
@@ -101,16 +97,15 @@ export function FinanceOverviewPanel({
               : `${money(obligations.next30Usd)} en 30 días`
           }
           tone={obligations.overdueCount > 0 ? "critical" : "default"}
-          icon={<Landmark className="w-4 h-4 text-gray-400" />}
         />
-      </div>
+      </KpiRow>
 
       <div className="grid lg:grid-cols-2 gap-4 md:gap-5">
         {/* Profit statement */}
         <SectionCard
           title="Estado de resultados"
           subtitle="Lo que quedó después de todo, no lo que entró en caja"
-          icon={<Scale className="w-4 h-4 text-primary" />}
+          icon={<Scale className="size-5 text-primary" aria-hidden="true" />}
         >
           <PnlRow label="Ventas" value={money(pnl.salesRevenue)} />
           <PnlRow
@@ -122,7 +117,7 @@ export function FinanceOverviewPanel({
           <PnlRow
             label="Utilidad bruta"
             value={money(pnl.grossProfit)}
-            hint={`Margen ${pnl.grossMarginPct.toFixed(1)}%`}
+            hint={`Margen ${pnl.grossMarginPct.toFixed(1).replace(".", ",")}%`}
             emphasis
           />
           <PnlRow
@@ -163,8 +158,8 @@ export function FinanceOverviewPanel({
           />
 
           {(pnl.investments > 0 || pnl.ownerDraws > 0) && (
-            <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
-              <p className="text-meta text-gray-500 mb-1">
+            <div className="mt-3 pt-3 border-t border-dashed border-border">
+              <p className="text-sm text-muted-foreground mb-1">
                 Debajo de la línea: no son costos del negocio, pero se llevan la
                 utilidad.
               </p>
@@ -192,7 +187,7 @@ export function FinanceOverviewPanel({
           )}
 
           {pnl.merchandisePurchases > 0 && (
-            <p className="text-meta text-gray-500 mt-3 leading-snug">
+            <p className="text-sm text-muted-foreground mt-3 leading-snug">
               Se compraron {money(pnl.merchandisePurchases)} en mercancía este
               período. No aparece arriba porque ese dinero se convirtió en
               inventario: entra al resultado cuando se venda.
@@ -205,24 +200,25 @@ export function FinanceOverviewPanel({
           <SectionCard
             title="Punto de equilibrio"
             subtitle="Cuánto hay que vender solo para no perder"
-            icon={<Target className="w-4 h-4 text-primary" />}
+            icon={<Target className="size-5 text-primary" aria-hidden="true" />}
           >
             {breakEven.reachable ? (
               <div className="space-y-3">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <p className="text-meta text-gray-500">Ventas necesarias al día</p>
-                    <p className="text-xl md:text-2xl font-semibold text-gray-900">
+                    <p className="text-sm text-muted-foreground">Ventas necesarias al día</p>
+                    <p className="text-2xl font-bold text-foreground" data-money>
                       {money(breakEven.dailySalesNeeded)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-meta text-gray-500">Vas en</p>
+                    <p className="text-sm text-muted-foreground">Vas en</p>
                     <p
-                      className={`text-xl md:text-2xl font-semibold ${
+                      data-money
+                      className={`text-2xl font-bold ${
                         breakEven.coveragePct >= 100
-                          ? "text-green-700"
-                          : "text-red-700"
+                          ? "text-primary-soft-foreground"
+                          : "text-destructive"
                       }`}
                     >
                       {money(breakEven.currentDailySales)}
@@ -232,12 +228,12 @@ export function FinanceOverviewPanel({
                 <MeterBar
                   pct={Math.min(breakEven.coveragePct, 100)}
                   color={
-                    breakEven.coveragePct >= 100 ? STATUS.good : STATUS.critical
+                    breakEven.coveragePct >= 100 ? "#0f7b4d" : "#c05252"
                   }
                 />
-                <p className="text-meta text-gray-500 leading-snug">
+                <p className="text-sm text-muted-foreground leading-snug">
                   Con {money(breakEven.fixedMonthly)} de gastos fijos al mes y un
-                  margen bruto de {(breakEven.grossMarginRatio * 100).toFixed(1)}%,
+                  margen bruto de {(breakEven.grossMarginRatio * 100).toFixed(1).replace(".", ",")}%,
                   el negocio necesita {money(breakEven.monthlySalesNeeded)} de venta
                   mensual para quedar en cero.
                 </p>
@@ -254,7 +250,7 @@ export function FinanceOverviewPanel({
           <SectionCard
             title="Flujo de caja"
             subtitle="El dinero que entró y salió de verdad"
-            icon={<Banknote className="w-4 h-4 text-primary" />}
+            icon={<Banknote className="size-5 text-primary" aria-hidden="true" />}
           >
             <PnlRow label="Cobros por ventas" value={`+ ${money(cashFlow.salesInflow)}`} />
             {cashFlow.otherInflow > 0 && (
@@ -280,11 +276,11 @@ export function FinanceOverviewPanel({
               negative={cashFlow.netUsd < 0}
               emphasis
             />
-            <div className="flex items-center gap-2 mt-2 text-meta text-gray-500">
+            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground" data-money>
               {cashFlow.netUsd >= 0 ? (
-                <ArrowUpRight className="w-3.5 h-3.5 text-green-600" />
+                <ArrowUpRight className="size-4 text-primary" aria-hidden="true" />
               ) : (
-                <ArrowDownRight className="w-3.5 h-3.5 text-red-600" />
+                <ArrowDownRight className="size-4 text-destructive" aria-hidden="true" />
               )}
               Saldo actual en todas las cuentas: {money(cashFlow.closingUsd)}
             </div>
@@ -296,7 +292,7 @@ export function FinanceOverviewPanel({
       <SectionCard
         title="Ingresos contra gastos"
         subtitle="Mes a mes, dentro del período elegido"
-        icon={<PiggyBank className="w-4 h-4 text-primary" />}
+        icon={<PiggyBank className="size-5 text-primary" aria-hidden="true" />}
       >
         {trendData.length === 0 ? (
           <EmptyNote>Sin movimientos en el período</EmptyNote>
@@ -304,10 +300,10 @@ export function FinanceOverviewPanel({
           <div style={{ width: "100%", height: 240 }}>
             <ResponsiveContainer>
               <BarChart data={trendData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-                <CartesianGrid stroke={INK.grid} vertical={false} />
-                <XAxis dataKey="month" tick={AXIS_TICK} axisLine={{ stroke: INK.axis }} />
+                <CartesianGrid stroke={GRID} vertical={false} />
+                <XAxis dataKey="month" tick={TICK} axisLine={{ stroke: GRID }} tickLine={false} />
                 <YAxis
-                  tick={AXIS_TICK}
+                  tick={TICK}
                   axisLine={false}
                   tickLine={false}
                   width={54}
@@ -316,12 +312,12 @@ export function FinanceOverviewPanel({
                 <Tooltip
                   content={
                     <ChartTooltip
-                      format={(value) => `${symbol} ${value.toFixed(2)}`}
+                      format={(value) => `${symbol} ${formatMoneyValue(value)}`}
                     />
                   }
                 />
-                <Bar dataKey="ingresos" name="Ingresos" fill={SERIES[1]} radius={[3, 3, 0, 0]} />
-                <Bar dataKey="gastos" name="Gastos" fill={SERIES[5]} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="ingresos" name="Ingresos" fill={CHART.income} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="gastos" name="Gastos" fill={CHART.expense} radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -332,12 +328,12 @@ export function FinanceOverviewPanel({
       <SectionCard
         title="Qué atender"
         subtitle="Ordenado por gravedad"
-        icon={<AlertTriangle className="w-4 h-4 text-primary" />}
+        icon={<AlertTriangle className="size-5 text-primary" aria-hidden="true" />}
       >
         <AlertList alerts={report.alerts} />
       </SectionCard>
 
-      <p className="text-meta text-gray-400 text-center">
+      <p className="text-sm text-muted-foreground text-center">
         Cifras en {symbol === "$" ? "dólares" : "bolívares"} ·{" "}
         {moneyCompact(pnl.salesRevenue)} vendidos en el período
       </p>

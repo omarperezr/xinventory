@@ -1,84 +1,118 @@
 @custom-variant dark (&:is(.dark *));
 
+/* ──────────────────────────────────────────────────────────────────────────
+   xinventory design tokens — "the counter tool"
+
+   One light world: cool paper ground, white surfaces, near-black ink, a
+   single deep money-green accent. Amber is reserved for "pending / not yet
+   real" (offline outbox, reference lenses), red for destructive and
+   out-of-stock. Nothing else gets a hue: money and state own all the color.
+   ────────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --font-size: 16px;
+  /* Elderly-first: 17px base. Everything in rem scales from here. */
+  --font-size: 17px;
+
   --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
-  /* The page behind the cards. Was pasted as a literal #FAFAFA in four
-     places, which is how a shell and its login screen drift apart. */
-  --canvas: #fafafa;
+  --foreground: #182420;
+  /* The page behind the cards. */
+  --canvas: #f3f5f4;
   --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #2196f3;
+  --card-foreground: #182420;
+  --popover: #ffffff;
+  --popover-foreground: #182420;
+
+  /* Money green: the one accent. Confirmed, primary actions, focus. */
+  --primary: #0f7b4d;
+  --primary-hover: #0c6a42;
+  --primary-soft: #e3f3ea;
+  --primary-soft-foreground: #0a5c39;
   --primary-foreground: #ffffff;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #0a0a0a;
-  --muted: #f4f4f5;
-  --muted-foreground: #71717a;
-  --accent: #f4f4f5;
-  --accent-foreground: #0a0a0a;
-  --destructive: #d4183d;
+
+  --secondary: #eef1f0;
+  --secondary-foreground: #2c3833;
+  --muted: #eef1f0;
+  --muted-foreground: #55625c;
+  --accent: #e8ece9;
+  --accent-foreground: #182420;
+
+  --destructive: #bf2e2e;
+  --destructive-soft: #fceceb;
+  --destructive-soft-foreground: #9c2323;
   --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
-  --input: transparent;
-  --input-background: #f3f3f5;
-  --switch-background: #cbced4;
-  --font-weight-medium: 500;
+
+  /* Pending / offline / reference-lens: "not yet real" money. */
+  --pending: #8a5a06;
+  --pending-soft: #fdf2e0;
+  --pending-strong: #f5b73f;
+
+  --border: #e3e8e6;
+  --border-strong: #cfd6d3;
+  --input: #cfd6d3;
+  --input-background: #ffffff;
+  --switch-background: #cbd2cf;
+
   --font-weight-normal: 400;
-  --ring: #2196f3;
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #030213;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --font-weight-medium: 500;
+
+  --ring: #0f7b4d;
+
+  --chart-1: #0f7b4d;
+  --chart-2: #3f6fae;
+  --chart-3: #d9962b;
+  --chart-4: #8a5fa8;
+  --chart-5: #c05252;
+
+  --radius: 0.75rem;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #182420;
+  --sidebar-primary: #0f7b4d;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef1f0;
+  --sidebar-accent-foreground: #182420;
+  --sidebar-border: #e3e8e6;
+  --sidebar-ring: #0f7b4d;
+
+  /* Soft real shadows: offset + blur, tinted with the ink. */
+  --shadow-card: 0 1px 2px rgb(24 36 32 / 0.05), 0 4px 12px rgb(24 36 32 / 0.05);
+  --shadow-raised: 0 2px 4px rgb(24 36 32 / 0.06), 0 10px 24px rgb(24 36 32 / 0.09);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  --background: #131917;
+  --foreground: #edf2ef;
+  --canvas: #0e1311;
+  --card: #171e1b;
+  --card-foreground: #edf2ef;
+  --popover: #171e1b;
+  --popover-foreground: #edf2ef;
+  --primary: #3fbd82;
+  --primary-hover: #59c993;
+  --primary-soft: #123527;
+  --primary-soft-foreground: #7ed7ab;
+  --primary-foreground: #06130c;
+  --secondary: #222b27;
+  --secondary-foreground: #d6ded9;
+  --muted: #222b27;
+  --muted-foreground: #9caba3;
+  --accent: #26302b;
+  --accent-foreground: #edf2ef;
+  --destructive: #e05d5d;
+  --destructive-soft: #3a1717;
+  --destructive-soft-foreground: #f0a2a2;
+  --destructive-foreground: #140505;
+  --pending: #e9b45c;
+  --pending-soft: #33270e;
+  --pending-strong: #f5b73f;
+  --border: #2a332e;
+  --border-strong: #3a453f;
+  --input: #3a453f;
+  --input-background: #171e1b;
+  --switch-background: #3a453f;
+  --ring: #3fbd82;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.35);
+  --shadow-raised: 0 2px 4px rgb(0 0 0 / 0.45), 0 10px 24px rgb(0 0 0 / 0.4);
 }
 
 @theme inline {
@@ -90,6 +124,9 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -98,8 +135,14 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-soft-foreground: var(--destructive-soft-foreground);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-pending: var(--pending);
+  --color-pending-soft: var(--pending-soft);
+  --color-pending-strong: var(--pending-strong);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-input-background: var(--input-background);
   --color-switch-background: var(--switch-background);
@@ -109,7 +152,7 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 6px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
@@ -121,6 +164,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
 }
 
 @layer base {
@@ -129,57 +174,83 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-canvas text-foreground;
   }
-
-  /**
-  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
-  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
-  */
 
   html {
     font-size: var(--font-size);
   }
 
+  /* Default typography. Utilities still override (base layer). */
   h1 {
     font-size: var(--text-2xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
   }
 
   h2 {
     font-size: var(--text-xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
   }
 
   h3 {
     font-size: var(--text-lg);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-weight: 600;
+    line-height: 1.4;
   }
 
   h4 {
     font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-weight: 600;
+    line-height: 1.45;
   }
 
   label {
     font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-weight: 600;
+    line-height: 1.45;
   }
 
   button {
     font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-weight: 600;
+    line-height: 1.45;
   }
 
   input {
     font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
-    line-height: 1.5;
+    line-height: 1.45;
+  }
+
+  /* Browser surfaces carry the design too. */
+  ::selection {
+    background: #b9e2cd;
+    color: #0a3e27;
+  }
+
+  input,
+  textarea {
+    caret-color: var(--primary);
+  }
+
+  a {
+    text-underline-offset: 3px;
+  }
+
+  /* Every number a user compares sits in a column somewhere. */
+  table,
+  [data-money] {
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  @media (pointer: fine) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-strong) transparent;
+    }
   }
 }

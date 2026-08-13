@@ -48,7 +48,7 @@ label {
 /* Visible keyboard focus. The default ring is easy to lose against the
    light surfaces used throughout the app. */
 :focus-visible {
-  outline: 2px solid var(--color-primary, #2196f3);
+  outline: 2px solid var(--color-primary, #0f7b4d);
   outline-offset: 2px;
 }
 
@@ -60,7 +60,7 @@ label {
 /* Matching spacer for a bottom bar that uses .pb-safe. Reserving only the
    bar's own height leaves the last row of content under the home indicator. */
 .h-nav-safe {
-  height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  height: calc(4.25rem + env(safe-area-inset-bottom, 0px));
 }
 
 @layer utilities {

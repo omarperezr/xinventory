@@ -1,11 +1,12 @@
 // Shared building blocks for the reports dashboard: the palette, stat tiles,
 // section cards and the sortable table every panel reuses.
 //
-// The categorical palette below is validated for colour-vision deficiency on a
-// white surface (adjacent-pair ΔE 9.1 protan, normal-vision floor 19.6). Three
-// of the slots sit under 3:1 contrast against white, so every chart that uses
-// them also ships a legend, a tooltip and a table or direct labels - colour is
-// never the only way to read a value.
+// Series colours are the app's five chart tokens (--chart-1..5); state colours
+// (good/warning/serious/critical) reuse the money-green, pending-amber,
+// chart-4 purple and destructive-red tokens so a chart never invents a hue the
+// rest of the app doesn't already use. Every chart that leans on colour also
+// ships a legend, a tooltip and a table or direct labels - colour is never the
+// only way to read a value.
 
 import { ReactNode, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Minus } from "lucide-react";
@@ -24,32 +25,30 @@ export interface PanelProps {
   symbol: string;
 }
 
-/** Categorical slots. Assign in order and never cycle past the last one. */
+/** Categorical slots - the app's chart-1..5 tokens. Assign in order and never
+ *  cycle past the last one. */
 export const SERIES = [
-  "#2a78d6", // blue
-  "#008300", // green
-  "#e87ba4", // magenta
-  "#eda100", // yellow
-  "#1baf7a", // aqua
-  "#eb6834", // orange
+  "#0f7b4d", // chart-1 / primary
+  "#3f6fae", // chart-2
+  "#d9962b", // chart-3
+  "#8a5fa8", // chart-4
+  "#c05252", // chart-5
 ] as const;
 
-/** Reserved for state, never for identity. */
+/** Reserved for state, never for identity. Sourced from the same tokens as
+ *  every other status colour in the app. */
 export const STATUS = {
-  good: "#0ca30c",
-  warning: "#fab219",
-  serious: "#ec835a",
-  critical: "#d03b3b",
+  good: "#0f7b4d", // --primary
+  warning: "#8a5a06", // --pending
+  serious: "#8a5fa8", // --chart-4, for "frozen" states distinct from warning/critical
+  critical: "#bf2e2e", // --destructive
 } as const;
 
 export const INK = {
-  primary: "#111827",
-  secondary: "#52514e",
-  muted: "#898781",
-  grid: "#e5e7eb",
-  axis: "#c3c2b7",
-  successText: "#006300",
-  dangerText: "#b42318",
+  secondary: "#2c3833", // --secondary-foreground
+  muted: "#55625c", // --muted-foreground
+  grid: "#e3e8e6", // --border
+  axis: "#e3e8e6", // --border
 } as const;
 
 /** A number a shop owner can read at a glance: 1.284 / 12,3K / 4,2M. */
@@ -90,16 +89,16 @@ export function SectionCard({
 }) {
   return (
     <section
-      className={`bg-white rounded-xl border border-gray-200 shadow-sm ${className}`}
+      className={`bg-white rounded-xl border border-border shadow-card ${className}`}
     >
-      <header className="flex flex-wrap items-start justify-between gap-2 px-4 md:px-5 pt-4 pb-3 border-b border-gray-100">
+      <header className="flex flex-wrap items-start justify-between gap-2 px-4 md:px-5 pt-4 pb-3 border-b border-border">
         <div className="min-w-0">
-          <h3 className="font-medium text-gray-900 text-sm md:text-base flex items-center gap-2">
+          <h3 className="font-bold text-foreground text-base flex items-center gap-2">
             {icon}
             {title}
           </h3>
           {subtitle && (
-            <p className="text-[11px] md:text-xs text-gray-500 mt-0.5">{subtitle}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
           )}
         </div>
         {actions && <div className="flex items-center gap-1.5">{actions}</div>}
@@ -111,7 +110,7 @@ export function SectionCard({
 
 export function EmptyNote({ children }: { children: ReactNode }) {
   return (
-    <p className="text-xs text-gray-500 py-6 text-center">{children}</p>
+    <p className="text-sm text-muted-foreground py-6 text-center">{children}</p>
   );
 }
 
@@ -132,8 +131,8 @@ export function DeltaBadge({
 }) {
   if (value === null || !Number.isFinite(value)) {
     return (
-      <span className="inline-flex items-center gap-1 text-meta text-gray-500">
-        <Minus className="w-3 h-3" />
+      <span className="inline-flex items-center gap-1 text-meta text-muted-foreground">
+        <Minus className="w-3 h-3" aria-hidden="true" />
         sin base
       </span>
     );
@@ -141,28 +140,45 @@ export function DeltaBadge({
   const flat = Math.abs(value) < 0.5;
   const good = higherIsBetter ? value > 0 : value < 0;
   const color = flat
-    ? "text-gray-500"
+    ? "text-muted-foreground"
     : good
-      ? "text-green-700"
-      : "text-red-700";
+      ? "text-primary-soft-foreground"
+      : "text-destructive";
   const Icon = flat ? Minus : value > 0 ? ArrowUp : ArrowDown;
+  // The comparison is named in words: a bare "↓ 81.6%" next to another figure
+  // reads as noise to the slowest user. es-VE decimal comma for display.
+  const pct = Math.abs(value).toFixed(value >= 100 ? 0 : 1).replace(".", ",");
   return (
     <span className={`inline-flex items-center gap-0.5 text-meta font-medium ${color}`}>
-      <Icon className="w-3 h-3" />
-      {Math.abs(value).toFixed(value >= 100 ? 0 : 1)}
+      <Icon className="w-3 h-3" aria-hidden="true" />
+      <span className="sr-only">{flat ? "igual," : value > 0 ? "subió" : "bajó"}</span>
+      {pct}
       {suffix}
-      {label && <span className="text-gray-500 font-normal ml-0.5">{label}</span>}
+      <span className="text-muted-foreground font-normal ml-0.5">
+        {label ?? "vs. anterior"}
+      </span>
     </span>
   );
 }
 
-export function StatTile({
+/** One card, one row: the period's headline figures side by side with
+ *  dividers, instead of N separate identical icon cards. Scrolls
+ *  horizontally on a narrow phone rather than wrapping into a grid, so every
+ *  figure keeps the same reading position across panels. */
+export function KpiRow({ children }: { children: ReactNode }) {
+  return (
+    <div className="bg-white rounded-xl border border-border shadow-card overflow-x-auto">
+      <div className="flex divide-x divide-border min-w-max sm:min-w-0">{children}</div>
+    </div>
+  );
+}
+
+export function Kpi({
   label,
   value,
   hint,
   delta,
   higherIsBetter = true,
-  icon,
   tone = "default",
   onClick,
 }: {
@@ -171,38 +187,39 @@ export function StatTile({
   hint?: ReactNode;
   delta?: number | null;
   higherIsBetter?: boolean;
-  icon?: ReactNode;
   tone?: "default" | "good" | "warning" | "critical";
   onClick?: () => void;
 }) {
   const valueColor =
     tone === "good"
-      ? "text-green-700"
+      ? "text-primary-soft-foreground"
       : tone === "critical"
-        ? "text-red-700"
+        ? "text-destructive"
         : tone === "warning"
-          ? "text-amber-700"
-          : "text-gray-900";
+          ? "text-pending"
+          : "text-foreground";
   const Wrapper = onClick ? "button" : "div";
   return (
     <Wrapper
       onClick={onClick}
-      className={`bg-white rounded-xl border border-gray-200 shadow-sm p-3 md:p-4 text-left w-full ${
-        onClick ? "hover:border-gray-300 transition-colors cursor-pointer" : ""
+      className={`flex-1 min-w-[8.5rem] sm:min-w-0 p-3.5 md:p-4 text-left ${
+        onClick ? "hover:bg-secondary transition-colors cursor-pointer" : ""
       }`}
     >
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <p className="text-meta text-gray-500 leading-tight">{label}</p>
-        {icon}
-      </div>
-      <p className={`text-lg md:text-2xl font-semibold truncate ${valueColor}`}>
+      <p className="text-sm text-muted-foreground leading-tight truncate">{label}</p>
+      <p className={`text-2xl font-bold truncate ${valueColor}`} data-money>
         {value}
       </p>
       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
         {delta !== undefined && (
           <DeltaBadge value={delta} higherIsBetter={higherIsBetter} />
         )}
-        {hint && <span className="text-meta text-gray-500">{hint}</span>}
+        {hint && (
+          <span className="text-meta text-muted-foreground">
+            {delta !== undefined ? "· " : ""}
+            {hint}
+          </span>
+        )}
       </div>
     </Wrapper>
   );
@@ -224,18 +241,19 @@ export function Segmented<T extends string>({
   size?: "sm" | "xs";
 }) {
   return (
-    <div className="inline-flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
+    <div className="inline-flex bg-secondary rounded-lg p-0.5 gap-0.5">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
-          className={`${
-            size === "xs" ? "text-meta px-2 py-1" : "text-xs px-2.5 py-1"
-          } rounded-md font-medium transition-colors whitespace-nowrap ${
+          aria-pressed={value === o.value}
+          className={`tap-target ${
+            size === "xs" ? "text-meta px-2 py-1.5" : "text-sm px-3 py-1.5"
+          } rounded-md font-semibold transition-colors whitespace-nowrap ${
             value === o.value
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
+              ? "bg-white text-primary shadow-card"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           {o.label}
@@ -264,7 +282,7 @@ export function Legend({
   return (
     <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
       {entries.map((e) => (
-        <li key={e.label} className="flex items-center gap-1.5 text-[11px] text-gray-600">
+        <li key={e.label} className="flex items-center gap-1.5 text-meta text-muted-foreground">
           <Swatch color={e.color} />
           {e.label}
         </li>
@@ -280,7 +298,7 @@ export function Legend({
 export function MeterBar({
   pct,
   color = SERIES[0],
-  track = "#eef2f6",
+  track = "#eef1f0",
 }: {
   pct: number;
   color?: string;
@@ -321,26 +339,26 @@ export function RankRow({
     <div>
       <div className="flex items-center justify-between mb-1 gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[11px] font-mono text-gray-500 flex-shrink-0 w-5 tabular-nums">
+          <span className="text-meta font-mono text-muted-foreground flex-shrink-0 w-5 tabular-nums">
             #{index}
           </span>
-          <span className="text-xs md:text-sm font-medium text-gray-900 truncate">
+          <span className="text-sm font-medium text-foreground truncate">
             {name}
           </span>
         </div>
         <div className="text-right flex-shrink-0">
           <span
-            className={`text-xs md:text-sm font-semibold tabular-nums ${
+            className={`text-sm font-semibold tabular-nums ${
               valueTone === "good"
-                ? "text-green-700"
+                ? "text-primary-soft-foreground"
                 : valueTone === "bad"
-                  ? "text-red-700"
-                  : "text-gray-900"
+                  ? "text-destructive"
+                  : "text-foreground"
             }`}
           >
             {value}
           </span>
-          {sub && <span className="text-meta text-gray-500 ml-1.5">{sub}</span>}
+          {sub && <span className="text-meta text-muted-foreground ml-1.5">{sub}</span>}
         </div>
       </div>
       <MeterBar pct={pct} color={color} />
@@ -417,17 +435,17 @@ export function DataTable<T>({
     <div>
       <div className="overflow-x-auto -mx-4 md:-mx-5 px-4 md:px-5">
         <div style={{ maxHeight, overflowY: "auto" }}>
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-sm border-collapse">
             <thead className="sticky top-0 bg-white z-10">
-              <tr className="border-b border-gray-200">
+              <tr className="border-b border-border">
                 {columns.map((c) => (
                   <th
                     key={c.key}
                     style={c.width ? { width: c.width } : undefined}
-                    className={`py-2 px-2 font-medium text-gray-500 whitespace-nowrap ${
+                    className={`py-2 px-2 font-medium text-muted-foreground whitespace-nowrap ${
                       c.align === "right" ? "text-right" : "text-left"
                     } ${c.secondary ? "hidden md:table-cell" : ""} ${
-                      c.sortValue ? "cursor-pointer select-none hover:text-gray-800" : ""
+                      c.sortValue ? "cursor-pointer select-none hover:text-foreground" : ""
                     }`}
                     onClick={() => toggle(c)}
                   >
@@ -440,12 +458,12 @@ export function DataTable<T>({
                       {c.sortValue &&
                         (sortKey === c.key ? (
                           dir === "asc" ? (
-                            <ArrowUp className="w-3 h-3" />
+                            <ArrowUp className="w-3 h-3" aria-hidden="true" />
                           ) : (
-                            <ArrowDown className="w-3 h-3" />
+                            <ArrowDown className="w-3 h-3" aria-hidden="true" />
                           )
                         ) : (
-                          <ArrowUpDown className="w-3 h-3 opacity-30" />
+                          <ArrowUpDown className="w-3 h-3 opacity-30" aria-hidden="true" />
                         ))}
                     </span>
                   </th>
@@ -456,7 +474,7 @@ export function DataTable<T>({
               {visible.map((row, i) => (
                 <tr
                   key={rowKey(row, i)}
-                  className="border-b border-gray-50 hover:bg-gray-50/70"
+                  className="border-b border-border hover:bg-canvas"
                 >
                   {columns.map((c) => (
                     <td
@@ -480,7 +498,7 @@ export function DataTable<T>({
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="mt-3 text-xs text-primary hover:underline font-medium"
+          className="tap-target mt-3 text-sm text-primary hover:underline font-semibold"
         >
           {expanded ? "Ver menos" : `Ver todo (${sorted.length})`}
         </button>
@@ -526,15 +544,15 @@ export function ChartTooltip({
   const heading =
     typeof named === "string" || typeof named === "number" ? named : label;
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 shadow-lg text-meta max-w-[220px]">
+    <div className="bg-white border border-border rounded-lg px-2.5 py-2 shadow-raised text-meta max-w-[220px]">
       {heading != null && (
-        <p className="font-medium text-gray-800 mb-1 truncate">{heading}</p>
+        <p className="font-medium text-foreground mb-1 truncate">{heading}</p>
       )}
       {payload.map((entry, i) => (
-        <p key={i} className="flex items-center gap-1.5 text-gray-600">
+        <p key={i} className="flex items-center gap-1.5 text-muted-foreground">
           <Swatch color={entry.color ?? entry.fill ?? SERIES[0]} />
           <span>{entry.name}</span>
-          <span className="ml-auto font-medium text-gray-900 tabular-nums">
+          <span className="ml-auto font-medium text-foreground tabular-nums">
             {format ? format(entry.value, entry.dataKey) : entry.value}
           </span>
         </p>
@@ -543,4 +561,4 @@ export function ChartTooltip({
   );
 }
 
-export const AXIS_TICK = { fontSize: 10, fill: INK.muted } as const;
+export const AXIS_TICK = { fontSize: 12, fill: INK.muted } as const;

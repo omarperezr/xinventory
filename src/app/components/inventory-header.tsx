@@ -1,14 +1,14 @@
 import { useState } from "react";
 import {
   Package,
-  LayoutGrid,
-  Search,
+  Store,
   ShoppingCart,
   History,
+  Boxes,
+  Menu,
   BarChart2,
   Banknote,
   Megaphone,
-  LogIn,
   LogOut,
   User,
   Users,
@@ -17,21 +17,18 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
+  ChevronRight,
   Shield,
   Tag,
+  Check,
+  RefreshCcw,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import {
   useApp,
-  isDisplayCurrency,
   isReferenceLens,
+  formatMoneyValue,
+  DisplayCurrency,
 } from "../context/app-context";
 import { useAuth, UserRole } from "../context/auth-context";
 import { MODULE_FINANZAS, MODULE_REPORTES, MODULE_REDES } from "../modules";
@@ -41,6 +38,13 @@ import { Label } from "./ui/label";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -48,122 +52,130 @@ import {
   DialogDescription,
 } from "./ui/dialog";
 
-// One definition of the "pill" look shared by the desktop nav and the dialog
-// tab strips. They had drifted apart into three near-identical copies.
-const pillClasses = (active: boolean) =>
-  `flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+// Desktop nav pill. Active = soft green, unmistakable at a glance.
+const navPillClasses = (active: boolean) =>
+  `flex shrink-0 items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-semibold transition-colors ${
     active
-      ? "bg-white text-primary shadow-sm"
-      : "text-gray-600 hover:text-gray-900"
+      ? "bg-primary-soft text-primary-soft-foreground"
+      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+  }`;
+
+// Dialog tab strip pill (user management).
+const pillClasses = (active: boolean) =>
+  `flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${
+    active ? "bg-white text-primary shadow-card" : "text-muted-foreground hover:text-foreground"
   }`;
 
 const mobileTabClasses = (active: boolean) =>
-  `flex flex-col items-center justify-center flex-1 h-full gap-0.5 ${
-    active ? "text-primary" : "text-gray-600"
+  `relative flex flex-col items-center justify-center flex-1 h-full gap-1 rounded-xl transition-colors ${
+    active ? "text-primary" : "text-muted-foreground"
   }`;
 
 // The count alone reads as a bare number to a screen reader, so the badge
 // carries its own wording and the digits are left to sighted users.
 function CartBadge({ count }: { count: number }) {
   return (
-    <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-meta font-bold text-white bg-red-600 rounded-full">
+    <span className="absolute -top-2 -right-2.5 min-w-[20px] h-5 px-1 flex items-center justify-center text-meta font-bold text-white bg-destructive rounded-full">
       <span aria-hidden="true">{count}</span>
       <span className="sr-only">{count} artículos en el total</span>
     </span>
   );
 }
 
-// Login Dialog
-function LoginDialog({
+const CURRENCY_OPTIONS: {
+  value: DisplayCurrency;
+  title: string;
+  detail: (rates: { USD: number; EUR: number; USDT: number }, honest: number) => string;
+  reference?: boolean;
+}[] = [
+  {
+    value: "USD",
+    title: "Dólares ($)",
+    detail: () => "Precios en dólares",
+  },
+  {
+    value: "BS",
+    title: "Bolívares (tasa real)",
+    detail: (_r, honest) => `Bs ${formatMoneyValue(honest)} por $1`,
+  },
+  {
+    value: "BCV",
+    title: "Bs a tasa BCV",
+    detail: (r) => `Bs ${formatMoneyValue(r.USD)} por $1`,
+    reference: true,
+  },
+  {
+    value: "EUR",
+    title: "Bs a tasa EUR (BCV)",
+    detail: (r) => `Bs ${formatMoneyValue(r.EUR)} por €1`,
+    reference: true,
+  },
+  {
+    value: "USDT",
+    title: "Bs a tasa Binance",
+    detail: (r) => `Bs ${formatMoneyValue(r.USDT)} por $1`,
+    reference: true,
+  },
+];
+
+// Currency picker: one big labeled row per option instead of a dense select.
+// Reference lenses are visibly a separate, "look but don't charge" group.
+function CurrencyDialog({
   open,
   onOpenChange,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { login } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState("");
+  const { currency, setCurrency, rates, honestRate } = useApp();
 
-  const handleSubmit = async () => {
-    setError("");
-    const result = await login(email, password);
-    if (result.success) {
-      onOpenChange(false);
-      setEmail("");
-      setPassword("");
-    } else {
-      setError(result.error || "Correo o contraseña incorrectos");
-    }
+  const row = (opt: (typeof CURRENCY_OPTIONS)[number]) => {
+    const active = currency === opt.value;
+    return (
+      <button
+        key={opt.value}
+        type="button"
+        onClick={() => {
+          setCurrency(opt.value);
+          onOpenChange(false);
+        }}
+        aria-pressed={active}
+        className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors ${
+          active
+            ? "border-primary bg-primary-soft"
+            : "border-border bg-white hover:bg-secondary"
+        }`}
+      >
+        <span className="min-w-0">
+          <span className="block font-semibold text-foreground">{opt.title}</span>
+          <span className="block text-sm text-muted-foreground" data-money>
+            {opt.detail(rates, honestRate)}
+          </span>
+        </span>
+        {active && <Check className="size-6 shrink-0 text-primary" aria-hidden="true" />}
+      </button>
+    );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm bg-white">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <LogIn className="w-5 h-5 text-primary" />
-            Iniciar Sesión
-          </DialogTitle>
+          <DialogTitle>¿Cómo mostrar los precios?</DialogTitle>
           <DialogDescription>
-            Ingresa tus credenciales para continuar
+            Los precios se guardan en dólares; el bolívar se calcula con la tasa.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 mt-2">
-          <div className="space-y-1.5">
-            <Label>Correo Electrónico</Label>
-            <Input
-              type="email"
-              placeholder="usuario@correo.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Contraseña</Label>
-            <div className="relative">
-              <Input
-                type={showPass ? "text" : "password"}
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                className="pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass(!showPass)}
-                aria-label={
-                  showPass ? "Ocultar contraseña" : "Mostrar contraseña"
-                }
-                aria-pressed={showPass}
-                className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-              >
-                {showPass ? (
-                  <EyeOff className="w-4 h-4" aria-hidden="true" />
-                ) : (
-                  <Eye className="w-4 h-4" aria-hidden="true" />
-                )}
-              </button>
-            </div>
-          </div>
+        <div className="grid gap-2">
+          {CURRENCY_OPTIONS.filter((o) => !o.reference).map(row)}
+        </div>
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md border border-red-100">
-              {error}
-            </p>
-          )}
-
-          <Button
-            onClick={handleSubmit}
-            className="w-full"
-          >
-            Entrar
-          </Button>
+        <div className="mt-1 grid gap-2">
+          <p className="text-sm font-semibold text-pending">
+            Solo para consultar — con estas tasas no se puede cobrar
+          </p>
+          {CURRENCY_OPTIONS.filter((o) => o.reference).map(row)}
         </div>
       </DialogContent>
     </Dialog>
@@ -228,19 +240,16 @@ function UserManagementDialog({
         if (!v) resetForm();
       }}
     >
-      <DialogContent className="sm:max-w-lg bg-white">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            Gestión de Usuarios
-          </DialogTitle>
+          <DialogTitle>Gestión de Usuarios</DialogTitle>
           <DialogDescription>
-            Administra los usuarios del sistema
+            Administra quién entra al sistema y qué puede hacer
           </DialogDescription>
         </DialogHeader>
 
         {/* Tabs */}
-        <div role="tablist" className="flex gap-1 bg-gray-100 p-1 rounded-lg mt-1">
+        <div role="tablist" className="flex gap-1 bg-secondary p-1 rounded-lg mt-1">
           <button
             role="tab"
             aria-selected={tab === "list"}
@@ -265,28 +274,28 @@ function UserManagementDialog({
             {users.map((u) => (
               <div
                 key={u.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                className="flex items-center justify-between p-3 bg-canvas rounded-xl border border-border"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
                       u.role === "admin"
-                        ? "bg-blue-100 text-primary"
-                        : "bg-green-100 text-green-700"
+                        ? "bg-secondary text-foreground"
+                        : "bg-primary-soft text-primary-soft-foreground"
                     }`}
                   >
                     <User className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
-                    <div className="font-medium text-sm text-gray-900 truncate flex items-center gap-1.5">
+                    <div className="font-semibold text-sm text-foreground truncate flex items-center gap-1.5">
                       {u.name}
                       {u.id === currentUser?.id && (
-                        <span className="text-meta bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                        <span className="text-meta bg-primary-soft text-primary-soft-foreground px-1.5 py-0.5 rounded font-semibold">
                           Tú
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">
+                    <div className="text-xs text-muted-foreground truncate">
                       {u.email}
                     </div>
                   </div>
@@ -303,16 +312,16 @@ function UserManagementDialog({
                           updateUser(u.id, { canEditPrice: c as boolean })
                         }
                       />
-                      <span className="text-xs text-gray-500 hidden sm:inline">
+                      <span className="text-xs text-muted-foreground hidden sm:inline">
                         Editar precio
                       </span>
                     </label>
                   )}
                   <span
-                    className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                    className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold ${
                       u.role === "admin"
-                        ? "bg-blue-50 text-blue-700"
-                        : "bg-green-50 text-green-700"
+                        ? "bg-secondary text-secondary-foreground"
+                        : "bg-primary-soft text-primary-soft-foreground"
                     }`}
                   >
                     <RoleIcon r={u.role} />
@@ -321,12 +330,12 @@ function UserManagementDialog({
                   {u.id !== currentUser?.id && (
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon-sm"
                       aria-label={`Eliminar usuario ${u.name}`}
                       onClick={async () => { await deleteUser(u.id); }}
-                      className="tap-target text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                      className="tap-target text-destructive hover:text-destructive hover:bg-destructive-soft"
                     >
-                      <Trash2 className="w-4 h-4" aria-hidden="true" />
+                      <Trash2 aria-hidden="true" />
                     </Button>
                   )}
                 </div>
@@ -363,7 +372,7 @@ function UserManagementDialog({
                   placeholder="Mínimo 6 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pr-10"
+                  className="pr-12"
                 />
                 <button
                   type="button"
@@ -372,12 +381,12 @@ function UserManagementDialog({
                     showPass ? "Ocultar contraseña" : "Mostrar contraseña"
                   }
                   aria-pressed={showPass}
-                  className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  className="tap-target absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPass ? (
-                    <EyeOff className="w-4 h-4" aria-hidden="true" />
+                    <EyeOff className="w-5 h-5" aria-hidden="true" />
                   ) : (
-                    <Eye className="w-4 h-4" aria-hidden="true" />
+                    <Eye className="w-5 h-5" aria-hidden="true" />
                   )}
                 </button>
               </div>
@@ -394,13 +403,13 @@ function UserManagementDialog({
                 <SelectContent>
                   <SelectItem value="seller">
                     <span className="flex items-center gap-2">
-                      <Tag className="w-3.5 h-3.5 text-green-600" />
+                      <Tag className="w-4 h-4 text-primary" />
                       Vendedor
                     </span>
                   </SelectItem>
                   <SelectItem value="admin">
                     <span className="flex items-center gap-2">
-                      <Shield className="w-3.5 h-3.5 text-blue-600" />
+                      <Shield className="w-4 h-4 text-foreground" />
                       Administrador
                     </span>
                   </SelectItem>
@@ -409,33 +418,30 @@ function UserManagementDialog({
             </div>
 
             {role === "seller" && (
-              <label className="flex items-center gap-2 cursor-pointer select-none bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none bg-canvas border border-border rounded-xl px-3.5 py-3">
                 <Checkbox
                   checked={canEditPrice}
                   onCheckedChange={(c) => setCanEditPrice(c as boolean)}
                 />
-                <span className="text-sm text-gray-700">
+                <span className="text-[0.9375rem] text-foreground">
                   Permitir modificar precio de venta
                 </span>
               </label>
             )}
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md border border-red-100">
+              <p className="text-sm text-destructive-soft-foreground bg-destructive-soft px-3.5 py-2.5 rounded-lg">
                 {error}
               </p>
             )}
             {success && (
-              <p className="text-sm text-green-700 bg-green-50 px-3 py-2 rounded-md border border-green-100">
+              <p className="text-sm text-primary-soft-foreground bg-primary-soft px-3.5 py-2.5 rounded-lg">
                 {success}
               </p>
             )}
 
-            <Button
-              onClick={handleCreate}
-              className="w-full"
-            >
-              <Plus className="w-4 h-4 mr-2" />
+            <Button onClick={handleCreate} className="w-full">
+              <Plus aria-hidden="true" />
               Crear Usuario
             </Button>
           </div>
@@ -445,18 +451,166 @@ function UserManagementDialog({
   );
 }
 
+// "Más" sheet: everything that does not deserve a permanent tab. Modules,
+// profile, currency, session — each a full-width labeled row.
+function MoreSheet({
+  open,
+  onOpenChange,
+  onOpenCurrency,
+  onOpenProfile,
+  onOpenUserMgmt,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onOpenCurrency: () => void;
+  onOpenProfile: () => void;
+  onOpenUserMgmt: () => void;
+}) {
+  const location = useLocation();
+  const { currency, honestRate } = useApp();
+  const { currentUser, logout } = useAuth();
+  const isAdmin = currentUser?.role === "admin";
+
+  const close = () => onOpenChange(false);
+
+  const linkRow = (
+    to: string,
+    icon: React.ReactNode,
+    title: string,
+    detail: string,
+  ) => (
+    <Link
+      to={to}
+      onClick={close}
+      aria-current={location.pathname === to ? "page" : undefined}
+      className="flex items-center gap-3.5 rounded-xl border border-border bg-white px-4 py-3.5 transition-colors hover:bg-secondary"
+    >
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-foreground">{title}</span>
+        <span className="block text-sm text-muted-foreground">{detail}</span>
+      </span>
+      <ChevronRight className="size-5 shrink-0 text-border-strong" aria-hidden="true" />
+    </Link>
+  );
+
+  const actionRow = (
+    onClick: () => void,
+    icon: React.ReactNode,
+    title: string,
+    detail: string,
+  ) => (
+    <button
+      type="button"
+      onClick={() => {
+        close();
+        onClick();
+      }}
+      className="flex w-full items-center gap-3.5 rounded-xl border border-border bg-white px-4 py-3.5 text-left transition-colors hover:bg-secondary"
+    >
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-foreground">{title}</span>
+        <span className="block text-sm text-muted-foreground">{detail}</span>
+      </span>
+      <ChevronRight className="size-5 shrink-0 text-border-strong" aria-hidden="true" />
+    </button>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Más opciones</DialogTitle>
+          {currentUser && (
+            <DialogDescription>
+              {currentUser.name} ·{" "}
+              {isAdmin ? "Administrador" : "Vendedor"}
+            </DialogDescription>
+          )}
+        </DialogHeader>
+
+        <div className="grid gap-2">
+          {MODULE_FINANZAS &&
+            linkRow(
+              "/finance",
+              <Banknote className="size-5" aria-hidden="true" />,
+              "Finanzas",
+              "Cuentas, gastos y compras",
+            )}
+          {MODULE_REPORTES &&
+            isAdmin &&
+            linkRow(
+              "/reports",
+              <BarChart2 className="size-5" aria-hidden="true" />,
+              "Reportes",
+              "Ventas, productos y proyección",
+            )}
+          {MODULE_REDES &&
+            isAdmin &&
+            linkRow(
+              "/social",
+              <Megaphone className="size-5" aria-hidden="true" />,
+              "Redes",
+              "Calendario de publicaciones",
+            )}
+
+          {actionRow(
+            onOpenCurrency,
+            <RefreshCcw className="size-5" aria-hidden="true" />,
+            "Moneda y tasa",
+            isReferenceLens(currency)
+              ? "Viendo tasa de referencia"
+              : `Bs ${formatMoneyValue(honestRate)} por $1`,
+          )}
+          {actionRow(
+            onOpenProfile,
+            <User className="size-5" aria-hidden="true" />,
+            "Mi perfil",
+            "Tu nombre y contraseña",
+          )}
+          {isAdmin &&
+            actionRow(
+              onOpenUserMgmt,
+              <Users className="size-5" aria-hidden="true" />,
+              "Usuarios",
+              "Crear y administrar personal",
+            )}
+
+          <button
+            type="button"
+            onClick={() => {
+              close();
+              logout();
+            }}
+            className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 py-3.5 font-semibold text-destructive transition-colors hover:bg-destructive-soft"
+          >
+            <LogOut className="size-5" aria-hidden="true" />
+            Cerrar sesión
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Main Header
 export function InventoryHeader() {
   const location = useLocation();
-  const { currency, setCurrency, cartItems, totalAmount, formatPrice } = useApp();
+  const { currency, cartItems, honestRate } = useApp();
   const { currentUser, logout } = useAuth();
 
   const cartCount = cartItems.reduce((sum, i) => sum + i.cartQuantity, 0);
 
-  const [showLogin, setShowLogin] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showUserMgmt, setShowUserMgmt] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showCurrency, setShowCurrency] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   const isAdmin = currentUser?.role === "admin";
   const isDashboard = location.pathname === "/";
@@ -467,335 +621,284 @@ export function InventoryHeader() {
   const isFinance = location.pathname === "/finance";
   const isSocial = location.pathname === "/social";
 
-  const roleLabel = currentUser?.role === "admin" ? "Admin" : "Vendedor";
-  const roleColor =
-    currentUser?.role === "admin"
-      ? "bg-blue-50 text-blue-700"
-      : "bg-green-50 text-green-700";
+  const lens = isReferenceLens(currency);
 
   return (
     <>
       {/* Top Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 md:py-5">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex items-center gap-6 justify-between md:justify-start w-full md:w-auto">
-              {/* Logo */}
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
-                  <Package className="w-4 h-4 text-white" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <h1 className="text-gray-900 tracking-tight text-base font-semibold leading-none">
-                    Inventario
-                  </h1>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Gestión de productos
-                  </p>
-                </div>
-              </div>
+      <header className="bg-white border-b border-border sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 md:h-[4.5rem] flex items-center justify-between gap-3">
+          {/* Brand */}
+          <div className="flex items-center gap-3 xl:gap-5 min-w-0">
+            <Link to="/search" className="flex items-center gap-2.5 shrink-0">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-primary">
+                <Package className="size-5 text-white" strokeWidth={2} aria-hidden="true" />
+              </span>
+              <span className="text-lg font-bold tracking-tight text-foreground">
+                Inventario
+              </span>
+            </Link>
 
-              {/* Desktop Nav */}
-              <nav
-                aria-label="Principal"
-                className="hidden md:flex items-center bg-gray-100/80 p-1 rounded-lg"
+            {/* Desktop Nav */}
+            <nav aria-label="Principal" className="hidden md:flex items-center gap-0.5 xl:gap-1 min-w-0 overflow-x-auto">
+              <Link
+                to="/search"
+                aria-current={isSearch ? "page" : undefined}
+                className={navPillClasses(isSearch)}
               >
-                {isAdmin && (
-                  <Link
-                    to="/"
-                    aria-current={isDashboard ? "page" : undefined}
-                    className={pillClasses(isDashboard)}
-                  >
-                    <LayoutGrid className="w-4 h-4 mr-2" aria-hidden="true" />
-                    Admin
-                  </Link>
-                )}
-                <Link
-                  to="/search"
-                  aria-current={isSearch ? "page" : undefined}
-                  className={pillClasses(isSearch)}
-                >
-                  <Search className="w-4 h-4 mr-2" aria-hidden="true" />
-                  Buscar
-                </Link>
-                <Link
-                  to="/total"
-                  aria-current={isTotal ? "page" : undefined}
-                  className={`relative ${pillClasses(isTotal)}`}
-                >
-                  <span className="relative mr-2">
-                    <ShoppingCart className="w-4 h-4" aria-hidden="true" />
-                    {cartCount > 0 && <CartBadge count={cartCount} />}
-                  </span>
-                  Total
-                  {totalAmount > 0 && (
-                    <span className="ml-2 text-xs font-semibold text-primary">
-                      {formatPrice(totalAmount)}
-                    </span>
-                  )}
-                </Link>
-                <Link
-                  to="/history"
-                  aria-current={isHistory ? "page" : undefined}
-                  className={pillClasses(isHistory)}
-                >
-                  <History className="w-4 h-4 mr-2" aria-hidden="true" />
-                  Historial
-                </Link>
-                {MODULE_FINANZAS && (
-                  <Link
-                    to="/finance"
-                    aria-current={isFinance ? "page" : undefined}
-                    className={pillClasses(isFinance)}
-                  >
-                    <Banknote className="w-4 h-4 mr-2" aria-hidden="true" />
-                    Finanzas
-                  </Link>
-                )}
-                {MODULE_REPORTES && isAdmin && (
-                  <Link
-                    to="/reports"
-                    aria-current={isReports ? "page" : undefined}
-                    className={pillClasses(isReports)}
-                  >
-                    <BarChart2 className="w-4 h-4 mr-2" aria-hidden="true" />
-                    Reportes
-                  </Link>
-                )}
-                {MODULE_REDES && isAdmin && (
-                  <Link
-                    to="/social"
-                    aria-current={isSocial ? "page" : undefined}
-                    className={pillClasses(isSocial)}
-                  >
-                    <Megaphone className="w-4 h-4 mr-2" aria-hidden="true" />
-                    Redes
-                  </Link>
-                )}
-              </nav>
-            </div>
-
-            {/* Right Controls */}
-            <div className="flex items-center justify-between md:justify-end gap-2 w-full md:w-auto">
-              {/* Currency Selector */}
-              <Select
-                value={currency}
-                onValueChange={(val) => {
-                  if (isDisplayCurrency(val)) setCurrency(val);
-                }}
+                <Store className="size-[1.125rem]" aria-hidden="true" />
+                Vender
+              </Link>
+              <Link
+                to="/total"
+                aria-current={isTotal ? "page" : undefined}
+                className={`relative ${navPillClasses(isTotal)}`}
               >
-                <SelectTrigger
-                  aria-label="Moneda mostrada"
-                  className="w-[120px] md:w-[140px] h-9 text-xs md:text-sm"
+                <span className="relative">
+                  <ShoppingCart className="size-[1.125rem]" aria-hidden="true" />
+                  {cartCount > 0 && <CartBadge count={cartCount} />}
+                </span>
+                Cobrar
+              </Link>
+              <Link
+                to="/history"
+                aria-current={isHistory ? "page" : undefined}
+                className={navPillClasses(isHistory)}
+              >
+                <History className="size-[1.125rem]" aria-hidden="true" />
+                Historial
+              </Link>
+              {isAdmin && (
+                <Link
+                  to="/"
+                  aria-current={isDashboard ? "page" : undefined}
+                  className={navPillClasses(isDashboard)}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USD">USD ($)</SelectItem>
-                  <SelectItem value="BS">Bs (real)</SelectItem>
-                  {/* Reference lenses: they restate the price at a rate we do
-                      not treat as the real worth of a bolivar, so money cannot
-                      be entered while one of these is selected. */}
-                  <SelectItem value="BCV">Bs (BCV) · referencia</SelectItem>
-                  <SelectItem value="EUR">Bs (EUR BCV) · referencia</SelectItem>
-                  <SelectItem value="USDT">
-                    Bs (Binance) · referencia
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* User Area */}
-              {currentUser ? (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                    aria-haspopup="menu"
-                    aria-expanded={showUserMenu}
-                    aria-label={`Menú de ${currentUser.name}`}
-                    className="flex items-center gap-2 h-9 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-sm"
-                  >
-                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                      <User className="w-3 h-3 text-white" aria-hidden="true" />
-                    </div>
-                    <span className="hidden sm:block text-gray-700 font-medium max-w-[100px] truncate">
-                      {currentUser.name.split(" ")[0]}
-                    </span>
-                    <span
-                      className={`hidden sm:block text-meta px-1.5 py-0.5 rounded-full font-medium ${roleColor}`}
-                    >
-                      {roleLabel}
-                    </span>
-                    <ChevronDown className="w-3 h-3 text-gray-500" aria-hidden="true" />
-                  </button>
-
-                  {/* Dropdown */}
-                  {showUserMenu && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-20"
-                        onClick={() => setShowUserMenu(false)}
-                      />
-                      <div
-                        role="menu"
-                        className="absolute right-0 mt-1 w-52 bg-white rounded-lg border border-gray-200 shadow-lg z-30 overflow-hidden"
-                      >
-                        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-                          <p className="font-medium text-sm text-gray-900 truncate">
-                            {currentUser.name}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {currentUser.email}
-                          </p>
-                        </div>
-                        <button
-                          role="menuitem"
-                          onClick={() => {
-                            setShowUserMenu(false);
-                            setShowProfile(true);
-                          }}
-                          className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                          <User className="w-4 h-4 text-gray-500" />
-                          Mi Perfil
-                        </button>
-                        {isAdmin && (
-                          <button
-                            role="menuitem"
-                            onClick={() => {
-                              setShowUserMenu(false);
-                              setShowUserMgmt(true);
-                            }}
-                            className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                          >
-                            <Users className="w-4 h-4 text-gray-500" />
-                            Gestionar Usuarios
-                          </button>
-                        )}
-                        <button
-                          role="menuitem"
-                          onClick={() => {
-                            logout();
-                            setShowUserMenu(false);
-                          }}
-                          className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-100"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          Cerrar Sesión
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowLogin(true)}
-                  className="flex items-center gap-2 h-9 px-3 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-colors"
-                >
-                  <LogIn className="w-4 h-4" aria-hidden="true" />
-                  <span className="hidden sm:block">Iniciar Sesión</span>
-                </button>
+                  <Boxes className="size-[1.125rem]" aria-hidden="true" />
+                  Inventario
+                </Link>
               )}
-            </div>
+              {MODULE_FINANZAS && (
+                <Link
+                  to="/finance"
+                  aria-current={isFinance ? "page" : undefined}
+                  className={navPillClasses(isFinance)}
+                >
+                  <Banknote className="size-[1.125rem]" aria-hidden="true" />
+                  Finanzas
+                </Link>
+              )}
+              {MODULE_REPORTES && isAdmin && (
+                <Link
+                  to="/reports"
+                  aria-current={isReports ? "page" : undefined}
+                  className={navPillClasses(isReports)}
+                >
+                  <BarChart2 className="size-[1.125rem]" aria-hidden="true" />
+                  Reportes
+                </Link>
+              )}
+              {MODULE_REDES && isAdmin && (
+                <Link
+                  to="/social"
+                  aria-current={isSocial ? "page" : undefined}
+                  className={navPillClasses(isSocial)}
+                >
+                  <Megaphone className="size-[1.125rem]" aria-hidden="true" />
+                  Redes
+                </Link>
+              )}
+            </nav>
+          </div>
+
+          {/* Right controls */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Day-rate chip: the number staff quotes all day, one tap away
+                from changing how prices are shown. */}
+            <button
+              type="button"
+              onClick={() => setShowCurrency(true)}
+              aria-label="Cambiar moneda y tasa"
+              data-money
+              className={`flex h-10 items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold transition-colors ${
+                lens
+                  ? "border-pending-strong bg-pending-soft text-pending"
+                  : "border-border bg-white text-foreground hover:bg-secondary"
+              }`}
+            >
+              {lens ? (
+                <>Referencia</>
+              ) : (
+                <>
+                  $1
+                  <span className="text-border-strong" aria-hidden="true">=</span>
+                  Bs {formatMoneyValue(honestRate)}
+                </>
+              )}
+              <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
+            </button>
+
+            {/* User menu (desktop; phones reach these through Más) */}
+            {currentUser && (
+              <div className="relative hidden md:block">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  aria-haspopup="menu"
+                  aria-expanded={showUserMenu}
+                  aria-label={`Menú de ${currentUser.name}`}
+                  className="flex items-center gap-2 h-10 px-2.5 rounded-lg border border-border hover:bg-secondary transition-colors text-sm"
+                >
+                  <span className="flex size-7 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+                    {currentUser.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="text-foreground font-semibold max-w-[110px] truncate">
+                    {currentUser.name.split(" ")[0]}
+                  </span>
+                  <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
+                </button>
+
+                {showUserMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setShowUserMenu(false)}
+                    />
+                    <div
+                      role="menu"
+                      className="absolute right-0 mt-1.5 w-60 bg-white rounded-xl border border-border shadow-raised z-30 overflow-hidden"
+                    >
+                      <div className="px-4 py-3 bg-canvas border-b border-border">
+                        <p className="font-semibold text-sm text-foreground truncate">
+                          {currentUser.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {currentUser.email} · {isAdmin ? "Administrador" : "Vendedor"}
+                        </p>
+                      </div>
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          setShowProfile(true);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-[0.9375rem] text-foreground hover:bg-secondary transition-colors"
+                      >
+                        <User className="size-4.5 text-muted-foreground" aria-hidden="true" />
+                        Mi Perfil
+                      </button>
+                      {isAdmin && (
+                        <button
+                          role="menuitem"
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            setShowUserMgmt(true);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-[0.9375rem] text-foreground hover:bg-secondary transition-colors"
+                        >
+                          <Users className="size-4.5 text-muted-foreground" aria-hidden="true" />
+                          Gestionar Usuarios
+                        </button>
+                      )}
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          logout();
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-[0.9375rem] text-destructive hover:bg-destructive-soft transition-colors border-t border-border"
+                      >
+                        <LogOut className="size-4.5" aria-hidden="true" />
+                        Cerrar Sesión
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       {/* Reference lenses are view-only: prices are shown at a rate we do not
           treat as the real worth of a bolivar, so money entry is disabled. */}
-      {isReferenceLens(currency) && (
+      {lens && (
         <div
           role="status"
-          className="bg-amber-50 border-b border-amber-200 text-amber-900 text-xs px-4 py-2 text-center"
+          className="bg-pending-soft border-b border-pending-strong/40 text-pending text-sm font-medium px-4 py-2 text-center"
         >
-          Viendo precios de <strong>referencia</strong>. Para cobrar o editar
-          precios, cambia a <strong>USD ($)</strong> o <strong>Bs (real)</strong>.
+          Estás viendo precios de <strong>referencia</strong>. Para cobrar,
+          cambia a <strong>$</strong> o <strong>Bs (tasa real)</strong>.
         </div>
       )}
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation: at most five doors, every door labeled. */}
       <nav
         aria-label="Principal"
-        className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-safe"
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border z-50 pb-safe"
       >
-        <div className="flex justify-around items-center h-14 px-1">
-          {isAdmin && (
-            <Link
-              to="/"
-              aria-current={isDashboard ? "page" : undefined}
-              className={mobileTabClasses(isDashboard)}
-            >
-              <LayoutGrid className="w-5 h-5" aria-hidden="true" />
-              <span className="text-meta font-medium">Admin</span>
-            </Link>
-          )}
+        <div className="flex items-stretch justify-around h-[4.25rem] px-1.5 py-1.5 gap-1">
           <Link
             to="/search"
             aria-current={isSearch ? "page" : undefined}
             className={mobileTabClasses(isSearch)}
           >
-            <Search className="w-5 h-5" aria-hidden="true" />
-            <span className="text-meta font-medium">Buscar</span>
+            <Store className="size-6" aria-hidden="true" strokeWidth={isSearch ? 2.25 : 1.75} />
+            <span className={`text-meta ${isSearch ? "font-bold" : "font-medium"}`}>Vender</span>
           </Link>
           <Link
             to="/total"
             aria-current={isTotal ? "page" : undefined}
-            className={`relative ${mobileTabClasses(isTotal)}`}
+            className={mobileTabClasses(isTotal)}
           >
             <span className="relative">
-              <ShoppingCart className="w-5 h-5" aria-hidden="true" />
+              <ShoppingCart className="size-6" aria-hidden="true" strokeWidth={isTotal ? 2.25 : 1.75} />
               {cartCount > 0 && <CartBadge count={cartCount} />}
             </span>
-            <span className="text-meta font-medium">
-              {totalAmount > 0 ? formatPrice(totalAmount) : "Total"}
-            </span>
+            <span className={`text-meta ${isTotal ? "font-bold" : "font-medium"}`}>Cobrar</span>
           </Link>
           <Link
             to="/history"
             aria-current={isHistory ? "page" : undefined}
             className={mobileTabClasses(isHistory)}
           >
-            <History className="w-5 h-5" aria-hidden="true" />
-            <span className="text-meta font-medium">Historial</span>
+            <History className="size-6" aria-hidden="true" strokeWidth={isHistory ? 2.25 : 1.75} />
+            <span className={`text-meta ${isHistory ? "font-bold" : "font-medium"}`}>Historial</span>
           </Link>
-          {MODULE_FINANZAS && (
+          {isAdmin && (
             <Link
-              to="/finance"
-              aria-current={isFinance ? "page" : undefined}
-              className={mobileTabClasses(isFinance)}
+              to="/"
+              aria-current={isDashboard ? "page" : undefined}
+              className={mobileTabClasses(isDashboard)}
             >
-              <Banknote className="w-5 h-5" aria-hidden="true" />
-              <span className="text-meta font-medium">Finanzas</span>
+              <Boxes className="size-6" aria-hidden="true" strokeWidth={isDashboard ? 2.25 : 1.75} />
+              <span className={`text-meta ${isDashboard ? "font-bold" : "font-medium"}`}>Inventario</span>
             </Link>
           )}
-          {MODULE_REPORTES && isAdmin && (
-            <Link
-              to="/reports"
-              aria-current={isReports ? "page" : undefined}
-              className={mobileTabClasses(isReports)}
-            >
-              <BarChart2 className="w-5 h-5" aria-hidden="true" />
-              <span className="text-meta font-medium">Reportes</span>
-            </Link>
-          )}
-          {MODULE_REDES && isAdmin && (
-            <Link
-              to="/social"
-              aria-current={isSocial ? "page" : undefined}
-              className={mobileTabClasses(isSocial)}
-            >
-              <Megaphone className="w-5 h-5" aria-hidden="true" />
-              <span className="text-meta font-medium">Redes</span>
-            </Link>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowMore(true)}
+            aria-haspopup="dialog"
+            className={mobileTabClasses(showMore)}
+          >
+            <Menu className="size-6" aria-hidden="true" strokeWidth={1.75} />
+            <span className="text-meta font-medium">Más</span>
+          </button>
         </div>
       </nav>
 
-      {/* Spacer for the bottom nav. Must match the bar's height *and* its
-          safe-area padding, or the last row of content sits under it. */}
-      <div className="md:hidden h-nav-safe" />
+      {/* Bottom-nav clearance lives on <main> (padding-bottom in App.tsx): a
+          spacer here sits at the TOP of the page flow and just pushes the
+          first content down without protecting the last row. */}
 
       {/* Dialogs */}
-      <LoginDialog open={showLogin} onOpenChange={setShowLogin} />
+      <CurrencyDialog open={showCurrency} onOpenChange={setShowCurrency} />
+      <MoreSheet
+        open={showMore}
+        onOpenChange={setShowMore}
+        onOpenCurrency={() => setShowCurrency(true)}
+        onOpenProfile={() => setShowProfile(true)}
+        onOpenUserMgmt={() => setShowUserMgmt(true)}
+      />
       <UserManagementDialog
         open={showUserMgmt}
         onOpenChange={setShowUserMgmt}

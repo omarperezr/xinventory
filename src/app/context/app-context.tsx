@@ -65,6 +65,18 @@ const DISPLAY_CURRENCIES = ["USD", "BS", "BCV", "EUR", "USDT"] as const;
  * charge or a reference figure, so the value picked in the selector is
  * checked rather than asserted on its way into state.
  */
+// Venezuelan number format: "1.234,56". Display only — entry fields keep
+// parsing dot decimals. NaN renders as an em dash a user reports, never as a
+// plausible wrong figure someone charges.
+const moneyFormat = new Intl.NumberFormat("es-VE", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export function formatMoneyValue(value: number): string {
+  return Number.isFinite(value) ? moneyFormat.format(value) : "—";
+}
+
 export function isDisplayCurrency(value: string): value is DisplayCurrency {
   return (DISPLAY_CURRENCIES as readonly string[]).includes(value);
 }
@@ -922,13 +934,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const currencySymbol = currency === "USD" ? "$" : "Bs";
 
   const formatPrice = (priceInUsd: number) =>
-    `${currencySymbol} ${convertPrice(priceInUsd).toFixed(2)}`;
+    `${currencySymbol} ${formatMoneyValue(convertPrice(priceInUsd))}`;
 
   // Clients often want to see the official (BCV) figure next to the real one.
   // Suppressed when BCV already is the honest rate, or when showing USD.
   const formatReferencePrice = (priceInUsd: number) => {
     if (currency !== "BS" || honestRateKey === "USD") return null;
-    return `Bs ${(priceInUsd * rates.USD).toFixed(2)} (BCV)`;
+    return `Bs ${formatMoneyValue(priceInUsd * rates.USD)} (BCV)`;
   };
 
   // Cart actions

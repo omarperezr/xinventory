@@ -14,15 +14,10 @@ import {
 } from "recharts";
 import {
   AlertTriangle,
-  BadgeDollarSign,
   CheckCircle2,
   Info,
   Layers,
   Lightbulb,
-  Package,
-  Percent,
-  Receipt,
-  ShoppingBag,
   TrendingUp,
   Wallet,
   XCircle,
@@ -32,46 +27,61 @@ import {
   ChartTooltip,
   EmptyNote,
   INK,
+  Kpi,
+  KpiRow,
   Legend,
   PanelProps,
   RankRow,
   SectionCard,
   SERIES,
-  StatTile,
   STATUS,
 } from "./report-ui";
 import { delta, type Alert, type AlertLevel } from "../../services/report-analytics";
+import { formatMoneyValue } from "../../context/app-context";
 
+// ok = primary-soft, warn = pending-soft, critical = destructive-soft; info
+// (no stock/money verdict either way) falls back to the neutral secondary tone.
 const ALERT_STYLE: Record<
   AlertLevel,
-  { border: string; bg: string; icon: typeof AlertTriangle; color: string; label: string }
+  {
+    border: string;
+    bg: string;
+    icon: typeof AlertTriangle;
+    color: string;
+    chip: string;
+    label: string;
+  }
 > = {
   critical: {
-    border: "border-l-red-500",
-    bg: "bg-red-50/60",
+    border: "border-l-destructive",
+    bg: "bg-destructive-soft/60",
     icon: XCircle,
     color: STATUS.critical,
+    chip: "bg-destructive-soft text-destructive-soft-foreground",
     label: "Crítico",
   },
   warning: {
-    border: "border-l-amber-400",
-    bg: "bg-amber-50/60",
+    border: "border-l-pending-strong",
+    bg: "bg-pending-soft/60",
     icon: AlertTriangle,
     color: STATUS.warning,
+    chip: "bg-pending-soft text-pending",
     label: "Atención",
   },
   info: {
-    border: "border-l-blue-400",
-    bg: "bg-blue-50/50",
+    border: "border-l-border-strong",
+    bg: "bg-secondary/50",
     icon: Info,
-    color: SERIES[0],
+    color: INK.muted,
+    chip: "bg-secondary text-secondary-foreground",
     label: "Información",
   },
   good: {
-    border: "border-l-green-500",
-    bg: "bg-green-50/50",
+    border: "border-l-primary",
+    bg: "bg-primary-soft/50",
     icon: CheckCircle2,
     color: STATUS.good,
+    chip: "bg-primary-soft text-primary-soft-foreground",
     label: "Buena señal",
   },
 };
@@ -81,19 +91,30 @@ function AlertCard({ alert }: { alert: Alert }) {
   const Icon = style.icon;
   return (
     <li
-      className={`border border-gray-200 border-l-4 ${style.border} ${style.bg} rounded-lg p-3`}
+      className={`border border-border border-l-4 ${style.border} ${style.bg} rounded-lg p-3`}
     >
       <div className="flex items-start gap-2.5">
-        <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: style.color }} />
+        <Icon
+          className="w-4 h-4 mt-0.5 flex-shrink-0"
+          style={{ color: style.color }}
+          aria-hidden="true"
+        />
         <div className="min-w-0">
-          <p className="text-xs md:text-sm font-medium text-gray-900">{alert.title}</p>
-          <p className="text-[11px] md:text-xs text-gray-600 mt-0.5">{alert.detail}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-foreground">{alert.title}</p>
+            <span
+              className={`text-meta font-semibold rounded-full px-2 py-0.5 ${style.chip}`}
+            >
+              {style.label}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground mt-0.5">{alert.detail}</p>
           {alert.items && alert.items.length > 0 && (
             <ul className="flex flex-wrap gap-1 mt-1.5">
               {alert.items.map((name) => (
                 <li
                   key={name}
-                  className="text-meta bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-600 max-w-[180px] truncate"
+                  className="text-meta bg-white border border-border rounded px-1.5 py-0.5 text-muted-foreground max-w-[180px] truncate"
                 >
                   {name}
                 </li>
@@ -138,23 +159,21 @@ export function OverviewPanel({
   return (
     <div className="space-y-4 md:space-y-5">
       {/* Headline KPIs, each against the equivalent previous window */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 md:gap-3">
-        <StatTile
+      <KpiRow>
+        <Kpi
           label="Ingresos"
           value={moneyCompact(m.revenue)}
           delta={delta(m.revenue, p.revenue)}
           hint={`${money(m.revenuePerDay)}/día`}
-          icon={<BadgeDollarSign className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Ganancia neta"
           value={moneyCompact(m.profit)}
           delta={delta(m.profit, p.profit)}
           tone={m.profit >= 0 ? "good" : "critical"}
           hint={`costo ${moneyCompact(m.cost)}`}
-          icon={<Wallet className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Margen"
           value={`${m.margin.toFixed(1)}%`}
           delta={delta(m.margin, p.margin)}
@@ -163,32 +182,28 @@ export function OverviewPanel({
               ? `antes ${p.margin.toFixed(1)}%`
               : "sin período anterior cargado"
           }
-          icon={<Percent className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Transacciones"
           value={m.transactions.toLocaleString()}
           delta={delta(m.transactions, p.transactions)}
           hint={`${m.activeDays} día(s) con ventas`}
-          icon={<Receipt className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Ticket promedio"
           value={moneyCompact(m.avgTicket)}
           delta={delta(m.avgTicket, p.avgTicket)}
           hint={`${m.unitsPerTicket.toFixed(1)} u/venta`}
-          icon={<ShoppingBag className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Unidades vendidas"
           value={m.units.toLocaleString()}
           delta={delta(m.units, p.units)}
           hint={
             m.returnedUnits > 0 ? `${m.returnedUnits} devueltas` : "sin devoluciones"
           }
-          icon={<Package className="w-3.5 h-3.5 text-gray-300" />}
         />
-      </div>
+      </KpiRow>
 
       {/* Trend against the previous period */}
       <SectionCard
@@ -198,7 +213,7 @@ export function OverviewPanel({
             ? `Comparado punto a punto con los ${report.previous.days} días anteriores`
             : "Sin comparación: el período anterior no está cargado completo"
         }
-        icon={<TrendingUp className="w-4 h-4 text-primary" />}
+        icon={<TrendingUp className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         {trend.length >= 2 ? (
           <>
@@ -236,7 +251,7 @@ export function OverviewPanel({
                 />
                 <Tooltip
                   cursor={{ stroke: INK.axis, strokeWidth: 1 }}
-                  content={<ChartTooltip format={(v: number) => (v == null ? "—" : v.toFixed(2))} />}
+                  content={<ChartTooltip format={(v: number) => (v == null ? "—" : formatMoneyValue(v))} />}
                 />
                 <Line
                   type="monotone"
@@ -269,7 +284,7 @@ export function OverviewPanel({
       <SectionCard
         title="Qué necesita tu atención"
         subtitle="Ordenado por el dinero que hay en juego"
-        icon={<Lightbulb className="w-4 h-4 text-amber-500" />}
+        icon={<Lightbulb className="w-4 h-4 text-pending" aria-hidden="true" />}
       >
         {alerts.length > 0 ? (
           <ul className="space-y-2">
@@ -288,7 +303,7 @@ export function OverviewPanel({
         <SectionCard
           title="Productos que más ganancia dejan"
           subtitle="Ingresos menos costo, neto de devoluciones"
-          icon={<Wallet className="w-4 h-4 text-primary" />}
+          icon={<Wallet className="w-4 h-4 text-primary" aria-hidden="true" />}
         >
           {topProfit.length > 0 ? (
             <div className="space-y-3">
@@ -300,7 +315,7 @@ export function OverviewPanel({
                   value={money(item.profit)}
                   sub={`${item.units} u · ${item.margin.toFixed(0)}%`}
                   pct={maxProfit > 0 ? (item.profit / maxProfit) * 100 : 0}
-                  color={item.profit >= 0 ? SERIES[1] : STATUS.critical}
+                  color={item.profit >= 0 ? STATUS.good : STATUS.critical}
                   valueTone={item.profit >= 0 ? "good" : "bad"}
                 />
               ))}
@@ -313,7 +328,7 @@ export function OverviewPanel({
         <SectionCard
           title="Categorías con más peso"
           subtitle="Participación en los ingresos del período"
-          icon={<Layers className="w-4 h-4 text-primary" />}
+          icon={<Layers className="w-4 h-4 text-primary" aria-hidden="true" />}
         >
           {categories.length > 0 ? (
             <div className="space-y-3">

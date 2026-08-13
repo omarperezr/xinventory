@@ -19,8 +19,6 @@ import {
   Info,
   ShoppingCart,
   Sparkles,
-  TrendingDown,
-  TrendingUp,
 } from "lucide-react";
 import {
   AXIS_TICK,
@@ -30,14 +28,16 @@ import {
   EmptyNote,
   formatDays,
   INK,
+  Kpi,
+  KpiRow,
   Legend,
   PanelProps,
   SectionCard,
   Segmented,
   SERIES,
-  StatTile,
 } from "./report-ui";
 import { reorderPlan, type ReorderRow } from "../../services/report-analytics";
+import { formatMoneyValue } from "../../context/app-context";
 
 export function ForecastPanel({ report, money, moneyCompact, convert }: PanelProps) {
   const [coverDays, setCoverDays] = useState<"15" | "30" | "60">("30");
@@ -85,7 +85,7 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
       key: "name",
       header: "Producto",
       render: (r) => (
-        <span className="font-medium text-gray-900 truncate block max-w-[150px] md:max-w-[220px]">
+        <span className="font-medium text-foreground truncate block max-w-[150px] md:max-w-[220px]">
           {r.name}
         </span>
       ),
@@ -111,7 +111,7 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
       header: "Comprar",
       align: "right",
       render: (r) => (
-        <span className="font-semibold text-gray-900">{r.suggestedQty}</span>
+        <span className="font-semibold text-foreground">{r.suggestedQty}</span>
       ),
       sortValue: (r) => r.suggestedQty,
     },
@@ -128,7 +128,7 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
       align: "right",
       secondary: true,
       render: (r) => (
-        <span className="text-green-700">{money(r.expectedProfit)}</span>
+        <span className="text-primary-soft-foreground">{money(r.expectedProfit)}</span>
       ),
       sortValue: (r) => r.expectedProfit,
     },
@@ -146,27 +146,24 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3">
-        <StatTile
+      <KpiRow>
+        <Kpi
           label="Proyección 7 días"
           value={moneyCompact(f.next7)}
           hint={`${money(f.next7 / 7)}/día`}
-          icon={<Sparkles className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Proyección 30 días"
           value={moneyCompact(f.next30)}
           hint={`vs ${moneyCompact(report.metrics.revenue)} del período`}
-          icon={<CalendarClock className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Ganancia esperada 30 días"
           value={moneyCompact(f.expectedProfit30)}
           hint={`al margen actual de ${report.metrics.margin.toFixed(0)}%`}
           tone="good"
-          icon={<TrendingUp className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Tendencia diaria"
           value={
             f.method === "average"
@@ -175,20 +172,13 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
           }
           hint={`confianza ${confidence}`}
           tone={f.method === "average" ? "default" : trendUp ? "good" : "warning"}
-          icon={
-            trendUp ? (
-              <TrendingUp className="w-3.5 h-3.5 text-gray-300" />
-            ) : (
-              <TrendingDown className="w-3.5 h-3.5 text-gray-300" />
-            )
-          }
         />
-      </div>
+      </KpiRow>
 
       <SectionCard
         title="Hacia dónde va la facturación"
         subtitle={`Últimos ${observed.length} días observados y ${f.points.length} días proyectados`}
-        icon={<Sparkles className="w-4 h-4 text-primary" />}
+        icon={<Sparkles className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         {observed.length >= 2 ? (
           <>
@@ -222,7 +212,7 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
                   cursor={{ stroke: INK.axis, strokeWidth: 1 }}
                   content={
                     <ChartTooltip
-                      format={(v: number) => (v == null ? "—" : v.toFixed(2))}
+                      format={(v: number) => (v == null ? "—" : formatMoneyValue(v))}
                     />
                   }
                 />
@@ -247,8 +237,8 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
                 />
               </LineChart>
             </ResponsiveContainer>
-            <p className="text-[11px] text-gray-500 mt-2 flex items-start gap-1.5">
-              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-px text-gray-500" />
+            <p className="text-sm text-muted-foreground mt-2 flex items-start gap-1.5">
+              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-px text-muted-foreground" aria-hidden="true" />
               <span>
                 {f.method === "trend"
                   ? `Ajuste de tendencia sobre ${f.sampleSize} días de ventas (calidad del ajuste ${(f.fit * 100).toFixed(0)}%).`
@@ -268,7 +258,7 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
       <SectionCard
         title="Plan de compra sugerido"
         subtitle="Cantidad necesaria para no quedarte sin stock en el horizonte elegido"
-        icon={<ShoppingCart className="w-4 h-4 text-primary" />}
+        icon={<ShoppingCart className="w-4 h-4 text-primary" aria-hidden="true" />}
         actions={
           <Segmented
             value={coverDays}
@@ -284,21 +274,21 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
         {plan.rows.length > 0 ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 mb-4">
-              <div className="border border-gray-200 rounded-lg p-3">
-                <p className="text-meta text-gray-500">Inversión requerida</p>
-                <p className="text-base md:text-lg font-semibold text-gray-900">
+              <div className="border border-border rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">Inversión requerida</p>
+                <p className="text-lg font-bold text-foreground" data-money>
                   {money(plan.totalCost)}
                 </p>
               </div>
-              <div className="border border-gray-200 rounded-lg p-3">
-                <p className="text-meta text-gray-500">Ganancia esperada</p>
-                <p className="text-base md:text-lg font-semibold text-green-700">
+              <div className="border border-border rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">Ganancia esperada</p>
+                <p className="text-lg font-bold text-primary-soft-foreground" data-money>
                   {money(plan.expectedProfit)}
                 </p>
               </div>
-              <div className="border border-gray-200 rounded-lg p-3">
-                <p className="text-meta text-gray-500">Productos a reponer</p>
-                <p className="text-base md:text-lg font-semibold text-gray-900">
+              <div className="border border-border rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">Productos a reponer</p>
+                <p className="text-lg font-bold text-foreground" data-money>
                   {plan.rows.length}
                 </p>
               </div>
@@ -323,7 +313,7 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
       <SectionCard
         title="Calendario de agotamiento"
         subtitle="Fecha estimada en que cada producto llega a cero"
-        icon={<CalendarClock className="w-4 h-4 text-primary" />}
+        icon={<CalendarClock className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         {upcoming.length > 0 ? (
           <ul className="space-y-2">
@@ -333,25 +323,25 @@ export function ForecastPanel({ report, money, moneyCompact, convert }: PanelPro
               return (
                 <li
                   key={r.id}
-                  className="flex items-center justify-between gap-3 border border-gray-100 rounded-lg px-3 py-2"
+                  className="flex items-center justify-between gap-3 border border-border rounded-lg px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="text-xs md:text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {r.name}
                     </p>
-                    <p className="text-meta text-gray-500">
+                    <p className="text-meta text-muted-foreground">
                       {r.quantity} en stock · {r.velocity.toFixed(2)} u/día
                     </p>
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p
-                      className={`text-xs font-semibold tabular-nums ${
-                        urgent ? "text-red-700" : "text-gray-900"
+                      className={`text-sm font-semibold tabular-nums ${
+                        urgent ? "text-destructive" : "text-foreground"
                       }`}
                     >
                       {format(date, "dd/MM/yy")}
                     </p>
-                    <p className="text-meta text-gray-500">
+                    <p className="text-meta text-muted-foreground">
                       {formatDays(r.daysOfStock)}
                     </p>
                   </div>

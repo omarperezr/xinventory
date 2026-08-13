@@ -16,19 +16,12 @@ import {
 } from "./ui/dialog";
 import { QuantityStepper } from "./quantity-stepper";
 import { useApp, InventoryItem } from "../context/app-context";
+import { PriceTag, StockChip } from "./price-tag";
 import { shareImageToWhatsApp, shareProductToWhatsApp } from "../services/whatsapp";
 
 interface ProductCardProps {
   item: InventoryItem;
   onAddToCart?: (item: InventoryItem, qty: number) => void;
-}
-
-function stockBadgeClasses(quantity: number) {
-  return quantity === 0
-    ? "text-red-600 bg-red-50"
-    : quantity < 10
-      ? "text-amber-600 bg-amber-50"
-      : "text-emerald-700 bg-emerald-50";
 }
 
 function ImageSurface({
@@ -65,6 +58,9 @@ export function ImageCarousel({
   onShare,
   onOpen,
   size = "preview",
+  /** "responsive" hides arrows/share below md — the phone list row is too
+      small for chrome; the detail dialog keeps everything. */
+  controls = "always",
 }: {
   images: string[];
   alt: string;
@@ -76,8 +72,10 @@ export function ImageCarousel({
       invalid markup and leaves a keyboard user unable to reach them. */
   onOpen?: () => void;
   size?: "preview" | "full";
+  controls?: "always" | "responsive";
 }) {
   const hasImages = images.length > 0;
+  const chromeVis = controls === "responsive" ? "hidden md:flex" : "flex";
 
   // startIndex is read once on init; feeding the live index back into the
   // options would re-init embla mid-drag.
@@ -100,7 +98,7 @@ export function ImageCarousel({
   };
 
   return (
-    <div className="relative aspect-square bg-gray-100 overflow-hidden">
+    <div className="relative h-full w-full md:aspect-square bg-secondary overflow-hidden">
       {hasImages ? (
         <div ref={emblaRef} className="h-full overflow-hidden">
           {/* pan-y keeps vertical page scroll working while embla owns the
@@ -127,7 +125,7 @@ export function ImageCarousel({
       ) : (
         <div className="w-full h-full flex items-center justify-center">
           <Package
-            className="w-10 h-10 text-gray-500"
+            className="w-10 h-10 text-muted-foreground/60"
             strokeWidth={1.5}
             aria-hidden="true"
           />
@@ -140,7 +138,7 @@ export function ImageCarousel({
             type="button"
             onClick={(e) => go(-1, e)}
             aria-label="Foto anterior"
-            className="tap-target absolute left-1.5 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 shadow-sm"
+            className={`tap-target absolute left-1.5 top-1/2 -translate-y-1/2 bg-white/85 hover:bg-white rounded-full p-1.5 shadow-card ${chromeVis} items-center justify-center`}
           >
             <ChevronLeft className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -148,13 +146,13 @@ export function ImageCarousel({
             type="button"
             onClick={(e) => go(1, e)}
             aria-label="Foto siguiente"
-            className="tap-target absolute right-1.5 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 shadow-sm"
+            className={`tap-target absolute right-1.5 top-1/2 -translate-y-1/2 bg-white/85 hover:bg-white rounded-full p-1.5 shadow-card ${chromeVis} items-center justify-center`}
           >
             <ChevronRight className="w-4 h-4" aria-hidden="true" />
           </button>
           <div
             aria-hidden="true"
-            className="absolute bottom-1.5 left-0 right-0 flex justify-center gap-1"
+            className={`absolute bottom-1.5 left-0 right-0 justify-center gap-1 ${chromeVis}`}
           >
             {images.map((_, i) => (
               <span
@@ -178,7 +176,7 @@ export function ImageCarousel({
           }}
           title="Compartir esta foto por WhatsApp"
           aria-label={`Compartir foto de ${alt} por WhatsApp`}
-          className="tap-target absolute top-2 right-2 bg-white/90 backdrop-blur rounded-full p-2 shadow-sm hover:bg-emerald-500 hover:text-white transition-colors"
+          className={`tap-target absolute top-2 right-2 bg-white/90 backdrop-blur rounded-full p-2 shadow-card hover:bg-primary hover:text-white transition-colors ${chromeVis} items-center justify-center`}
         >
           <MessageCircle className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
         </button>
@@ -187,15 +185,20 @@ export function ImageCarousel({
   );
 }
 
+/**
+ * One product, two shapes from one DOM: a horizontal row on phones (photo
+ * left, facts middle, one green button right) and a grid card from md up
+ * (photo on top, stepper + add below).
+ */
 export function ProductCard({ item, onAddToCart }: ProductCardProps) {
-  const { formatPrice } = useApp();
   const [qty, setQty] = useState(1);
   const [cardImageIndex, setCardImageIndex] = useState(0);
   const [dialogImageIndex, setDialogImageIndex] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  const unitLabel = { units: "u", kg: "kg", liters: "L" }[item.unit || "units"];
+  const unit = item.unit || "units";
   const images = item.images || [];
+  const out = item.quantity === 0;
 
   const handleShareImage = (index: number) => {
     if (!images[index]) {
@@ -212,57 +215,64 @@ export function ProductCard({ item, onAddToCart }: ProductCardProps) {
 
   return (
     <>
-      <div className="group flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden transition-shadow hover:shadow-lg">
-        <ImageCarousel
-          images={images}
-          alt={item.name}
-          activeIndex={cardImageIndex}
-          setActiveIndex={setCardImageIndex}
-          onShare={handleShareImage}
-          onOpen={openDetail}
-        />
+      <div className="group flex flex-row items-stretch md:flex-col bg-white rounded-xl border border-border shadow-card overflow-hidden transition-shadow hover:shadow-raised">
+        <div className="w-24 shrink-0 self-stretch md:w-full">
+          <ImageCarousel
+            images={images}
+            alt={item.name}
+            activeIndex={cardImageIndex}
+            setActiveIndex={setCardImageIndex}
+            onShare={handleShareImage}
+            onOpen={openDetail}
+            controls="responsive"
+          />
+        </div>
 
-        <div className="flex flex-col gap-1.5 p-3 flex-1">
-          <button
-            type="button"
-            onClick={openDetail}
-            className="text-left"
-          >
-            <p className="text-sm font-semibold text-gray-900 leading-tight line-clamp-2">
-              {item.name}
-            </p>
-          </button>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-meta uppercase tracking-wide bg-gray-900 text-white px-1.5 py-0.5 rounded">
-              {item.brand}
-            </span>
-            <span className="text-meta uppercase tracking-wide bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-              {item.type}
-            </span>
-            {item.includesTaxes && (
-              <span className="text-meta uppercase bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                +IVA
+        <div className="flex min-w-0 flex-1 items-center gap-2 p-3 md:flex-col md:items-stretch md:gap-1.5">
+          <div className="min-w-0 flex-1 md:flex-none">
+            <button type="button" onClick={openDetail} className="block text-left">
+              <p className="text-[0.9375rem] md:text-base font-semibold text-foreground leading-snug line-clamp-2">
+                {item.name}
+              </p>
+            </button>
+
+            <div className="mt-0.5 hidden md:flex items-center gap-1.5 flex-wrap">
+              <span className="text-meta uppercase tracking-wide bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded font-semibold">
+                {item.brand}
               </span>
-            )}
+              <span className="text-meta uppercase tracking-wide text-muted-foreground px-0.5 py-0.5">
+                {item.type}
+              </span>
+              {item.includesTaxes && (
+                <span className="text-meta uppercase bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded font-semibold">
+                  +IVA
+                </span>
+              )}
+            </div>
+
+            <div className="mt-1 flex flex-col gap-1 md:mt-2 md:flex-row md:items-center md:justify-between">
+              <PriceTag usd={item.sellingPrice} size="sm" className="md:text-base" />
+              <StockChip quantity={item.quantity} unit={unit} size="sm" className="self-start" />
+            </div>
           </div>
 
-          <div className="flex items-center justify-between mt-1">
-            <span className="text-base font-bold text-gray-900">
-              {formatPrice(item.sellingPrice)}
-            </span>
-            <span
-              className={`text-xs font-medium px-2 py-0.5 rounded-full ${stockBadgeClasses(item.quantity)}`}
-            >
-              {item.quantity} {unitLabel}
-            </span>
-          </div>
-
-          {/* Quantity and the action it feeds sit in one block, and the
-              primary action spans the card so it is unmistakably the thing
-              to press. Stacked rather than side by side because a two-column
-              card on a phone has no room for both on one line. */}
+          {/* Phone: one labeled green button, adds one. Quantity lives in the
+              detail sheet a row-tap opens. */}
           {onAddToCart && (
-            <div className="flex flex-col gap-2 mt-2">
+            <Button
+              onClick={() => onAddToCart(item, 1)}
+              disabled={out}
+              aria-label={`Agregar ${item.name}`}
+              className="shrink-0 self-center md:hidden px-3.5"
+            >
+              <Plus aria-hidden="true" />
+              Agregar
+            </Button>
+          )}
+
+          {/* Desktop: stepper + add, stacked so the primary action spans the card. */}
+          {onAddToCart && (
+            <div className="hidden md:flex md:flex-col gap-2 mt-1">
               <QuantityStepper
                 value={qty}
                 onChange={setQty}
@@ -274,10 +284,11 @@ export function ProductCard({ item, onAddToCart }: ProductCardProps) {
               />
               <Button
                 onClick={() => onAddToCart(item, qty)}
-                disabled={item.quantity === 0}
-                className="w-full h-10 text-sm"
+                disabled={out}
+                className="w-full"
+                size="sm"
               >
-                <Plus className="w-4 h-4 mr-1" aria-hidden="true" />
+                <Plus aria-hidden="true" />
                 Agregar
               </Button>
             </div>
@@ -291,71 +302,60 @@ export function ProductCard({ item, onAddToCart }: ProductCardProps) {
             <DialogTitle>{item.name}</DialogTitle>
           </DialogHeader>
 
-          <ImageCarousel
-            images={images}
-            alt={item.name}
-            activeIndex={dialogImageIndex}
-            setActiveIndex={setDialogImageIndex}
-            onShare={handleShareImage}
-            size="full"
-          />
+          <div className="overflow-hidden rounded-xl">
+            <ImageCarousel
+              images={images}
+              alt={item.name}
+              activeIndex={dialogImageIndex}
+              setActiveIndex={setDialogImageIndex}
+              onShare={handleShareImage}
+              size="full"
+            />
+          </div>
 
-          <div className="space-y-2 text-sm">
+          <div className="space-y-3">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-meta uppercase tracking-wide bg-gray-900 text-white px-1.5 py-0.5 rounded">
+              <span className="text-meta uppercase tracking-wide bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded font-semibold">
                 {item.brand}
               </span>
-              <span className="text-meta uppercase tracking-wide bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+              <span className="text-meta uppercase tracking-wide text-muted-foreground px-0.5">
                 {item.type}
               </span>
               {item.includesTaxes && (
-                <span className="text-meta uppercase bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                <span className="text-meta uppercase bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded font-semibold">
                   +IVA
                 </span>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <div>
-                <p className="text-xs text-gray-500">Precio</p>
-                <p className="font-semibold text-gray-900">
-                  {formatPrice(item.sellingPrice)}
-                </p>
+            <div className="rounded-xl bg-canvas border border-border p-4 flex flex-col gap-2">
+              <PriceTag usd={item.sellingPrice} size="lg" />
+              <div className="flex items-center justify-between gap-2">
+                <StockChip quantity={item.quantity} unit={unit} />
+                {item.discount > 0 && (
+                  <span className="text-sm font-semibold text-pending" data-money>
+                    -{item.discount}% descuento
+                  </span>
+                )}
               </div>
-              <div>
-                <p className="text-xs text-gray-500">Stock</p>
-                <p
-                  className={`font-semibold inline-flex px-2 py-0.5 rounded-full text-xs ${stockBadgeClasses(item.quantity)}`}
-                >
-                  {item.quantity} {unitLabel}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Código</p>
-                <p className="font-mono text-gray-700">{item.barcode}</p>
-              </div>
-              {item.discount > 0 && (
-                <div>
-                  <p className="text-xs text-gray-500">Descuento</p>
-                  <p className="font-semibold text-orange-600">
-                    -{item.discount}%
-                  </p>
-                </div>
-              )}
+            </div>
+
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="text-muted-foreground">Código</span>
+              <span className="font-mono text-foreground" data-money>
+                {item.barcode}
+              </span>
             </div>
 
             {item.notes && item.notes.trim() && (
-              <div className="pt-1">
-                <p className="text-xs text-gray-500">Notas</p>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 border border-gray-100 rounded-md p-2 mt-0.5">
-                  {item.notes}
-                </p>
-              </div>
+              <p className="text-[0.9375rem] text-foreground whitespace-pre-wrap bg-canvas border border-border rounded-lg p-3">
+                {item.notes}
+              </p>
             )}
           </div>
 
           {onAddToCart && (
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center gap-2.5 pt-1">
               <QuantityStepper
                 value={qty}
                 onChange={setQty}
@@ -368,11 +368,11 @@ export function ProductCard({ item, onAddToCart }: ProductCardProps) {
                   onAddToCart(item, qty);
                   setDetailOpen(false);
                 }}
-                disabled={item.quantity === 0}
-                className="flex-1 h-11 text-sm"
+                disabled={out}
+                className="flex-1"
               >
-                <Plus className="w-4 h-4 mr-1" aria-hidden="true" />
-                Agregar al Total
+                <Plus aria-hidden="true" />
+                Agregar
               </Button>
             </div>
           )}

@@ -7,14 +7,12 @@
 
 import { useState } from "react";
 import {
-  AlarmClock,
-  CalendarClock,
   HandCoins,
   Repeat,
   Users,
 } from "lucide-react";
 import { Button } from "../ui/button";
-import { Column, DataTable, SectionCard, StatTile } from "../reports/report-ui";
+import { Column, DataTable, SectionCard, Kpi, KpiRow } from "../reports/report-ui";
 import {
   EntryInput,
   todayIso,
@@ -82,8 +80,8 @@ export function ObligationsPanel({
       header: "Regla",
       render: (row) => (
         <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">{row.ruleName}</p>
-          <p className="text-meta text-gray-500">
+          <p className="font-semibold text-foreground truncate">{row.ruleName}</p>
+          <p className="text-sm text-muted-foreground">
             {formatDay(row.periodKey)} ·{" "}
             {row.daysLate > 0 ? `${row.daysLate} día(s) de atraso` : "hoy"}
           </p>
@@ -96,7 +94,7 @@ export function ObligationsPanel({
       header: "Categoría",
       secondary: true,
       render: (row) => (
-        <span className="text-gray-600">{categoryName(row.categoryId)}</span>
+        <span className="text-muted-foreground">{categoryName(row.categoryId)}</span>
       ),
     },
     {
@@ -105,7 +103,7 @@ export function ObligationsPanel({
       align: "right",
       sortValue: (row) => row.amountUsd,
       render: (row) => (
-        <span className="font-semibold text-gray-900">{money(row.amountUsd)}</span>
+        <span className="font-bold text-foreground" data-money>{money(row.amountUsd)}</span>
       ),
     },
     {
@@ -117,7 +115,6 @@ export function ObligationsPanel({
         <div className="flex justify-end gap-1">
           <Button
             size="sm"
-            className="h-8 text-meta"
             onClick={() => postOccurrence(row)}
           >
             Registrar
@@ -125,7 +122,6 @@ export function ObligationsPanel({
           <Button
             size="sm"
             variant="outline"
-            className="h-8 text-meta"
             onClick={() => {
               setPrefill({
                 kind: row.kind,
@@ -154,10 +150,10 @@ export function ObligationsPanel({
       header: kind === "payable" ? "A quién" : "Quién debe",
       render: (row) => (
         <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">
+          <p className="font-semibold text-foreground truncate">
             {row.payeeName ?? row.description}
           </p>
-          <p className="text-meta text-gray-500 truncate">
+          <p className="text-sm text-muted-foreground truncate">
             {[row.categoryName, row.payeeName ? row.description : null]
               .filter(Boolean)
               .join(" · ")}
@@ -173,12 +169,12 @@ export function ObligationsPanel({
       render: (row) => (
         <span
           className={`whitespace-nowrap ${
-            row.overdue ? "text-red-700 font-medium" : "text-gray-600"
+            row.overdue ? "text-destructive font-semibold" : "text-muted-foreground"
           }`}
         >
           {formatDay(row.dueOn)}
           {row.daysUntilDue !== null && (
-            <span className="text-meta text-gray-500 ml-1">
+            <span className="text-meta text-muted-foreground ml-1" data-money>
               ({row.overdue
                 ? `${Math.abs(row.daysUntilDue)}d vencida`
                 : `${row.daysUntilDue}d`})
@@ -193,7 +189,7 @@ export function ObligationsPanel({
       align: "right",
       sortValue: (row) => row.amountUsd,
       render: (row) => (
-        <span className="font-semibold text-gray-900">{money(row.amountUsd)}</span>
+        <span className="font-bold text-foreground" data-money>{money(row.amountUsd)}</span>
       ),
     },
     {
@@ -206,7 +202,6 @@ export function ObligationsPanel({
           <Button
             size="sm"
             variant="outline"
-            className="h-8 text-meta"
             onClick={() => settleEntry(row.id, row.accountId, todayIso())}
           >
             {kind === "payable" ? "Pagué" : "Me pagaron"}
@@ -217,37 +212,33 @@ export function ObligationsPanel({
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile
+      <KpiRow>
+        <Kpi
           label="Por pagar"
           value={money(report.obligations.payablesUsd)}
           hint={`${payables.length} cuenta(s)`}
           tone={report.obligations.overdueCount > 0 ? "critical" : "default"}
-          icon={<HandCoins className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Vencidas"
           value={String(report.obligations.overdueCount)}
           tone={report.obligations.overdueCount > 0 ? "critical" : "good"}
-          icon={<AlarmClock className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Vence en 30 días"
           value={money(report.obligations.next30Usd)}
-          icon={<CalendarClock className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Por cobrar"
           value={money(report.obligations.receivablesUsd)}
           hint={`${receivables.length} cuenta(s)`}
-          icon={<HandCoins className="w-4 h-4 text-gray-400" />}
         />
-      </div>
+      </KpiRow>
 
       <SectionCard
         title="Recurrentes por registrar"
         subtitle="Alquiler, sueldos, servicios. Se proponen; nadie los registra por ti"
-        icon={<Repeat className="w-4 h-4 text-primary" />}
+        icon={<Repeat className="size-5 text-primary" aria-hidden="true" />}
       >
         <DataTable
           columns={occurrenceColumns}
@@ -267,7 +258,7 @@ export function ObligationsPanel({
         <SectionCard
           title="Cuentas por pagar"
           subtitle="Compromisos registrados que aún no se pagan"
-          icon={<HandCoins className="w-4 h-4 text-primary" />}
+          icon={<HandCoins className="size-5 text-primary" aria-hidden="true" />}
         >
           <DataTable
             columns={obligationColumns("payable")}
@@ -282,7 +273,7 @@ export function ObligationsPanel({
         <SectionCard
           title="Cuentas por cobrar"
           subtitle="Ventas o servicios que aún no te han pagado"
-          icon={<HandCoins className="w-4 h-4 text-primary" />}
+          icon={<HandCoins className="size-5 text-primary" aria-hidden="true" />}
         >
           <DataTable
             columns={obligationColumns("receivable")}
@@ -299,19 +290,19 @@ export function ObligationsPanel({
         <SectionCard
           title="Nómina"
           subtitle="Sueldos base configurados. Un clic propone el pago ya lleno"
-          icon={<Users className="w-4 h-4 text-primary" />}
+          icon={<Users className="size-5 text-primary" aria-hidden="true" />}
         >
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-border">
             {employees.map((employee) => (
               <li
                 key={employee.id}
                 className="flex items-center justify-between gap-3 py-2.5"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-base font-semibold text-foreground truncate">
                     {employee.name}
                   </p>
-                  <p className="text-meta text-gray-500">
+                  <p className="text-sm text-muted-foreground" data-money>
                     {money(employee.baseSalaryUsd ?? 0)} ·{" "}
                     {employee.payCadence
                       ? CADENCE_LABEL[employee.payCadence]
@@ -321,7 +312,7 @@ export function ObligationsPanel({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-9 text-xs flex-shrink-0"
+                  className="shrink-0"
                   onClick={() => {
                     setPrefill({
                       kind: "expense",
@@ -338,7 +329,7 @@ export function ObligationsPanel({
               </li>
             ))}
           </ul>
-          <p className="text-meta text-gray-500 mt-3">
+          <p className="text-sm text-muted-foreground mt-3">
             El pago se registra como cualquier otro gasto: elige la cuenta de
             donde sale y, si es en bolívares, queda con la tasa del día.
           </p>
@@ -355,7 +346,7 @@ export function ObligationsPanel({
         defaultKind={prefill?.kind ?? "expense"}
       />
 
-      <p className="text-meta text-gray-400 text-center">
+      <p className="text-sm text-muted-foreground text-center">
         Las cuentas por pagar y cobrar no dependen del período elegido: una
         factura de hace tres meses sigue debiéndose hoy.
       </p>

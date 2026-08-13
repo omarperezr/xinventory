@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Package, Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
+import { Package, Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuth } from "../context/auth-context";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -31,57 +31,40 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
-        {/* Logo / Brand */}
+        {/* Brand */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 bg-primary rounded-xl flex items-center justify-center shadow-lg mb-4">
-            <Package className="w-7 h-7 text-white" strokeWidth={1.5} />
+          <div className="flex size-16 items-center justify-center rounded-2xl bg-primary shadow-raised mb-4">
+            <Package className="size-8 text-white" strokeWidth={2} aria-hidden="true" />
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
+          <h1 className="text-[1.75rem] font-bold text-foreground tracking-tight">
             Inventario
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Gestión de productos
+          <p className="text-base text-muted-foreground mt-1">
+            Inicia sesión para empezar el día
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8">
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Iniciar sesión
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Ingresa tu correo y contraseña para continuar
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="email"
-              >
-                Correo electrónico
-              </Label>
+        <div className="bg-white rounded-2xl border border-border shadow-card p-6 md:p-8">
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="email">Correo electrónico</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="correo@ejemplo.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-11"
+                className="h-13"
                 autoComplete="email"
                 required
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="password"
-              >
-                Contraseña
-              </Label>
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -89,7 +72,7 @@ export function LoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 pr-10"
+                  className="h-13 pr-12"
                   autoComplete="current-password"
                   required
                 />
@@ -100,27 +83,28 @@ export function LoginPage() {
                     showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
                   }
                   aria-pressed={showPassword}
-                  className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                  className="tap-target absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showPassword ? (
-                    <EyeOff className="w-4 h-4" aria-hidden="true" />
+                    <EyeOff className="size-5" aria-hidden="true" />
                   ) : (
-                    <Eye className="w-4 h-4" aria-hidden="true" />
+                    <Eye className="size-5" aria-hidden="true" />
                   )}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+              <div className="bg-destructive-soft rounded-xl px-4 py-3 text-[0.9375rem] text-destructive-soft-foreground">
                 {error}
               </div>
             )}
 
             <Button
               type="submit"
+              size="lg"
               disabled={loading || !email || !password}
-              className="w-full h-11 mt-2"
+              className="w-full mt-1"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
@@ -129,16 +113,16 @@ export function LoginPage() {
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <LogIn className="w-4 h-4" aria-hidden="true" />
-                  Ingresar
+                  <LogIn className="size-5" aria-hidden="true" />
+                  Entrar
                 </span>
               )}
             </Button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-gray-100 text-center">
-            <p className="text-xs text-gray-500">
-              Contacta a tu administrador para obtener acceso
+          <div className="mt-6 pt-5 border-t border-border text-center">
+            <p className="text-sm text-muted-foreground">
+              ¿No tienes acceso? Pídele una cuenta a tu administrador.
             </p>
           </div>
         </div>

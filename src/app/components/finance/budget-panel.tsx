@@ -26,9 +26,10 @@ import {
   MeterBar,
   RankRow,
   SectionCard,
-  SERIES,
-  STATUS,
 } from "../reports/report-ui";
+
+// Rule 9 palette, in rank order.
+const RANK_COLORS = ["#0f7b4d", "#3f6fae", "#d9962b", "#8a5fa8", "#c05252"];
 import type {
   AllocationStatus,
   CategorySpend,
@@ -57,8 +58,8 @@ export function BudgetPanel({
       sortValue: (row) => row.name,
       render: (row) => (
         <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">{row.name}</p>
-          <p className="text-meta text-gray-500">
+          <p className="font-semibold text-foreground truncate">{row.name}</p>
+          <p className="text-sm text-muted-foreground">
             {NATURE_LABEL[row.nature]} · {row.entries} movimiento(s)
           </p>
         </div>
@@ -70,7 +71,7 @@ export function BudgetPanel({
       align: "right",
       sortValue: (row) => row.amount,
       render: (row) => (
-        <span className="font-semibold text-gray-900">{money(row.amount)}</span>
+        <span className="font-bold text-foreground" data-money>{money(row.amount)}</span>
       ),
     },
     {
@@ -80,7 +81,7 @@ export function BudgetPanel({
       secondary: true,
       sortValue: (row) => row.previousAmount,
       render: (row) => (
-        <span className="text-gray-600">
+        <span className="text-muted-foreground" data-money>
           {row.previousAmount > 0 ? money(row.previousAmount) : "—"}
         </span>
       ),
@@ -92,12 +93,13 @@ export function BudgetPanel({
       sortValue: (row) => row.budgetUsedPct ?? -1,
       render: (row) =>
         row.budgetForRange === null ? (
-          <span className="text-gray-400">sin presupuesto</span>
+          <span className="text-sm text-muted-foreground">sin presupuesto</span>
         ) : (
           <div className="w-28 ml-auto">
             <p
+              data-money
               className={`text-meta mb-1 ${
-                (row.budgetUsedPct ?? 0) > 100 ? "text-red-700 font-medium" : "text-gray-600"
+                (row.budgetUsedPct ?? 0) > 100 ? "text-destructive font-semibold" : "text-muted-foreground"
               }`}
             >
               {money(row.budgetForRange)} · {(row.budgetUsedPct ?? 0).toFixed(0)}%
@@ -106,10 +108,10 @@ export function BudgetPanel({
               pct={Math.min(row.budgetUsedPct ?? 0, 100)}
               color={
                 (row.budgetUsedPct ?? 0) > 100
-                  ? STATUS.critical
+                  ? "#c05252"
                   : (row.budgetUsedPct ?? 0) > 85
-                    ? STATUS.warning
-                    : STATUS.good
+                    ? "#d9962b"
+                    : "#0f7b4d"
               }
             />
           </div>
@@ -122,7 +124,7 @@ export function BudgetPanel({
       <SectionCard
         title="En qué se va el dinero"
         subtitle="Ordenado por peso. Los primeros tres suelen explicar casi todo"
-        icon={<PieChart className="w-4 h-4 text-primary" />}
+        icon={<PieChart className="size-5 text-primary" aria-hidden="true" />}
       >
         {expenses.length === 0 ? (
           <EmptyNote>Sin gastos registrados en el período</EmptyNote>
@@ -136,7 +138,7 @@ export function BudgetPanel({
                 value={money(category.amount)}
                 sub={`${category.sharePct.toFixed(0)}%`}
                 pct={biggest > 0 ? (category.amount / biggest) * 100 : 0}
-                color={SERIES[index % SERIES.length]}
+                color={RANK_COLORS[index % RANK_COLORS.length]}
               />
             ))}
           </div>
@@ -157,7 +159,7 @@ export function BudgetPanel({
         <SectionCard
           title="Ingresos que no son ventas"
           subtitle="Servicios, rendimientos, alquileres, comisiones"
-          icon={<PiggyBank className="w-4 h-4 text-primary" />}
+          icon={<PiggyBank className="size-5 text-primary" aria-hidden="true" />}
         >
           <DataTable
             columns={columns.filter((c) => c.key !== "budget")}
@@ -178,7 +180,7 @@ export function BudgetPanel({
             ? `${unlinkedFunds} fondo(s) sin cuenta: vincúlalos para saber dónde está ese dinero`
             : "Lo que la regla dice que debería apartarse, contra lo que se apartó"
         }
-        icon={<Target className="w-4 h-4 text-primary" />}
+        icon={<Target className="size-5 text-primary" aria-hidden="true" />}
       >
         {report.allocations.length === 0 ? (
           <EmptyNote>
@@ -236,28 +238,28 @@ function AllocationRow({
     <li>
       <div className="flex items-baseline justify-between gap-2 mb-1">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">
+          <p className="text-base font-semibold text-foreground truncate">
             {allocation.name}
           </p>
-          <p className="text-meta text-gray-500">
+          <p className="text-sm text-muted-foreground" data-money>
             {allocation.percent}% de {ALLOCATION_BASIS_LABEL[allocation.basis]} ·
             base {money(allocation.baseUsd)}
           </p>
         </div>
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-semibold text-gray-900 tabular-nums">
+        <div className="text-right shrink-0">
+          <p className="text-base font-bold text-foreground" data-money>
             {money(allocation.fundedUsd)}
           </p>
-          <p className="text-meta text-gray-500">
+          <p className="text-sm text-muted-foreground" data-money>
             de {money(allocation.shouldBeUsd)}
           </p>
         </div>
       </div>
       <MeterBar
         pct={Math.min(fundedPct, 100)}
-        color={fundedPct >= 99 ? STATUS.good : STATUS.warning}
+        color={fundedPct >= 99 ? "#0f7b4d" : "#d9962b"}
       />
-      <p className="text-meta mt-1 text-gray-500">
+      <p className="text-sm mt-1.5 text-muted-foreground">
         {allocation.gapUsd > 0.01
           ? `Faltan ${money(allocation.gapUsd)} por trasladar al fondo.`
           : "Fondeado según la regla."}
@@ -269,9 +271,10 @@ function AllocationRow({
           Linking it is one control, here, rather than a trip to the settings
           dialog. */}
       {linked ? (
-        <p className="text-meta text-gray-500 mt-0.5 flex items-center gap-1.5">
-          <Link2 className="w-3 h-3" aria-hidden="true" />
-          Se guarda en <span className="font-medium text-gray-700">{linked.name}</span>
+        <p className="text-sm text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
+          <Link2 className="size-4" aria-hidden="true" />
+          Se guarda en{" "}
+          <span className="font-semibold text-foreground">{linked.name}</span>
           {isAdmin && (
             <button
               type="button"
@@ -288,20 +291,20 @@ function AllocationRow({
       ) : (
         !linking && (
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span className="text-meta text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+            <span className="text-meta font-semibold text-pending bg-pending-soft rounded-full px-2 py-0.5">
               Sin cuenta asignada
             </span>
             {isAdmin && activeAccounts.length > 0 && (
               <button
                 type="button"
                 onClick={() => setLinking(true)}
-                className="text-meta text-primary hover:underline font-medium"
+                className="text-sm text-primary hover:underline font-semibold"
               >
                 Vincular a una cuenta
               </button>
             )}
             {activeAccounts.length === 0 && (
-              <span className="text-meta text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 Crea primero una cuenta en Cuentas → Gestionar.
               </span>
             )}
@@ -313,7 +316,8 @@ function AllocationRow({
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Select value={choice} onValueChange={setChoice}>
             <SelectTrigger
-              className="h-9 w-52 text-xs"
+              size="sm"
+              className="w-52"
               aria-label={`Cuenta para ${allocation.name}`}
             >
               <SelectValue placeholder="Elegir cuenta" />
@@ -328,7 +332,6 @@ function AllocationRow({
           </Select>
           <Button
             size="sm"
-            className="h-9 text-xs"
             disabled={!choice}
             onClick={() => link(choice)}
           >
@@ -337,7 +340,6 @@ function AllocationRow({
           <Button
             size="sm"
             variant="outline"
-            className="h-9 text-xs"
             onClick={() => setLinking(false)}
           >
             Cancelar

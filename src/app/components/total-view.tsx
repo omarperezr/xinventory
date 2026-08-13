@@ -40,7 +40,9 @@ import {
   PaymentRecord,
   isReferenceLens,
   InsufficientStockError,
+  formatMoneyValue,
 } from "../context/app-context";
+import { PriceTag } from "./price-tag";
 import { useAuth } from "../context/auth-context";
 import { MoneyInput } from "./money-input";
 import { QuantityStepper } from "./quantity-stepper";
@@ -237,13 +239,13 @@ export function TotalView({ onCheckout }: TotalViewProps) {
         {/* Main cart */}
         <div className="flex-1 space-y-4">
           {/* Header */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3">
+          <div className="bg-white rounded-xl border border-border shadow-card p-4 md:p-6 space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm md:text-lg font-medium text-gray-900 flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                Lista Actual
+              <h2 className="text-base md:text-lg font-bold text-foreground flex items-center gap-2">
+                <ShoppingCart className="size-5 text-primary" aria-hidden="true" />
+                Lista para cobrar
                 {cartItems.length > 0 && (
-                  <span className="text-xs bg-primary text-white rounded-full px-2 py-0.5">
+                  <span className="text-sm bg-primary-soft text-primary-soft-foreground font-bold rounded-full px-2.5 py-0.5" data-money>
                     {cartItems.length}
                   </span>
                 )}
@@ -251,29 +253,32 @@ export function TotalView({ onCheckout }: TotalViewProps) {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={clearCart}
                   disabled={cartItems.length === 0}
                   aria-label="Limpiar la lista"
-                  className="tap-target text-red-600 hover:text-red-700 hover:bg-red-50 h-9 px-2 md:px-3 text-xs"
+                  className="tap-target text-destructive hover:text-destructive hover:bg-destructive-soft"
                 >
-                  <Trash2 className="w-4 h-4 md:mr-1.5" aria-hidden="true" />
-                  <span className="hidden md:inline">Limpiar</span>
+                  <Trash2 aria-hidden="true" />
+                  Limpiar
                 </Button>
                 <Button
+                  variant="soft"
+                  size="sm"
                   onClick={saveCart}
                   disabled={cartItems.length === 0}
                   aria-label="Guardar la lista"
-                  className="tap-target h-9 px-2 md:px-3 text-xs"
+                  className="tap-target"
                 >
-                  <Save className="w-4 h-4 md:mr-1.5" aria-hidden="true" />
-                  <span className="hidden md:inline">Guardar</span>
+                  <Save aria-hidden="true" />
+                  Guardar
                 </Button>
               </div>
             </div>
             {cartItems.length > 0 && (
               <div className="relative">
                 <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground"
                   aria-hidden="true"
                 />
                 <Input
@@ -281,42 +286,51 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                   placeholder="Buscar en la lista…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 h-9 text-sm"
+                  className="pl-10 h-10 text-sm"
                 />
               </div>
             )}
           </div>
 
           {/* Cart items */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-xl border border-border overflow-hidden shadow-card">
             {cartItems.length === 0 ? (
-              <div className="p-10 text-center">
-                <ShoppingCart className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500 text-sm">Tu lista está vacía</p>
+              <div className="p-10 md:p-14 text-center">
+                <ShoppingCart
+                  className="size-10 text-muted-foreground/50 mx-auto mb-3"
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                />
+                <p className="text-base font-semibold text-foreground mb-1">
+                  Todavía no hay nada que cobrar
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Busca productos en <strong>Vender</strong> y agrégalos aquí.
+                </p>
               </div>
             ) : (
               <>
                 {/* Desktop table */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-canvas border-b border-border">
                       <tr>
-                        <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
+                        <th className="text-left px-6 py-3.5 text-sm text-muted-foreground font-semibold">
                           Producto
                         </th>
-                        <th className="text-left px-6 py-4 text-sm text-gray-600 font-normal">
+                        <th className="text-left px-6 py-3.5 text-sm text-muted-foreground font-semibold">
                           Precio Unit.
                         </th>
-                        <th className="text-center px-6 py-4 text-sm text-gray-600 font-normal">
+                        <th className="text-center px-6 py-3.5 text-sm text-muted-foreground font-semibold">
                           Cantidad
                         </th>
-                        <th className="text-right px-6 py-4 text-sm text-gray-600 font-normal">
+                        <th className="text-right px-6 py-3.5 text-sm text-muted-foreground font-semibold">
                           Subtotal
                         </th>
-                        <th className="px-6 py-4" />
+                        <th className="px-6 py-3.5" />
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-border">
                       {filteredItems.map((item) => {
                         const finalPrice =
                           item.applyDiscount && item.discount > 0
@@ -328,16 +342,16 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                             key={item.id}
                             className={
                               unavailable
-                                ? "bg-red-50/60"
-                                : "hover:bg-gray-50"
+                                ? "bg-destructive-soft/60"
+                                : "hover:bg-canvas"
                             }
                           >
                             <td className="px-6 py-4">
                               <div
-                                className={`font-medium ${
+                                className={`font-semibold ${
                                   unavailable
-                                    ? "text-red-700 line-through"
-                                    : "text-gray-900"
+                                    ? "text-destructive-soft-foreground line-through"
+                                    : "text-foreground"
                                 }`}
                               >
                                 {item.name}
@@ -347,32 +361,33 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                               {unavailable && (
                                 <div
                                   role="status"
-                                  className="text-[11px] font-medium text-red-700 mt-0.5"
+                                  className="text-xs font-semibold text-destructive-soft-foreground mt-0.5"
                                 >
-                                  Sin stock - quita este producto para continuar
+                                  Sin stock — quita este producto para continuar
                                 </div>
                               )}
                               <div
                                 className={`text-xs font-mono ${
                                   unavailable
-                                    ? "text-red-400 line-through"
-                                    : "text-gray-500"
+                                    ? "text-destructive-soft-foreground/70 line-through"
+                                    : "text-muted-foreground"
                                 }`}
+                                data-money
                               >
                                 {item.barcode}
                               </div>
                               {item.includesTaxes && (
-                                <div className="text-meta text-blue-600 bg-blue-50 inline-block px-1 rounded mt-0.5">
-                                  Con Impuestos
+                                <div className="text-meta font-semibold text-secondary-foreground bg-secondary inline-block px-1.5 py-0.5 rounded mt-1">
+                                  Con impuestos
                                 </div>
                               )}
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-600">
+                            <td className="px-6 py-4 text-sm text-foreground">
                               <div className="flex flex-col gap-1">
                                 {canEditPrice ? (
                                   <EditablePrice item={item} />
                                 ) : (
-                                  formatPrice(item.sellingPrice)
+                                  <PriceTag usd={item.sellingPrice} size="sm" />
                                 )}
                                 {item.discount > 0 && (
                                   <div className="flex items-center gap-1.5 mt-1">
@@ -385,11 +400,11 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                           c as boolean,
                                         )
                                       }
-                                      className="h-3 w-3"
+                                      className="size-4"
                                     />
                                     <Label
                                       htmlFor={`d-${item.id}`}
-                                      className="text-xs text-green-600 cursor-pointer font-medium"
+                                      className="text-xs text-primary cursor-pointer font-semibold"
                                     >
                                       -{item.discount}%
                                     </Label>
@@ -409,87 +424,93 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                 />
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-right font-medium text-gray-900">
+                            <td className="px-6 py-4 text-right font-semibold text-foreground" data-money>
                               {item.applyDiscount && item.discount > 0 ? (
                                 <div className="flex flex-col items-end">
-                                  <span className="text-xs text-gray-500 line-through">
+                                  <span className="text-xs text-muted-foreground line-through">
                                     {formatPrice(
                                       item.sellingPrice * item.cartQuantity,
                                     )}
                                   </span>
-                                  <span className="text-green-600">
-                                    {formatPrice(
-                                      finalPrice * item.cartQuantity,
-                                    )}
-                                  </span>
+                                  <PriceTag
+                                    usd={finalPrice * item.cartQuantity}
+                                    size="sm"
+                                    className="text-primary-soft-foreground"
+                                  />
                                 </div>
                               ) : (
-                                formatPrice(finalPrice * item.cartQuantity)
+                                <PriceTag
+                                  usd={finalPrice * item.cartQuantity}
+                                  size="sm"
+                                  className="justify-end"
+                                />
                               )}
                             </td>
                             <td className="px-6 py-4 text-right">
                               <button
                                 onClick={() => removeFromCart(item.id)}
                                 aria-label={`Quitar ${item.name} de la lista`}
-                                className="tap-target inline-flex items-center justify-center h-9 w-9 rounded-md text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                className="tap-target inline-flex items-center justify-center h-10 w-10 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive-soft transition-colors"
                               >
-                                <X className="w-4 h-4" aria-hidden="true" />
+                                <X className="size-4.5" aria-hidden="true" />
                               </button>
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
-                    <tfoot className="bg-gray-50 border-t border-gray-200">
+                    <tfoot className="bg-canvas border-t border-border">
                       <tr>
                         <td
                           colSpan={3}
-                          className="px-6 py-2 text-right text-sm text-gray-500"
+                          className="px-6 py-2 text-right text-sm text-muted-foreground"
                         >
                           Subtotal:
                         </td>
-                        <td className="px-6 py-2 text-right text-sm font-medium">
-                          {formatPrice(subtotal)}
+                        <td className="px-6 py-2 text-right text-sm font-semibold" data-money>
+                          <PriceTag usd={subtotal} size="sm" className="justify-end" />
                         </td>
                         <td />
                       </tr>
                       <tr>
                         <td
                           colSpan={3}
-                          className="px-6 py-2 text-right text-sm text-gray-500"
+                          className="px-6 py-2 text-right text-sm text-muted-foreground"
                         >
                           Impuestos (10%):
                         </td>
-                        <td className="px-6 py-2 text-right text-sm font-medium">
-                          {formatPrice(taxAmount)}
+                        <td className="px-6 py-2 text-right text-sm font-semibold" data-money>
+                          <PriceTag usd={taxAmount} size="sm" className="justify-end" />
                         </td>
                         <td />
                       </tr>
                       {currentPayments.map((p, i) => (
-                        <tr key={i} className="text-green-600">
+                        <tr key={i} className="text-primary-soft-foreground">
                           <td
                             colSpan={3}
                             className="px-6 py-2 text-right text-sm"
                           >
                             Pagado ({p.method}):
                           </td>
-                          <td className="px-6 py-2 text-right text-sm font-medium">
+                          <td className="px-6 py-2 text-right text-sm font-semibold" data-money>
                             -{formatPrice(p.amount)}
                           </td>
                           <td />
                         </tr>
                       ))}
-                      <tr className={isOverpaid ? "bg-red-50" : "bg-gray-100"}>
+                      <tr className={isOverpaid ? "bg-destructive-soft" : "bg-canvas"}>
                         <td
                           colSpan={3}
-                          className="px-6 py-4 text-right font-bold text-gray-700"
+                          className="px-6 py-4 text-right text-base font-bold text-foreground"
                         >
-                          {isOverpaid ? "Cambio Pendiente:" : "Total a Pagar:"}
+                          {isOverpaid ? "Cambio pendiente:" : "Total a pagar:"}
                         </td>
-                        <td
-                          className={`px-6 py-4 text-right text-xl font-bold ${isOverpaid ? "text-red-600" : "text-primary"}`}
-                        >
-                          {formatPrice(Math.abs(remainingDue))}
+                        <td className="px-6 py-4 text-right">
+                          <PriceTag
+                            usd={Math.abs(remainingDue)}
+                            size="lg"
+                            className={`justify-end ${isOverpaid ? "text-destructive [&>span]:text-destructive" : ""}`}
+                          />
                         </td>
                         <td />
                       </tr>
@@ -499,7 +520,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
 
                 {/* Mobile cart cards */}
                 <div className="md:hidden">
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-border">
                     {filteredItems.map((item) => {
                       const finalPrice =
                         item.applyDiscount && item.discount > 0
@@ -509,15 +530,15 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                       return (
                         <div
                           key={item.id}
-                          className={`p-3 ${unavailable ? "bg-red-50/60" : ""}`}
+                          className={`p-3.5 ${unavailable ? "bg-destructive-soft/60" : ""}`}
                         >
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="min-w-0 flex-1">
                               <p
-                                className={`text-sm font-medium truncate ${
+                                className={`text-[0.9375rem] font-semibold ${
                                   unavailable
-                                    ? "text-red-700 line-through"
-                                    : "text-gray-900"
+                                    ? "text-destructive-soft-foreground line-through"
+                                    : "text-foreground"
                                 }`}
                               >
                                 {item.name}
@@ -525,26 +546,24 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                               {unavailable && (
                                 <p
                                   role="status"
-                                  className="text-[11px] font-medium text-red-700"
+                                  className="text-xs font-semibold text-destructive-soft-foreground"
                                 >
-                                  Sin stock - quita este producto
+                                  Sin stock — quita este producto
                                 </p>
                               )}
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 {canEditPrice ? (
                                   <EditablePrice item={item} />
                                 ) : (
-                                  <span className="text-sm text-gray-600">
-                                    {formatPrice(item.sellingPrice)}
-                                  </span>
+                                  <PriceTag usd={item.sellingPrice} size="sm" className="font-normal" />
                                 )}
                                 {item.includesTaxes && (
-                                  <span className="text-meta text-blue-600 bg-blue-50 px-1 rounded">
+                                  <span className="text-meta font-semibold text-secondary-foreground bg-secondary px-1.5 py-0.5 rounded">
                                     +IVA
                                   </span>
                                 )}
                                 {item.discount > 0 && (
-                                  <label className="flex items-center gap-1 cursor-pointer">
+                                  <label className="flex items-center gap-1.5 cursor-pointer">
                                     <Checkbox
                                       id={`dm-${item.id}`}
                                       checked={item.applyDiscount}
@@ -554,9 +573,9 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                           c as boolean,
                                         )
                                       }
-                                      className="h-3 w-3"
+                                      className="size-4"
                                     />
-                                    <span className="text-meta text-green-600 font-medium">
+                                    <span className="text-meta text-primary font-semibold">
                                       -{item.discount}%
                                     </span>
                                   </label>
@@ -564,35 +583,35 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                               </div>
                             </div>
                             {/* Subtotal + remove */}
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <div className="text-right">
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <div className="text-right" data-money>
                                 {item.applyDiscount && item.discount > 0 ? (
                                   <>
-                                    <p className="text-meta text-gray-500 line-through">
+                                    <p className="text-meta text-muted-foreground line-through">
                                       {formatPrice(
                                         item.sellingPrice * item.cartQuantity,
                                       )}
                                     </p>
-                                    <p className="text-sm font-semibold text-green-600">
+                                    <p className="text-[0.9375rem] font-bold text-primary-soft-foreground">
                                       {formatPrice(
                                         finalPrice * item.cartQuantity,
                                       )}
                                     </p>
                                   </>
                                 ) : (
-                                  <p className="text-sm font-semibold text-gray-900">
-                                    {formatPrice(
-                                      finalPrice * item.cartQuantity,
-                                    )}
-                                  </p>
+                                  <PriceTag
+                                    usd={finalPrice * item.cartQuantity}
+                                    size="sm"
+                                    className="justify-end"
+                                  />
                                 )}
                               </div>
                               <button
                                 onClick={() => removeFromCart(item.id)}
                                 aria-label={`Quitar ${item.name} del carrito`}
-                                className="h-11 w-11 min-w-11 flex items-center justify-center rounded-md text-gray-500 hover:text-red-500 transition-colors"
+                                className="h-11 w-11 min-w-11 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive-soft transition-colors"
                               >
-                                <X className="w-4 h-4" aria-hidden="true" />
+                                <X className="size-4.5" aria-hidden="true" />
                               </button>
                             </div>
                           </div>
@@ -606,7 +625,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                                 updateCartItemQuantity(item.id, q)
                               }
                             />
-                            <span className="text-xs text-gray-500">
+                            <span className="text-sm text-muted-foreground">
                               {item.unit === "units"
                                 ? "unid."
                                 : item.unit === "kg"
@@ -620,54 +639,59 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                   </div>
 
                   {/* Mobile totals summary */}
-                  <div className="border-t border-gray-200 bg-gray-50 p-3 space-y-1.5">
-                    <div className="flex justify-between text-xs text-gray-500">
+                  <div className="border-t border-border bg-canvas p-4 space-y-1.5" data-money>
+                    <div className="flex justify-between gap-2 text-sm text-muted-foreground">
                       <span>Subtotal</span>
-                      <span>{formatPrice(subtotal)}</span>
+                      <PriceTag usd={subtotal} size="sm" className="font-normal text-muted-foreground [&>span]:text-muted-foreground" />
                     </div>
-                    <div className="flex justify-between text-xs text-gray-500">
+                    <div className="flex justify-between gap-2 text-sm text-muted-foreground">
                       <span>Impuestos (10%)</span>
-                      <span>{formatPrice(taxAmount)}</span>
+                      <PriceTag usd={taxAmount} size="sm" className="font-normal text-muted-foreground [&>span]:text-muted-foreground" />
                     </div>
                     {currentPayments.map((p, i) => (
                       <div
                         key={i}
-                        className="flex justify-between text-xs text-green-600"
+                        className="flex justify-between text-sm font-semibold text-primary-soft-foreground"
                       >
                         <span>Pagado ({p.method})</span>
                         <span>-{formatPrice(p.amount)}</span>
                       </div>
                     ))}
-                    <div
-                      className={`flex justify-between text-base font-bold pt-1.5 border-t border-gray-200 ${isOverpaid ? "text-red-600" : "text-primary"}`}
-                    >
-                      <span>{isOverpaid ? "Cambio" : "Total"}</span>
-                      <span>{formatPrice(Math.abs(remainingDue))}</span>
+                    <div className="flex items-baseline justify-between pt-2 border-t border-border">
+                      <span className={`text-base font-bold ${isOverpaid ? "text-destructive" : "text-foreground"}`}>
+                        {isOverpaid ? "Cambio" : "Total"}
+                      </span>
+                      <PriceTag
+                        usd={Math.abs(remainingDue)}
+                        size="lg"
+                        className={isOverpaid ? "text-destructive [&>span]:text-destructive" : ""}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Pay button */}
-                <div className="p-4 bg-white border-t border-gray-200 flex flex-col items-end gap-2">
+                <div className="p-4 bg-white border-t border-border flex flex-col items-end gap-2">
                   {/* Collecting money under a reference lens would quote the
                       customer bolivares at a rate the sale is not booked at:
                       the seller takes that cash and the books record a
                       fraction of it. Same rule as the price edit above. */}
                   <Button
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-5 text-base shadow-md hover:shadow-lg w-full md:w-auto disabled:opacity-60"
+                    size="lg"
+                    className="w-full md:w-auto disabled:opacity-60"
                     onClick={() => setIsPaymentModalOpen(true)}
                     disabled={referenceLens}
                   >
-                    <CreditCard className="w-5 h-5 mr-2" />
+                    <CreditCard aria-hidden="true" />
                     {remainingDue <= 0.01
                       ? "Finalizar"
                       : referenceLens
-                        ? `Pagar $ ${remainingDue.toFixed(2)}`
-                        : `Pagar ${formatPrice(remainingDue)}`}
+                        ? `Cobrar $ ${formatMoneyValue(remainingDue)}`
+                        : `Cobrar ${formatPrice(remainingDue)}`}
                   </Button>
                   {referenceLens && (
-                    <p className="text-xs text-amber-700 text-right">
-                      Estás viendo una tasa de referencia. Cambia a USD o Bs para cobrar.
+                    <p className="text-sm text-pending text-right">
+                      Estás viendo una tasa de referencia. Cambia a $ o Bs para cobrar.
                     </p>
                   )}
                 </div>
@@ -678,21 +702,21 @@ export function TotalView({ onCheckout }: TotalViewProps) {
 
         {/* Saved carts sidebar */}
         <div className="w-full md:w-72 space-y-3">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-            <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2 text-sm">
-              <RotateCcw className="w-4 h-4 text-gray-500" />
-              Listas Guardadas
+          <div className="bg-white rounded-xl border border-border shadow-card p-4 md:p-6">
+            <h3 className="font-bold text-foreground mb-3 flex items-center gap-2 text-[0.9375rem]">
+              <RotateCcw className="size-4.5 text-muted-foreground" aria-hidden="true" />
+              Listas guardadas
             </h3>
             {savedCarts.length === 0 ? (
-              <p className="text-xs text-gray-500 text-center py-3">
-                No hay listas guardadas
+              <p className="text-sm text-muted-foreground text-center py-3">
+                Guarda una lista para retomarla después
               </p>
             ) : (
               <div className="space-y-2">
                 {savedCarts.map((cart) => (
                   <div
                     key={cart.id}
-                    className="rounded-lg border border-gray-200 hover:border-primary hover:bg-blue-50 transition-all group relative"
+                    className="rounded-lg border border-border hover:border-primary hover:bg-primary-soft/40 transition-all group relative"
                   >
                     {/* Loading the list is a button rather than a click
                         handler on the card, so it can be reached by keyboard.
@@ -703,17 +727,17 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                       aria-label={`Cargar la lista ${cart.name}`}
                       className="w-full text-left p-3 cursor-pointer"
                     >
-                      <div className="font-medium text-xs text-gray-900 mb-1 pr-8 truncate">
+                      <div className="font-semibold text-sm text-foreground mb-1 pr-8 truncate">
                         {cart.name}
                       </div>
-                      <div className="flex justify-between items-center text-meta text-gray-500">
+                      <div className="flex justify-between items-center text-meta text-muted-foreground" data-money>
                         <span>
                           {format(new Date(cart.dateSaved), "dd MMM HH:mm")}
                         </span>
                         <span>{cart.items.length} items</span>
                       </div>
                       {cart.payments?.length > 0 && (
-                        <div className="mt-1 text-meta text-green-600 font-medium">
+                        <div className="mt-1 text-meta text-primary-soft-foreground font-semibold" data-money>
                           Abonado:{" "}
                           {formatPrice(
                             cart.payments.reduce((s, p) => s + p.amount, 0),
@@ -726,9 +750,9 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                     <button
                       onClick={() => deleteSavedCart(cart.id)}
                       aria-label={`Eliminar la lista ${cart.name}`}
-                      className="tap-target absolute top-1.5 right-1.5 inline-flex items-center justify-center h-8 w-8 rounded-md text-gray-500 hover:text-red-500 hover:bg-red-50 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+                      className="tap-target absolute top-1.5 right-1.5 inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive-soft transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                     >
-                      <X className="w-4 h-4" aria-hidden="true" />
+                      <X className="size-4" aria-hidden="true" />
                     </button>
                   </div>
                 ))}
@@ -740,24 +764,26 @@ export function TotalView({ onCheckout }: TotalViewProps) {
 
       {/* Fixed mobile pay bar */}
       {cartItems.length > 0 && (
-        <div className="md:hidden fixed bottom-14 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2.5 z-40 shadow-lg">
+        <div className="md:hidden fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] left-0 right-0 bg-white border-t border-border px-4 py-3 z-40 shadow-raised">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-gray-500">
-                {isOverpaid ? "Cambio:" : "Total:"}
+              <p className={`text-sm font-semibold ${isOverpaid ? "text-destructive" : "text-muted-foreground"}`}>
+                {isOverpaid ? "Cambio" : "Total"}
               </p>
-              <p
-                className={`text-lg font-bold ${isOverpaid ? "text-red-600" : "text-primary"}`}
-              >
-                {formatPrice(Math.abs(remainingDue))}
-              </p>
+              <PriceTag
+                usd={Math.abs(remainingDue)}
+                size="lg"
+                className={isOverpaid ? "text-destructive [&>span]:text-destructive" : ""}
+              />
             </div>
             <Button
-              className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 text-sm shadow-md flex-shrink-0"
+              size="lg"
+              className="flex-shrink-0"
               onClick={() => setIsPaymentModalOpen(true)}
+              disabled={referenceLens}
             >
-              <CreditCard className="w-4 h-4 mr-1.5" />
-              {remainingDue <= 0.01 ? "Finalizar" : "Pagar"}
+              <CreditCard aria-hidden="true" />
+              {remainingDue <= 0.01 ? "Finalizar" : "Cobrar"}
             </Button>
           </div>
         </div>
@@ -765,19 +791,19 @@ export function TotalView({ onCheckout }: TotalViewProps) {
 
       {/* Payment modal */}
       <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
-        <DialogContent className="sm:max-w-md bg-white w-[calc(100vw-2rem)]">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Procesar Pago</DialogTitle>
-            <DialogDescription>
-              Restante:{" "}
-              <span className="font-bold text-primary">
+            <DialogTitle>Cobrar</DialogTitle>
+            <DialogDescription className="text-base">
+              Falta por pagar:{" "}
+              <span className="font-bold text-foreground" data-money>
                 {formatPrice(remainingDue)}
               </span>
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-1">
             <div className="space-y-2">
-              <Label htmlFor="payment-method">Método de Pago</Label>
+              <Label htmlFor="payment-method">¿Cómo paga el cliente?</Label>
               <Select value={selectedMethod} onValueChange={setSelectedMethod}>
                 <SelectTrigger id="payment-method">
                   <SelectValue />
@@ -797,36 +823,36 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                 {/* Explicit basis: the amount owed is restated in whichever
                     unit the seller is about to type, so what they read on
                     screen is exactly what settles the sale. */}
-                <div className="flex rounded-md border border-input overflow-hidden">
+                <div className="flex rounded-lg border border-input overflow-hidden">
                   {(["USD", "BS"] as const).map((c) => (
                     <button
                       key={c}
                       type="button"
                       aria-pressed={paymentEntry === c}
                       onClick={() => setPaymentEntry(c)}
-                      className={`h-11 px-3 text-xs font-medium ${
+                      className={`h-11 px-4 text-sm font-semibold ${
                         paymentEntry === c
                           ? "bg-primary text-white"
-                          : "bg-input-background text-gray-700 hover:bg-gray-50"
+                          : "bg-input-background text-foreground hover:bg-secondary"
                       }`}
                     >
-                      {c === "USD" ? "$ USD" : "Bs"}
+                      {c === "USD" ? "$" : "Bs"}
                     </button>
                   ))}
                 </div>
               </div>
-              <p className="text-xs text-gray-500" aria-live="polite">
+              <p className="text-sm text-muted-foreground" aria-live="polite" data-money>
                 Pendiente:{" "}
-                <span className="font-medium text-gray-700">
+                <span className="font-semibold text-foreground">
                   {paymentEntry === "USD"
-                    ? `$ ${remainingDue.toFixed(2)}`
-                    : `Bs ${usdToBs(remainingDue).toFixed(2)}`}
+                    ? `$ ${formatMoneyValue(remainingDue)}`
+                    : `Bs ${formatMoneyValue(usdToBs(remainingDue))}`}
                 </span>
               </p>
               <div className="relative">
                 <span
                   aria-hidden="true"
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground text-base font-semibold"
                 >
                   {paymentEntry === "USD" ? "$" : "Bs"}
                 </span>
@@ -836,7 +862,8 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                   inputMode="decimal"
                   enterKeyHint="done"
                   placeholder="0.00"
-                  className="pl-9 h-11"
+                  className="pl-10 h-13 text-lg font-semibold"
+                  data-money
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   autoFocus
@@ -845,10 +872,10 @@ export function TotalView({ onCheckout }: TotalViewProps) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="transaction-notes">Notas (Opcional)</Label>
+              <Label htmlFor="transaction-notes">Notas (opcional)</Label>
               <Textarea
                 id="transaction-notes"
-                placeholder="Notas de la transacción…"
+                placeholder="Notas de la venta…"
                 value={transactionNotes}
                 onChange={(e) => setTransactionNotes(e.target.value)}
                 className="min-h-[70px]"
@@ -870,11 +897,11 @@ export function TotalView({ onCheckout }: TotalViewProps) {
             >
               {processing ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="size-4.5 animate-spin" aria-hidden="true" />
                   Procesando…
                 </span>
               ) : (
-                "Confirmar Pago"
+                "Confirmar pago"
               )}
             </Button>
           </DialogFooter>
@@ -886,43 +913,44 @@ export function TotalView({ onCheckout }: TotalViewProps) {
           dialog closing - Escape and backdrop clicks must not finalize money. */}
       <Dialog open={isChangeModalOpen} onOpenChange={setIsChangeModalOpen}>
         <DialogContent
-          className="sm:max-w-md bg-white border-red-100 w-[calc(100vw-2rem)]"
+          className="sm:max-w-md"
           onEscapeKeyDown={(e) => e.preventDefault()}
           onPointerDownOutside={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
         >
           <DialogHeader>
-            <DialogTitle className="text-red-600 flex items-center gap-2">
-              <Banknote className="w-6 h-6" />
-              Cambio Requerido
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="size-6 text-primary" aria-hidden="true" />
+              Entrega el cambio
             </DialogTitle>
           </DialogHeader>
           {/* Change is physical cash. It is quoted in dollars and honest-rate
               bolivares, never through the display lens: the payment that
               produced it was converted at the honest rate, so a lens figure
               here would send the seller to the till with the wrong notes. */}
-          <div className="py-8 text-center">
-            <p className="text-gray-600 text-base">Dale cambio de</p>
-            <p className="text-4xl font-bold text-red-600 mt-2">
-              $ {changeAmount.toFixed(2)}
+          <div className="py-6 text-center rounded-2xl bg-canvas border border-border" data-money>
+            <p className="text-muted-foreground text-base">Dale al cliente</p>
+            <p className="text-[2.5rem] leading-tight font-bold text-foreground mt-1.5">
+              $ {formatMoneyValue(changeAmount)}
             </p>
-            <p className="text-lg font-medium text-red-500 mt-1">
-              Bs {usdToBs(changeAmount).toFixed(2)}
+            <p className="text-2xl font-bold text-foreground mt-0.5">
+              Bs {formatMoneyValue(usdToBs(changeAmount))}
             </p>
           </div>
           <DialogFooter>
             <Button
+              size="lg"
               onClick={() => handleCompleteTransaction(pendingPayments)}
               disabled={processing}
-              className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-5 disabled:opacity-60"
+              className="w-full disabled:opacity-60"
             >
               {processing ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="size-5 animate-spin" aria-hidden="true" />
                   Procesando…
                 </span>
               ) : (
-                "Listo (Entregado)"
+                "Cambio entregado, terminar"
               )}
             </Button>
           </DialogFooter>

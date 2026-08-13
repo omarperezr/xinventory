@@ -25,6 +25,7 @@ import {
   todayIso,
   useFinance,
 } from "../../context/finance-context";
+import { formatMoneyValue } from "../../context/app-context";
 import { EntryDialog } from "./entry-dialog";
 
 const ALL = "all";
@@ -96,7 +97,7 @@ export function LedgerPanel({
       width: "5.5rem",
       sortValue: (row) => row.occurredOn,
       render: (row) => (
-        <span className="whitespace-nowrap text-gray-600">
+        <span className="whitespace-nowrap text-muted-foreground" data-money>
           {formatDay(row.occurredOn)}
         </span>
       ),
@@ -107,21 +108,34 @@ export function LedgerPanel({
       sortValue: (row) => row.description,
       render: (row) => (
         <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">
+          <p className="font-semibold text-foreground truncate">
             {row.description || "—"}
           </p>
-          <p className="text-meta text-gray-500 truncate">
-            {row.kind === "transfer"
-              ? `${accountName(row.accountId)} → ${accountName(row.counterAccountId)}`
-              : [categoryName(row.categoryId), payeeName(row.payeeId)]
-                  .filter((v) => v !== "—")
-                  .join(" · ")}
-          </p>
-          {row.tags.length > 0 && (
-            <p className="text-meta text-gray-400 truncate">
-              {row.tags.map((tag) => `#${tag}`).join(" ")}
-            </p>
-          )}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {row.kind === "transfer" ? (
+              <span className="text-sm text-muted-foreground truncate">
+                {accountName(row.accountId)} → {accountName(row.counterAccountId)}
+              </span>
+            ) : (
+              <>
+                {categoryName(row.categoryId) !== "—" && (
+                  <span className="rounded-full bg-secondary px-2 py-0.5 text-meta font-semibold text-secondary-foreground">
+                    {categoryName(row.categoryId)}
+                  </span>
+                )}
+                {payeeName(row.payeeId) !== "—" && (
+                  <span className="text-sm text-muted-foreground truncate">
+                    {payeeName(row.payeeId)}
+                  </span>
+                )}
+              </>
+            )}
+            {row.tags.map((tag) => (
+              <span key={tag} className="text-meta text-muted-foreground">
+                #{tag}
+              </span>
+            ))}
+          </div>
         </div>
       ),
     },
@@ -131,7 +145,7 @@ export function LedgerPanel({
       secondary: true,
       sortValue: (row) => accountName(row.accountId),
       render: (row) => (
-        <span className="text-gray-600">{accountName(row.accountId)}</span>
+        <span className="text-muted-foreground">{accountName(row.accountId)}</span>
       ),
     },
     {
@@ -156,22 +170,25 @@ export function LedgerPanel({
       align: "right",
       sortValue: (row) => row.amountUsd,
       render: (row) => (
-        <div>
+        <div data-money>
           <span
-            className={`font-semibold ${
+            className={`font-bold ${
               row.kind === "income"
-                ? "text-green-700"
+                ? "text-primary-soft-foreground"
                 : row.kind === "expense"
-                  ? "text-red-700"
-                  : "text-gray-700"
+                  ? "text-foreground"
+                  : "text-muted-foreground"
             }`}
           >
             {row.kind === "expense" ? "−" : row.kind === "income" ? "+" : ""}
             {money(row.amountUsd)}
           </span>
+          {/* The bolivar figure and its rate are what was actually paid that
+              day: printed exactly as stored, never re-converted. */}
           {row.paidIn === "BS" && row.amountBs !== null && (
-            <p className="text-meta text-gray-500">
-              Bs {row.amountBs.toFixed(2)} @ {row.rateUsed?.toFixed(2)}
+            <p className="text-meta text-muted-foreground">
+              Bs {formatMoneyValue(row.amountBs)} @{" "}
+              {row.rateUsed !== null ? formatMoneyValue(row.rateUsed) : "—"}
             </p>
           )}
         </div>
@@ -188,7 +205,6 @@ export function LedgerPanel({
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-meta"
               onClick={() => settleEntry(row.id, row.accountId, todayIso())}
             >
               Marcar pagado
@@ -203,17 +219,17 @@ export function LedgerPanel({
                   setEditing(row);
                   setDialogOpen(true);
                 }}
-                className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
+                className="tap-target inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               >
-                <Pencil className="w-3.5 h-3.5" />
+                <Pencil className="size-4" aria-hidden="true" />
               </button>
               <button
                 type="button"
                 aria-label={`Eliminar ${row.description || "movimiento"}`}
                 onClick={() => deleteEntry(row.id)}
-                className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                className="tap-target inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="size-4" aria-hidden="true" />
               </button>
             </>
           )}
@@ -227,7 +243,7 @@ export function LedgerPanel({
       <SectionCard
         title="Movimientos"
         subtitle={`${rows.length} de ${report.rangeEntries.length} en el período · neto ${money(total)}`}
-        icon={<Wallet className="w-4 h-4 text-primary" />}
+        icon={<Wallet className="size-5 text-primary" aria-hidden="true" />}
         actions={
           <Segmented
             value={kind}
@@ -243,12 +259,15 @@ export function LedgerPanel({
       >
         <div className="flex flex-wrap gap-2 mb-4">
           <div className="relative flex-1 min-w-[12rem]">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search
+              className="size-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar concepto, etiqueta, proveedor…"
-              className="pl-9"
+              className="pl-11"
               aria-label="Buscar movimientos"
             />
           </div>

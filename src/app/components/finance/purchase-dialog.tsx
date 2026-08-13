@@ -226,7 +226,7 @@ export function PurchaseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Registrar compra</DialogTitle>
           <DialogDescription>
@@ -235,39 +235,42 @@ export function PurchaseDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* Product search */}
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="purchase-search">Agregar producto</Label>
             <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search
+                className="size-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
               <Input
                 id="purchase-search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar por nombre o código"
-                className="pl-9"
+                className="pl-11"
               />
             </div>
             {results.length > 0 && (
-              <ul className="mt-1 border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto">
+              <ul className="mt-2 border border-border rounded-xl divide-y divide-border max-h-56 overflow-y-auto">
                 {results.map((item) => (
                   <li key={item.id}>
                     <button
                       type="button"
                       onClick={() => addLine(item.id, item.name, item.buyingPrice)}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between gap-2"
+                      className="w-full text-left px-3.5 py-3 hover:bg-canvas flex items-center justify-between gap-2"
                     >
                       <span className="min-w-0">
-                        <span className="block text-sm text-gray-900 truncate">
+                        <span className="block text-base font-semibold text-foreground truncate">
                           {item.name}
                         </span>
-                        <span className="block text-meta text-gray-500">
+                        <span className="block text-sm text-muted-foreground" data-money>
                           Stock {item.quantity} · último costo{" "}
                           {formatPrice(item.buyingPrice)}
                         </span>
                       </span>
-                      <Plus className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <Plus className="size-5 text-primary shrink-0" aria-hidden="true" />
                     </button>
                   </li>
                 ))}
@@ -277,19 +280,15 @@ export function PurchaseDialog({
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button
                   type="button"
-                  size="sm"
                   variant="outline"
-                  className="text-xs"
                   onClick={() => setNewProduct(emptyProduct(query.trim()))}
                 >
-                  <PackagePlus className="w-3.5 h-3.5 mr-1.5" />
+                  <PackagePlus aria-hidden="true" />
                   Crear «{query.trim()}» como producto nuevo
                 </Button>
                 <Button
                   type="button"
-                  size="sm"
                   variant="outline"
-                  className="text-xs"
                   onClick={() => addLine(null, query.trim().toUpperCase(), 0)}
                 >
                   Agregar sin inventario
@@ -297,7 +296,7 @@ export function PurchaseDialog({
               </div>
             )}
             {query.trim().length > 1 && !newProduct && (
-              <p className="text-meta text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1.5">
                 «Sin inventario» es para lo que no se pone en estante: flete,
                 empaques, un servicio de la misma factura.
               </p>
@@ -306,23 +305,21 @@ export function PurchaseDialog({
 
           {/* New product */}
           {newProduct && (
-            <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 space-y-3">
+            <div className="border border-primary/30 bg-primary-soft/50 rounded-xl p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-900">
-                  Producto nuevo
-                </p>
+                <p className="text-base font-bold text-foreground">Producto nuevo</p>
                 <button
                   type="button"
                   onClick={() => setNewProduct(null)}
                   aria-label="Cancelar producto nuevo"
-                  className="p-1 rounded-md hover:bg-white text-gray-500"
+                  className="tap-target inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-white hover:text-foreground"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="size-5" aria-hidden="true" />
                 </button>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-3">
-                <div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="new-product-name">Nombre</Label>
                   <Input
                     id="new-product-name"
@@ -332,7 +329,7 @@ export function PurchaseDialog({
                     }
                   />
                 </div>
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="new-product-barcode">Código de barras</Label>
                   <Input
                     id="new-product-barcode"
@@ -345,8 +342,8 @@ export function PurchaseDialog({
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-3 gap-3">
-                <div>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="new-product-price">Precio de venta $</Label>
                   <Input
                     id="new-product-price"
@@ -362,7 +359,7 @@ export function PurchaseDialog({
                     }
                   />
                 </div>
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="new-product-unit">Unidad</Label>
                   <Select
                     value={newProduct.unit}
@@ -380,7 +377,7 @@ export function PurchaseDialog({
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="new-product-brand">Marca</Label>
                   <Input
                     id="new-product-brand"
@@ -393,8 +390,8 @@ export function PurchaseDialog({
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-3">
-                <div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="new-product-type">Categoría del producto</Label>
                   <Input
                     id="new-product-type"
@@ -406,7 +403,7 @@ export function PurchaseDialog({
                   />
                 </div>
                 <div className="flex items-end">
-                  <label className="flex items-center gap-2 text-sm text-gray-700 min-h-11">
+                  <label className="flex items-center gap-2.5 text-base font-semibold text-foreground min-h-12">
                     <input
                       type="checkbox"
                       checked={newProduct.includesTaxes}
@@ -416,21 +413,21 @@ export function PurchaseDialog({
                           includesTaxes: e.target.checked,
                         })
                       }
-                      className="w-4 h-4"
+                      className="size-5 accent-[var(--primary)]"
                     />
                     Aplica impuesto
                   </label>
                 </div>
               </div>
 
-              <p className="text-meta text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 El costo lo pone la línea de la compra. El producto se crea
                 cuando registres la compra, no antes: si cancelas, no queda nada
                 a medias en el catálogo.
               </p>
 
-              <Button type="button" size="sm" onClick={confirmNewProduct}>
-                <Plus className="w-4 h-4 mr-1.5" />
+              <Button type="button" onClick={confirmNewProduct}>
+                <Plus aria-hidden="true" />
                 Agregar a la compra
               </Button>
             </div>
@@ -438,20 +435,20 @@ export function PurchaseDialog({
 
           {/* Lines */}
           {lines.length > 0 && (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50">
+            <div className="border border-border rounded-xl overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-canvas">
                   <tr>
-                    <th className="text-left px-3 py-2 font-medium text-gray-500">
+                    <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground">
                       Producto
                     </th>
-                    <th className="text-right px-2 py-2 font-medium text-gray-500 w-20">
+                    <th className="text-right px-2 py-2.5 font-semibold text-muted-foreground w-24">
                       Cant.
                     </th>
-                    <th className="text-right px-2 py-2 font-medium text-gray-500 w-28">
+                    <th className="text-right px-2 py-2.5 font-semibold text-muted-foreground w-32">
                       Costo unit. $
                     </th>
-                    <th className="text-right px-3 py-2 font-medium text-gray-500 w-24">
+                    <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground w-28">
                       Subtotal
                     </th>
                     <th className="w-10" />
@@ -459,16 +456,18 @@ export function PurchaseDialog({
                 </thead>
                 <tbody>
                   {lines.map((line) => (
-                    <tr key={line.key} className="border-t border-gray-100">
+                    <tr key={line.key} className="border-t border-border">
                       <td className="px-3 py-2">
-                        <p className="text-gray-900 truncate">{line.name}</p>
+                        <p className="font-semibold text-foreground truncate">
+                          {line.name}
+                        </p>
                         {line.newProduct ? (
-                          <p className="text-meta text-primary">
+                          <p className="text-meta font-semibold text-primary">
                             Producto nuevo · se crea al registrar
                           </p>
                         ) : (
                           !line.itemId && (
-                            <p className="text-meta text-gray-500">
+                            <p className="text-meta text-muted-foreground">
                               No afecta inventario
                             </p>
                           )
@@ -487,7 +486,8 @@ export function PurchaseDialog({
                               ),
                             })
                           }
-                          className="h-9 text-right"
+                          className="h-11 text-right"
+                          data-money
                         />
                       </td>
                       <td className="px-2 py-2">
@@ -501,10 +501,14 @@ export function PurchaseDialog({
                               unitCostUsd: Math.max(0, Number(e.target.value) || 0),
                             })
                           }
-                          className="h-9 text-right"
+                          className="h-11 text-right"
+                          data-money
                         />
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-gray-900">
+                      <td
+                        className="px-3 py-2 text-right font-semibold text-foreground"
+                        data-money
+                      >
                         {formatPrice(line.quantity * line.unitCostUsd)}
                       </td>
                       <td className="px-2 py-2 text-right">
@@ -514,9 +518,9 @@ export function PurchaseDialog({
                           onClick={() =>
                             setLines((prev) => prev.filter((l) => l.key !== line.key))
                           }
-                          className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                          className="tap-target inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="size-4" aria-hidden="true" />
                         </button>
                       </td>
                     </tr>
@@ -527,8 +531,8 @@ export function PurchaseDialog({
           )}
 
           {/* Header fields */}
-          <div className="grid md:grid-cols-3 gap-3">
-            <div>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="purchase-supplier">Proveedor</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
                 <SelectTrigger id="purchase-supplier">
@@ -544,7 +548,7 @@ export function PurchaseDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="purchase-account">Pagado desde</Label>
               <Select value={accountId} onValueChange={setAccountId}>
                 <SelectTrigger id="purchase-account">
@@ -562,7 +566,7 @@ export function PurchaseDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="purchase-category">Categoría</Label>
               <Select value={effectiveCategoryId} onValueChange={setCategoryId}>
                 <SelectTrigger id="purchase-category">
@@ -580,8 +584,8 @@ export function PurchaseDialog({
             </div>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-3">
-            <div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="purchase-date">Fecha</Label>
               <Input
                 id="purchase-date"
@@ -590,7 +594,7 @@ export function PurchaseDialog({
                 onChange={(e) => setOccurredOn(e.target.value)}
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="purchase-invoice">Factura</Label>
               <Input
                 id="purchase-invoice"
@@ -599,7 +603,7 @@ export function PurchaseDialog({
                 placeholder="0001234"
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="purchase-freight">Flete $</Label>
               <Input
                 id="purchase-freight"
@@ -610,7 +614,7 @@ export function PurchaseDialog({
                 onChange={(e) => setFreight(e.target.value)}
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="purchase-credit">Crédito usado $</Label>
               <Input
                 id="purchase-credit"
@@ -623,24 +627,26 @@ export function PurchaseDialog({
             </div>
           </div>
 
-          <label className="flex items-start gap-2 text-xs text-gray-700">
+          <label className="flex items-start gap-2.5 text-base text-foreground">
             <input
               type="checkbox"
               checked={prorate}
               onChange={(e) => setProrate(e.target.checked)}
-              className="w-4 h-4 mt-0.5"
+              className="size-5 mt-0.5 accent-[var(--primary)]"
             />
             <span>
-              Repartir el flete entre los productos según su valor.
-              <span className="block text-meta text-gray-500">
+              <span className="font-semibold">
+                Repartir el flete entre los productos según su valor.
+              </span>
+              <span className="block text-sm text-muted-foreground">
                 Así el costo que queda guardado es lo que la mercancía realmente
                 costó puesta en la tienda, no lo que decía la factura.
               </span>
             </span>
           </label>
 
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="purchase-paidin">Pagado en</Label>
               <Select
                 value={paidIn}
@@ -655,13 +661,13 @@ export function PurchaseDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col justify-end">
-              <label className="flex items-center gap-2 text-sm text-gray-700 min-h-11">
+            <div className="flex flex-col justify-end gap-2">
+              <label className="flex items-center gap-2.5 text-base font-semibold text-foreground min-h-12">
                 <input
                   type="checkbox"
                   checked={pending}
                   onChange={(e) => setPending(e.target.checked)}
-                  className="w-4 h-4"
+                  className="size-5 accent-[var(--primary)]"
                 />
                 Queda a crédito (aún no se paga)
               </label>
@@ -676,7 +682,7 @@ export function PurchaseDialog({
             </div>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="purchase-notes">Notas</Label>
             <Textarea
               id="purchase-notes"
@@ -687,21 +693,21 @@ export function PurchaseDialog({
           </div>
 
           {/* Totals */}
-          <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-1 text-sm">
+          <div className="rounded-xl bg-canvas p-4 space-y-1.5 text-base" data-money>
             <Row label="Mercancía" value={formatPrice(goods)} />
             {freightUsd > 0 && <Row label="Flete" value={formatPrice(freightUsd)} />}
             {creditUsd > 0 && (
               <Row label="Crédito del proveedor" value={`− ${formatPrice(creditUsd)}`} />
             )}
-            <div className="flex items-center justify-between pt-1 border-t border-gray-200">
-              <span className="font-semibold text-gray-900">Total a pagar</span>
-              <span className="font-semibold text-gray-900 tabular-nums">
+            <div className="flex items-center justify-between pt-2 border-t border-border">
+              <span className="text-base font-bold text-foreground">Total a pagar</span>
+              <span className="text-xl font-bold text-foreground">
                 {formatPrice(total)}
               </span>
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <Button
               variant="outline"
               className="flex-1"
@@ -714,7 +720,7 @@ export function PurchaseDialog({
               disabled={lines.length === 0 || saving}
               onClick={handleSave}
             >
-              <Truck className="w-4 h-4 mr-2" />
+              <Truck aria-hidden="true" />
               Registrar compra
             </Button>
           </div>
@@ -726,9 +732,9 @@ export function PurchaseDialog({
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between text-gray-600">
+    <div className="flex items-center justify-between text-muted-foreground">
       <span>{label}</span>
-      <span className="tabular-nums">{value}</span>
+      <span className="font-semibold text-foreground">{value}</span>
     </div>
   );
 }

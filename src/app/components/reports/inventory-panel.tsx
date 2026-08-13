@@ -6,33 +6,30 @@ import { format } from "date-fns";
 import {
   AlertTriangle,
   Ban,
-  Boxes,
   Clock3,
   Layers,
-  PackageX,
-  Repeat,
   Snowflake,
-  Warehouse,
 } from "lucide-react";
 import {
   Column,
   DataTable,
   EmptyNote,
   formatDays,
+  Kpi,
+  KpiRow,
   MeterBar,
   PanelProps,
   SectionCard,
   SERIES,
-  StatTile,
   STATUS,
 } from "./report-ui";
 import type { StockRow } from "../../services/report-analytics";
 
 function coverageTone(days: number): string {
-  if (!Number.isFinite(days)) return "text-gray-500";
-  if (days <= 7) return "text-red-700 font-medium";
-  if (days <= 21) return "text-amber-700";
-  return "text-gray-900";
+  if (!Number.isFinite(days)) return "text-muted-foreground";
+  if (days <= 7) return "text-destructive font-medium";
+  if (days <= 21) return "text-pending";
+  return "text-foreground";
 }
 
 export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
@@ -43,7 +40,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
     { label: "Por agotarse", count: inv.urgent.length, color: STATUS.warning },
     { label: "Agotado", count: inv.outOfStock.length, color: STATUS.critical },
     { label: "Sin rotación", count: inv.deadStock.length, color: STATUS.serious },
-    { label: "Nunca vendido", count: inv.neverSold.length, color: SERIES[0] },
+    { label: "Nunca vendido", count: inv.neverSold.length, color: SERIES[1] },
   ];
   const healthTotal = health.reduce((s, h) => s + h.count, 0) || 1;
 
@@ -57,10 +54,10 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
       header: "Producto",
       render: (r) => (
         <div className="min-w-0">
-          <span className="font-medium text-gray-900 truncate block max-w-[150px] md:max-w-[220px]">
+          <span className="font-medium text-foreground truncate block max-w-[150px] md:max-w-[220px]">
             {r.name}
           </span>
-          <span className="text-meta text-gray-500">{r.type}</span>
+          <span className="text-meta text-muted-foreground">{r.type}</span>
         </div>
       ),
       sortValue: (r) => r.name,
@@ -81,7 +78,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
         r.velocity > 0 ? (
           `${r.velocity.toFixed(2)} u/día`
         ) : (
-          <span className="text-gray-300">sin ventas</span>
+          <span className="text-muted-foreground/50">sin ventas</span>
         ),
       sortValue: (r) => r.velocity,
     },
@@ -103,7 +100,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
         Number.isFinite(r.daysOfStock) && r.daysOfStock < 365 ? (
           format(new Date(Date.now() + r.daysOfStock * 86_400_000), "dd/MM/yy")
         ) : (
-          <span className="text-gray-300">—</span>
+          <span className="text-muted-foreground/50">—</span>
         ),
       sortValue: (r) => (Number.isFinite(r.daysOfStock) ? r.daysOfStock : 1e9),
     },
@@ -123,7 +120,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
         r.lastSold ? (
           `hace ${r.daysSinceLastSale} d`
         ) : (
-          <span className="text-gray-300">nunca</span>
+          <span className="text-muted-foreground/50">nunca</span>
         ),
       sortValue: (r) => r.daysSinceLastSale ?? 1e9,
     },
@@ -134,7 +131,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
       key: "name",
       header: "Producto",
       render: (r) => (
-        <span className="font-medium text-gray-900 truncate block max-w-[160px]">
+        <span className="font-medium text-foreground truncate block max-w-[160px]">
           {r.name}
         </span>
       ),
@@ -169,52 +166,46 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 md:gap-3">
-        <StatTile
+      <KpiRow>
+        <Kpi
           label="Inventario al costo"
           value={moneyCompact(inv.costValue)}
           hint={`${inv.units} u en ${inv.skus} productos`}
-          icon={<Warehouse className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Valor a precio de venta"
           value={moneyCompact(inv.retailValue)}
           hint="si se vendiera todo a lista"
-          icon={<Boxes className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Ganancia potencial"
           value={moneyCompact(inv.potentialProfit)}
           hint="retenida en el stock actual"
           tone="good"
-          icon={<Layers className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Rotación del período"
           value={`${inv.turnover.toFixed(2)}x`}
           hint={`vueltas en ${report.range.days} días`}
-          icon={<Repeat className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Días de inventario"
           value={formatDays(inv.daysOfInventory)}
           hint="para vender todo el stock"
-          icon={<Clock3 className="w-3.5 h-3.5 text-gray-300" />}
         />
-        <StatTile
+        <Kpi
           label="Agotados"
           value={inv.outOfStock.length.toLocaleString()}
           hint={`${inv.lostSales.length} de ellos sí se venden`}
           tone={inv.lostSales.length > 0 ? "critical" : "default"}
           higherIsBetter={false}
-          icon={<PackageX className="w-3.5 h-3.5 text-gray-300" />}
         />
-      </div>
+      </KpiRow>
 
       <SectionCard
         title="Salud del inventario"
         subtitle={`${inv.skus} productos en catálogo, clasificados por lo que exige cada uno`}
-        icon={<Layers className="w-4 h-4 text-primary" />}
+        icon={<Layers className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         <div className="flex h-2.5 rounded-full overflow-hidden gap-0.5 mb-3">
           {health
@@ -232,17 +223,17 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
         </div>
         <ul className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {health.map((h) => (
-            <li key={h.label} className="border border-gray-200 rounded-lg p-2.5">
+            <li key={h.label} className="border border-border rounded-lg p-2.5">
               <div className="flex items-center gap-1.5">
                 <span
                   className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
                   style={{ backgroundColor: h.color }}
                 />
-                <span className="text-sm font-semibold text-gray-900 tabular-nums">
+                <span className="text-sm font-semibold text-foreground tabular-nums">
                   {h.count}
                 </span>
               </div>
-              <p className="text-meta text-gray-500 mt-0.5">{h.label}</p>
+              <p className="text-meta text-muted-foreground mt-0.5">{h.label}</p>
             </li>
           ))}
         </ul>
@@ -252,7 +243,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
         <SectionCard
           title="Agotados que sí se venden"
           subtitle="Cada día sin reponer es facturación que no entra"
-          icon={<Ban className="w-4 h-4 text-red-500" />}
+          icon={<Ban className="w-4 h-4 text-destructive" aria-hidden="true" />}
         >
           <div className="space-y-3">
             {inv.lostSales.slice(0, 8).map((r) => {
@@ -261,10 +252,10 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
               return (
                 <div key={r.id}>
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-xs md:text-sm font-medium text-gray-900 truncate">
+                    <span className="text-sm font-medium text-foreground truncate">
                       {r.name}
                     </span>
-                    <span className="text-xs text-red-700 font-medium tabular-nums flex-shrink-0">
+                    <span className="text-sm text-destructive font-medium tabular-nums flex-shrink-0">
                       ~{money(perDay)}/día
                     </span>
                   </div>
@@ -276,7 +267,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
               );
             })}
           </div>
-          <p className="text-[11px] text-gray-500 mt-3">
+          <p className="text-sm text-muted-foreground mt-3">
             Estimado con el ritmo de venta del período y el precio de lista
             actual. Reponer estos productos es la acción con mejor retorno hoy.
           </p>
@@ -287,7 +278,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
         <SectionCard
           title="Se agotan pronto"
           subtitle="Menos de 7 días de cobertura al ritmo actual"
-          icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
+          icon={<AlertTriangle className="w-4 h-4 text-pending" aria-hidden="true" />}
         >
           <DataTable
             columns={coverageColumns}
@@ -303,7 +294,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
       <SectionCard
         title="Cobertura de stock"
         subtitle="Cuántos días aguanta cada producto al ritmo de venta del período"
-        icon={<Clock3 className="w-4 h-4 text-primary" />}
+        icon={<Clock3 className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         <DataTable
           columns={coverageColumns}
@@ -320,7 +311,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
       <SectionCard
         title="Capital detenido"
         subtitle={`${money(idleValue)} en productos con stock y sin rotación`}
-        icon={<Snowflake className="w-4 h-4 text-primary" />}
+        icon={<Snowflake className="w-4 h-4 text-primary" aria-hidden="true" />}
       >
         {idleRows.length > 0 ? (
           <>
@@ -331,7 +322,7 @@ export function InventoryPanel({ report, money, moneyCompact }: PanelProps) {
               initialSort="costValue"
               maxHeight="20rem"
             />
-            <p className="text-[11px] text-gray-500 mt-3">
+            <p className="text-sm text-muted-foreground mt-3">
               Ese dinero está comprado y quieto. Una promoción, un combo o una
               liquidación lo convierte en efectivo para reponer los productos de
               clase A.

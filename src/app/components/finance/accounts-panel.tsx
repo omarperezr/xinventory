@@ -8,10 +8,8 @@
 import { useState } from "react";
 import {
   AlertTriangle,
-  Landmark,
   Link2,
   Settings2,
-  TrendingDown,
   Wallet,
 } from "lucide-react";
 import { Button } from "../ui/button";
@@ -28,10 +26,12 @@ import {
   DataTable,
   EmptyNote,
   SectionCard,
-  StatTile,
+  Kpi,
+  KpiRow,
 } from "../reports/report-ui";
 import type { AccountBalance } from "../../services/finance-analytics";
 import { ACCOUNT_KIND_LABEL, FinancePanelProps } from "./finance-ui";
+import { formatMoneyValue } from "../../context/app-context";
 
 export function AccountsPanel({
   report,
@@ -54,13 +54,13 @@ export function AccountsPanel({
       sortValue: (row) => row.name,
       render: (row) => (
         <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">
+          <p className="font-semibold text-foreground truncate">
             {row.name}
             {!row.active && (
-              <span className="text-meta text-gray-400 ml-2">archivada</span>
+              <span className="text-meta text-muted-foreground ml-2">archivada</span>
             )}
           </p>
-          <p className="text-meta text-gray-500">
+          <p className="text-sm text-muted-foreground">
             {ACCOUNT_KIND_LABEL[row.kind] ?? row.kind} ·{" "}
             {row.basis === "BS" ? "bolívares" : "dólares"}
           </p>
@@ -74,7 +74,9 @@ export function AccountsPanel({
       secondary: true,
       sortValue: (row) => row.inflowUsd,
       render: (row) => (
-        <span className="text-green-700">{money(row.inflowUsd)}</span>
+        <span className="text-primary-soft-foreground" data-money>
+          {money(row.inflowUsd)}
+        </span>
       ),
     },
     {
@@ -83,7 +85,11 @@ export function AccountsPanel({
       align: "right",
       secondary: true,
       sortValue: (row) => row.outflowUsd,
-      render: (row) => <span className="text-red-700">{money(row.outflowUsd)}</span>,
+      render: (row) => (
+        <span className="text-foreground" data-money>
+          {money(row.outflowUsd)}
+        </span>
+      ),
     },
     {
       key: "balance",
@@ -91,17 +97,17 @@ export function AccountsPanel({
       align: "right",
       sortValue: (row) => row.worthNowUsd,
       render: (row) => (
-        <div>
+        <div data-money>
           <span
-            className={`font-semibold ${
-              row.worthNowUsd < 0 ? "text-red-700" : "text-gray-900"
+            className={`font-bold ${
+              row.worthNowUsd < 0 ? "text-destructive" : "text-foreground"
             }`}
           >
             {money(row.worthNowUsd)}
           </span>
           {row.basis === "BS" && (
-            <p className="text-meta text-gray-500">
-              Bs {row.balanceBs.toFixed(2)}
+            <p className="text-meta text-muted-foreground">
+              Bs {formatMoneyValue(row.balanceBs)}
             </p>
           )}
         </div>
@@ -114,11 +120,14 @@ export function AccountsPanel({
       sortValue: (row) => row.devaluationUsd,
       render: (row) =>
         row.basis === "USD" ? (
-          <span className="text-gray-400">—</span>
+          <span className="text-muted-foreground">—</span>
         ) : (
           <span
+            data-money
             className={
-              row.devaluationUsd < 0 ? "text-red-700 font-medium" : "text-gray-600"
+              row.devaluationUsd < 0
+                ? "text-destructive font-semibold"
+                : "text-muted-foreground"
             }
           >
             {money(row.devaluationUsd)}
@@ -129,14 +138,13 @@ export function AccountsPanel({
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile
+      <KpiRow>
+        <Kpi
           label="Total disponible"
           value={money(totalWorth)}
           hint={`${balances.filter((a) => a.active).length} cuenta(s) activa(s)`}
-          icon={<Wallet className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="En bolívares"
           value={money(bolivarWorth)}
           hint={
@@ -144,36 +152,33 @@ export function AccountsPanel({
               ? `${((bolivarWorth / totalWorth) * 100).toFixed(0)}% del efectivo`
               : undefined
           }
-          icon={<Landmark className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Pérdida por devaluación"
           value={money(totalDevaluation)}
           tone={totalDevaluation < -1 ? "critical" : "default"}
           hint="Lo que costó tener bolívares guardados"
-          icon={<TrendingDown className="w-4 h-4 text-gray-400" />}
         />
-        <StatTile
+        <Kpi
           label="Cobros sin asignar"
           value={money(report.cashFlow.unassignedSalesUsd)}
           tone={report.cashFlow.unassignedSalesUsd > 0 ? "warning" : "good"}
           hint="Ventas cuyo método no pertenece a ninguna cuenta"
-          icon={<AlertTriangle className="w-4 h-4 text-gray-400" />}
         />
-      </div>
+      </KpiRow>
 
       <SectionCard
         title="Saldos por cuenta"
         subtitle="Acumulado de todo lo registrado, no solo del período"
-        icon={<Wallet className="w-4 h-4 text-primary" />}
         actions={
           isAdmin ? (
-            <Button variant="outline" size="sm" className="text-xs" onClick={onManage}>
-              <Settings2 className="w-3.5 h-3.5 mr-1.5" />
+            <Button variant="outline" size="sm" onClick={onManage}>
+              <Settings2 aria-hidden="true" />
               Gestionar
             </Button>
           ) : null
         }
+        icon={<Wallet className="size-5 text-primary" aria-hidden="true" />}
       >
         {accounts.length === 0 ? (
           <EmptyNote>
@@ -196,9 +201,9 @@ export function AccountsPanel({
         <SectionCard
           title="Métodos de cobro sin cuenta"
           subtitle="El dinero entró, pero el módulo no sabe a qué cuenta"
-          icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
+          icon={<AlertTriangle className="size-5 text-pending" aria-hidden="true" />}
         >
-          <p className="text-xs text-gray-600 mb-3">
+          <p className="text-sm text-muted-foreground mb-3">
             Los vendedores cobraron con estos métodos y ninguna cuenta los
             reclama. Asígnale una cuenta a cada uno y ese dinero pasa a contar en
             el saldo.
@@ -216,7 +221,7 @@ export function AccountsPanel({
         </SectionCard>
       )}
 
-      <p className="text-meta text-gray-400 text-center leading-relaxed">
+      <p className="text-sm text-muted-foreground text-center leading-relaxed">
         La devaluación compara lo que valían los bolívares al entrar contra lo
         que valen hoy a la tasa honesta. Una cuenta en dólares no puede
         devaluarse, por eso muestra un guion.
@@ -260,24 +265,25 @@ function MethodRow({
   };
 
   return (
-    <li className="flex flex-wrap items-center gap-2 border border-gray-200 rounded-lg px-3 py-2">
-      <span className="text-xs font-medium text-gray-900 flex-1 min-w-[8rem]">
+    <li className="flex flex-wrap items-center gap-2 border border-border rounded-lg px-3 py-2">
+      <span className="text-base font-semibold text-foreground flex-1 min-w-[8rem]">
         {method}
       </span>
 
       {!isAdmin ? (
-        <span className="text-meta text-gray-500">
+        <span className="text-sm text-muted-foreground">
           Pídele a un administrador que lo asigne
         </span>
       ) : active.length === 0 ? (
-        <span className="text-meta text-gray-500">
+        <span className="text-sm text-muted-foreground">
           Crea una cuenta primero, en «Gestionar»
         </span>
       ) : (
         <>
           <Select value={choice} onValueChange={setChoice}>
             <SelectTrigger
-              className="h-9 w-48 text-xs"
+              size="sm"
+              className="w-48"
               aria-label={`Cuenta para ${method}`}
             >
               <SelectValue placeholder="Entra a…" />
@@ -292,11 +298,10 @@ function MethodRow({
           </Select>
           <Button
             size="sm"
-            className="h-9 text-xs"
             disabled={!choice || saving}
             onClick={assign}
           >
-            <Link2 className="w-3.5 h-3.5 mr-1.5" />
+            <Link2 aria-hidden="true" />
             Asignar
           </Button>
         </>

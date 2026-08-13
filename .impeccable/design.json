@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-13T00:00:00Z",
+  "title": "Design System: xinventory",
+  "extensions": {
+    "colorMeta": {
+      "money-green": {
+        "role": "primary",
+        "displayName": "Money Green",
+        "canonical": "#0f7b4d",
+        "tonalRamp": ["oklch(20% 0.07 160)", "oklch(30% 0.09 160)", "oklch(40% 0.11 160)", "oklch(50% 0.12 160)", "oklch(60% 0.12 160)", "oklch(72% 0.10 160)", "oklch(85% 0.07 160)", "oklch(95% 0.03 160)"]
+      },
+      "counter-ink": {
+        "role": "neutral",
+        "displayName": "Counter Ink",
+        "canonical": "#182420",
+        "tonalRamp": ["oklch(15% 0.01 170)", "oklch(25% 0.012 170)", "oklch(35% 0.012 170)", "oklch(48% 0.012 170)", "oklch(60% 0.01 170)", "oklch(75% 0.008 170)", "oklch(88% 0.006 170)", "oklch(96% 0.004 170)"]
+      },
+      "cool-paper": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "#f3f5f4",
+        "tonalRamp": ["oklch(20% 0.005 170)", "oklch(32% 0.005 170)", "oklch(45% 0.005 170)", "oklch(58% 0.005 170)", "oklch(70% 0.005 170)", "oklch(82% 0.005 170)", "oklch(90% 0.004 170)", "oklch(96.5% 0.003 170)"]
+      },
+      "pending-amber": {
+        "role": "state-pending",
+        "displayName": "Pending Amber",
+        "canonical": "#8a5a06",
+        "tonalRamp": ["oklch(20% 0.06 80)", "oklch(30% 0.08 80)", "oklch(40% 0.10 80)", "oklch(50% 0.11 80)", "oklch(62% 0.12 80)", "oklch(75% 0.11 80)", "oklch(87% 0.08 80)", "oklch(95% 0.04 80)"]
+      },
+      "alert-red": {
+        "role": "state-destructive",
+        "displayName": "Alert Red",
+        "canonical": "#bf2e2e",
+        "tonalRamp": ["oklch(20% 0.09 25)", "oklch(30% 0.12 25)", "oklch(40% 0.15 25)", "oklch(50% 0.17 25)", "oklch(60% 0.16 25)", "oklch(72% 0.12 25)", "oklch(85% 0.07 25)", "oklch(95% 0.03 25)"]
+      }
+    },
+    "typographyMeta": {
+      "body": { "displayName": "Body", "purpose": "17px root — the whole rem grid runs ~6% larger than a 16px default. Elderly-first floor." },
+      "money-display": { "displayName": "Money Display", "purpose": "PriceTag xl and totals. Always lining-nums tabular-nums via [data-money]." },
+      "label": { "displayName": "Label / Button", "purpose": "Labels and buttons are semibold at full body size; never small caps, never tiny." }
+    },
+    "shadows": [
+      { "name": "shadow-card", "value": "0 1px 2px rgb(24 36 32 / 0.05), 0 4px 12px rgb(24 36 32 / 0.05)", "purpose": "Resting cards and white panels. Ink-tinted, never neutral black." },
+      { "name": "shadow-raised", "value": "0 2px 4px rgb(24 36 32 / 0.06), 0 10px 24px rgb(24 36 32 / 0.09)", "purpose": "Sheets, dialogs, the docked Cobrar strip — anything floating over content." }
+    ],
+    "motion": [
+      { "name": "press-scale", "value": "transform: scale(0.98) on :active, transition-all", "purpose": "Every button confirms the tap physically." },
+      { "name": "sheet-enter", "value": "200ms slide-in-from-bottom + fade (Radix animate-in)", "purpose": "Mobile bottom sheets; desktop dialogs zoom-in-95 instead." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one obvious action per screen: money-green fill, 48px tall, visible Spanish label.",
+      "html": "<button class=\"ds-btn-primary\">Cobrar</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 48px; padding: 0 1.25rem; background: var(--primary, #0f7b4d); color: #ffffff; font-family: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif; font-size: 17px; font-weight: 600; border: none; border-radius: 12px; cursor: pointer; transition: all 0.15s; } .ds-btn-primary:hover { background: var(--primary-hover, #0c6a42); } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgb(15 123 77 / 0.4); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action: white with a strong hairline, same 48px stature.",
+      "html": "<button class=\"ds-btn-outline\">Cancelar</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0 1.25rem; background: #ffffff; color: var(--foreground, #182420); font-family: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif; font-size: 17px; font-weight: 600; border: 1px solid var(--border-strong, #cfd6d3); border-radius: 12px; cursor: pointer; transition: all 0.15s; } .ds-btn-outline:hover { background: var(--secondary, #eef1f0); } .ds-btn-outline:active { transform: scale(0.98); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px rgb(15 123 77 / 0.4); }"
+    },
+    {
+      "name": "Soft Button",
+      "kind": "button",
+      "refersTo": "button-soft",
+      "description": "Green presence without green weight: soft-green fill for supporting confirmed actions.",
+      "html": "<button class=\"ds-btn-soft\">Agregar</button>",
+      "css": ".ds-btn-soft { display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0 1.25rem; background: var(--primary-soft, #e3f3ea); color: var(--primary-soft-foreground, #0a5c39); font-family: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif; font-size: 17px; font-weight: 600; border: none; border-radius: 12px; cursor: pointer; transition: all 0.15s; } .ds-btn-soft:hover { background: rgb(227 243 234 / 0.7); } .ds-btn-soft:active { transform: scale(0.98); } .ds-btn-soft:focus-visible { outline: none; box-shadow: 0 0 0 3px rgb(15 123 77 / 0.4); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "48px white field, hairline stroke; focus turns the border green with a soft ring; caret is green.",
+      "html": "<input class=\"ds-input\" placeholder=\"Buscar producto\" />",
+      "css": ".ds-input { display: flex; width: 100%; height: 48px; padding: 0.25rem 0.875rem; background: var(--input-background, #ffffff); color: var(--foreground, #182420); font-family: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif; font-size: 17px; border: 1px solid var(--input, #cfd6d3); border-radius: 12px; caret-color: var(--primary, #0f7b4d); transition: color 0.15s, box-shadow 0.15s; } .ds-input::placeholder { color: var(--muted-foreground, #55625c); } .ds-input:focus-visible { outline: none; border-color: var(--ring, #0f7b4d); box-shadow: 0 0 0 3px rgb(15 123 77 / 0.3); }"
+    },
+    {
+      "name": "Stock Chip",
+      "kind": "chip",
+      "refersTo": "chip-stock-ok",
+      "description": "Stock level as words a first-day employee reads correctly: green OK, amber low, red out.",
+      "html": "<span class=\"ds-chip ds-chip-ok\">24 u</span> <span class=\"ds-chip ds-chip-low\">Quedan 4 u</span> <span class=\"ds-chip ds-chip-out\">Agotado</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; padding: 0.25rem 0.625rem; border-radius: 9999px; font-family: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; white-space: nowrap; font-variant-numeric: lining-nums tabular-nums; } .ds-chip-ok { background: var(--primary-soft, #e3f3ea); color: var(--primary-soft-foreground, #0a5c39); } .ds-chip-low { background: var(--pending-soft, #fdf2e0); color: var(--pending, #8a5a06); } .ds-chip-out { background: var(--destructive-soft, #fceceb); color: var(--destructive-soft-foreground, #9c2323); }"
+    },
+    {
+      "name": "PriceTag",
+      "kind": "custom",
+      "refersTo": "money-display",
+      "description": "The one way to print a current price: dollars and bolívares at equal weight; reference-lens Bs goes amber with a 'ref.' suffix. Historical rows never use this — they print stored snapshots.",
+      "html": "<span class=\"ds-pricetag\"><span>$ 12,50</span><span class=\"ds-pricetag-dot\">·</span><span>Bs 512,50</span></span>",
+      "css": ".ds-pricetag { display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.5rem; color: var(--foreground, #182420); font-family: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif; font-size: 1.75rem; line-height: 1.2; font-weight: 700; font-variant-numeric: lining-nums tabular-nums; } .ds-pricetag-dot { font-weight: 400; color: var(--border-strong, #cfd6d3); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White panel on cool paper: hairline border plus ink-tinted soft shadow, always both.",
+      "html": "<div class=\"ds-card\"><h4 class=\"ds-card-title\">Resumen del día</h4><p class=\"ds-card-body\">12 ventas registradas</p></div>",
+      "css": ".ds-card { display: flex; flex-direction: column; gap: 0.5rem; padding: 1.5rem; background: var(--card, #ffffff); color: var(--card-foreground, #182420); border: 1px solid var(--border, #e3e8e6); border-radius: 12px; box-shadow: var(--shadow-card, 0 1px 2px rgb(24 36 32 / 0.05), 0 4px 12px rgb(24 36 32 / 0.05)); font-family: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif; } .ds-card-title { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.45; } .ds-card-body { margin: 0; font-size: 17px; color: var(--muted-foreground, #55625c); }"
+    },
+    {
+      "name": "Bottom Tab Bar",
+      "kind": "nav",
+      "refersTo": "button-primary",
+      "description": "Mobile shell: five equal tabs, icon plus always-visible Spanish label, soft-green active state.",
+      "html": "<nav class=\"ds-tabbar\"><button class=\"ds-tab ds-tab-active\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><span>Vender</span></button><button class=\"ds-tab\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"8\" cy=\"21\" r=\"1\"/><circle cx=\"19\" cy=\"21\" r=\"1\"/><path d=\"M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12\"/></svg><span>Cobrar</span></button><button class=\"ds-tab\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 3v18h18\"/><path d=\"m19 9-5 5-4-4-3 3\"/></svg><span>Historial</span></button></nav>",
+      "css": ".ds-tabbar { display: flex; gap: 0.25rem; padding: 0.375rem 0.75rem; background: #ffffff; border-top: 1px solid var(--border, #e3e8e6); } .ds-tab { position: relative; display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; height: 60px; background: transparent; border: none; border-radius: 12px; color: var(--muted-foreground, #55625c); font-family: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: color 0.15s, background 0.15s; } .ds-tab:hover { background: var(--secondary, #eef1f0); } .ds-tab:focus-visible { outline: none; box-shadow: 0 0 0 3px rgb(15 123 77 / 0.4); } .ds-tab-active { background: var(--primary-soft, #e3f3ea); color: var(--primary-soft-foreground, #0a5c39); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Counter Tool",
+    "overview": "A point-of-sale for Venezuelan shops that the slowest user at the counter operates unaided. The world is one calm light room: a cool paper ground, white cards, near-black green-tinted ink, and exactly one hue that means anything — a deep money green for confirmed actions and confirmed money. Two auxiliary signals exist and are never decorative: amber means 'pending / not yet real' (offline outbox, reference-lens figures), red means destructive or out-of-stock. Everything else is grayscale-on-paper. The system deliberately refuses the dense admin-dashboard default: one obvious action per screen, oversized controls, money printed large in both currencies at equal weight. Legibility is the material: the entire UI is set in Atkinson Hyperlegible Next (self-hosted), the base size is 17px, and every comparable number is tabular.",
+    "keyCharacteristics": [
+      "One accent (money green); amber and red are state signals, never styling.",
+      "Cool paper canvas behind white, hairline-bordered, soft-shadowed cards.",
+      "17px base type; hyperlegible face; tabular numerals for all money and quantities.",
+      "Phone-first shell: five labeled bottom tabs on mobile, nav pills on desktop.",
+      "Saved is always visually distinguishable from pending (green vs. amber)."
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "Green is the only accent. If a new element wants a hue, it must be expressing money-green confirmation, amber pendingness, or red danger — otherwise it is gray ink on paper. The five chart hues exist solely inside report charts and never leak into UI chrome.", "section": "colors" },
+      { "name": "The Amber-Means-Pending Rule", "body": "Amber is never a warm decorative tone. It appears only on money or records that are not yet settled: queued offline writes, reference-lens conversions, low stock.", "section": "colors" },
+      { "name": "The Tabular Money Rule", "body": "Every element showing money or comparable quantities carries data-money (or lives in a table) and renders lining-nums tabular-nums. Numbers a user compares sit in a column somewhere.", "section": "typography" },
+      { "name": "The Both-Currencies Rule", "body": "Prices print as `$ X · Bs Y` at equal weight — that is how prices are spoken at the counter. Neither currency is the footnote.", "section": "typography" },
+      { "name": "The 44px Floor Rule", "body": "No interactive target under 44px. Default controls are 48px (h-12); 40px (h-10/sm) exists only for dense desktop toolbars, never for primary mobile actions.", "section": "layout" },
+      { "name": "The Ink-Shadow Rule", "body": "Shadows are always the ink color at low alpha, never neutral black; there are exactly two levels. No hard offset shadows, no glows.", "section": "elevation" },
+      { "name": "The Snapshot Rule", "body": "PriceTag is only for current prices. Historical and snapshotted rows (sales, finance entries) must print their stored figures via formatMoneyValue — never re-convert past money at today's rate.", "section": "components" },
+      { "name": "The Honest Rate Rule", "body": "While a reference lens is selected, money entry is blocked and lens figures are visibly amber + 'ref.'; only honest-rate money looks settled.", "section": "components" }
+    ],
+    "dos": [
+      "Do print every current price with PriceTag, and every stored/historical figure with formatMoneyValue from its snapshot — the Snapshot Rule is a money-correctness rule, not a style preference.",
+      "Do mark every money/quantity element with data-money for tabular numerals.",
+      "Do keep default controls at 48px and every target ≥44px; sm sizes are desktop-dense only.",
+      "Do display numbers in es-VE format (1.234,56) while accepting dot-decimal keyboard entry.",
+      "Do give every primary action a visible text label (Spanish); icons accompany, never replace.",
+      "Do use amber exclusively for pending/unsynced/reference states and red exclusively for destructive/out-of-stock."
+    ],
+    "donts": [
+      "Don't introduce a second accent hue; the chart palette stays inside charts.",
+      "Don't ship icon-only primary actions or sub-44px targets anywhere staff transacts.",
+      "Don't re-convert historical money at today's rate, restyle a past row's figures, or show lens-rate money without the amber 'ref.' treatment.",
+      "Don't use Anton/Montserrat outside the social-composer canvas; the UI face is Atkinson Hyperlegible Next only.",
+      "Don't rely on the .dark token block: it exists but is never toggled — the shipped product is light-only, and new surfaces are designed against the light tokens.",
+      "Don't drop below the 17px root or use hard offset shadows, glows, or borderless floating cards."
+    ]
+  }
+}

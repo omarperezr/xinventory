@@ -210,8 +210,8 @@ export function FinanceView() {
 
   if (finance.loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-gray-500 text-sm gap-2">
-        <Loader2 className="w-4 h-4 animate-spin" />
+      <div className="flex items-center justify-center py-20 text-muted-foreground text-base gap-2">
+        <Loader2 className="size-5 animate-spin" aria-hidden="true" />
         Cargando finanzas…
       </div>
     );
@@ -220,106 +220,105 @@ export function FinanceView() {
   return (
     <div className="space-y-4 md:space-y-5 pb-8">
       {/* Filter row */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-5 space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Banknote className="w-5 h-5 text-primary" />
-              Finanzas
-            </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {format(range.from, "dd/MM/yyyy")} — {format(range.to, "dd/MM/yyyy")} ·{" "}
-              {range.days} día(s) · {report.entryCount} movimiento(s)
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap gap-1 bg-gray-100 rounded-lg p-0.5">
-              {PERIOD_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => setPeriod(option.key)}
-                  title={option.label}
-                  className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors ${
-                    period === option.key
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-800"
-                  }`}
-                >
-                  {option.short}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setPeriod("custom")}
-                title="Rango personalizado"
-                className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1 ${
-                  period === "custom"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-800"
-                }`}
-              >
-                <CalendarRange className="w-3.5 h-3.5" />
-                Rango
-              </button>
+      <div className="bg-white rounded-xl border border-border shadow-card p-4 md:p-5 space-y-3">
+        {/* Two deliberate rows: title + actions, then the period picker on its
+            own line — one flex-wrap row orphaned "Configurar" into the title
+            block at 1280. */}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg md:text-xl font-bold text-foreground flex items-center gap-2">
+                <Banknote className="size-5 text-primary" aria-hidden="true" />
+                Finanzas
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5" data-money>
+                {format(range.from, "dd/MM/yyyy")} — {format(range.to, "dd/MM/yyyy")} ·{" "}
+                {range.days} día(s) · {report.entryCount} movimiento(s)
+              </p>
             </div>
 
-            <Button size="sm" className="text-xs" onClick={() => setEntryOpen(true)}>
-              <Plus className="w-4 h-4 mr-1.5" />
-              Movimiento
-            </Button>
-            {isAdmin && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => setPurchaseOpen(true)}
-                >
-                  <Truck className="w-4 h-4 mr-1.5" />
-                  Compra
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => setSetupOpen(true)}
-                  aria-label="Configuración de finanzas"
-                >
-                  <Settings2 className="w-4 h-4" />
-                </Button>
-              </>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={() => setEntryOpen(true)}>
+                <Plus aria-hidden="true" />
+                Movimiento
+              </Button>
+              {isAdmin && (
+                <>
+                  <Button variant="outline" onClick={() => setPurchaseOpen(true)}>
+                    <Truck aria-hidden="true" />
+                    Compra
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSetupOpen(true)}
+                    aria-label="Configuración de finanzas"
+                  >
+                    <Settings2 aria-hidden="true" />
+                    Configurar
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-1 bg-secondary rounded-xl p-1 overflow-x-auto max-w-full self-start">
+            {PERIOD_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setPeriod(option.key)}
+                title={option.label}
+                className={`h-11 px-4 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+                  period === option.key
+                    ? "bg-white text-primary shadow-card"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {option.short}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPeriod("custom")}
+              title="Rango personalizado"
+              className={`h-11 px-4 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+                period === "custom"
+                  ? "bg-white text-primary shadow-card"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <CalendarRange className="size-4" aria-hidden="true" />
+              Rango
+            </button>
           </div>
         </div>
 
         {period === "custom" && (
-          <div className="flex flex-wrap items-end gap-2 pt-1">
-            <label className="text-[11px] text-gray-500">
+          <div className="flex flex-wrap items-end gap-3 pt-1">
+            <label className="text-sm font-semibold text-foreground">
               Desde
               <input
                 type="date"
                 value={custom.from}
                 onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))}
-                className="block mt-0.5 text-xs border border-gray-200 rounded-md px-2 py-1.5"
+                className="block mt-1 h-12 text-base border border-input bg-input-background rounded-lg px-3.5"
               />
             </label>
-            <label className="text-[11px] text-gray-500">
+            <label className="text-sm font-semibold text-foreground">
               Hasta
               <input
                 type="date"
                 value={custom.to}
                 onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
-                className="block mt-0.5 text-xs border border-gray-200 rounded-md px-2 py-1.5"
+                className="block mt-1 h-12 text-base border border-input bg-input-background rounded-lg px-3.5"
               />
             </label>
           </div>
         )}
 
         {finance.offline && (
-          <div className="flex items-center gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+          <div className="flex items-center gap-2 text-sm text-pending bg-pending-soft rounded-lg px-3.5 py-2.5">
+            <Info className="size-5 shrink-0" aria-hidden="true" />
             Sin conexión: se muestra la última copia guardada en este dispositivo.
             Lo que registres se enviará al reconectar.
           </div>
@@ -328,16 +327,16 @@ export function FinanceView() {
         {/* Without the server totals the balances only cover the loaded window,
             which understates every pot. Say it rather than show a wrong saldo. */}
         {!finance.loading && !finance.balances && (
-          <div className="flex items-center gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+          <div className="flex items-center gap-2 text-sm text-pending bg-pending-soft rounded-lg px-3.5 py-2.5">
+            <Info className="size-5 shrink-0" aria-hidden="true" />
             Saldos parciales: no se pudo consultar el acumulado en el servidor,
             así que solo se suman los movimientos y ventas cargados aquí.
           </div>
         )}
 
         {isPartial && (
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+          <div className="flex flex-wrap items-center gap-2 text-sm text-pending bg-pending-soft rounded-lg px-3.5 py-2.5">
+            <Info className="size-5 shrink-0" aria-hidden="true" />
             <span>
               El período tiene {serverCount} movimientos registrados y el
               navegador tiene {report.entryCount}. Los cálculos usan solo los
@@ -347,14 +346,14 @@ export function FinanceView() {
               <Button
                 variant="outline"
                 size="sm"
-                className="text-meta h-9 ml-auto"
+                className="ml-auto"
                 disabled={finance.loadingMore}
                 onClick={finance.loadMore}
               >
                 {finance.loadingMore ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                  <Loader2 className="animate-spin" aria-hidden="true" />
                 ) : (
-                  <Download className="w-3.5 h-3.5 mr-1" />
+                  <Download aria-hidden="true" />
                 )}
                 Cargar más
               </Button>
@@ -364,8 +363,8 @@ export function FinanceView() {
       </div>
 
       {/* Panel navigation */}
-      <nav className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-        <ul className="flex gap-2 min-w-max md:min-w-0">
+      <nav className="-mx-4 px-4 md:mx-0 md:px-0">
+        <ul className="flex gap-1 overflow-x-auto rounded-xl bg-secondary p-1">
           {visibleTabs.map((option) => {
             const Icon = option.icon;
             const active = tab === option.key;
@@ -375,29 +374,15 @@ export function FinanceView() {
                   type="button"
                   onClick={() => setTab(option.key)}
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${
+                  title={option.hint}
+                  className={`flex h-11 items-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-colors ${
                     active
-                      ? "bg-white border-primary/40 shadow-sm"
-                      : "bg-white/60 border-gray-200 hover:border-gray-300"
+                      ? "bg-white text-primary shadow-card"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <Icon
-                    className={`w-4 h-4 flex-shrink-0 ${
-                      active ? "text-primary" : "text-gray-500"
-                    }`}
-                  />
-                  <span>
-                    <span
-                      className={`block text-xs md:text-sm font-medium ${
-                        active ? "text-gray-900" : "text-gray-600"
-                      }`}
-                    >
-                      {option.label}
-                    </span>
-                    <span className="hidden md:block text-meta text-gray-500 leading-tight">
-                      {option.hint}
-                    </span>
-                  </span>
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  {option.label}
                 </button>
               </li>
             );
@@ -407,8 +392,8 @@ export function FinanceView() {
 
       <Suspense
         fallback={
-          <div className="flex items-center justify-center py-16 text-gray-500 text-sm gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
+          <div className="flex items-center justify-center py-16 text-muted-foreground text-base gap-2">
+            <Loader2 className="size-5 animate-spin" aria-hidden="true" />
             Calculando…
           </div>
         }

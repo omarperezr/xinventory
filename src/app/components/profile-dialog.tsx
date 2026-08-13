@@ -96,11 +96,11 @@ export function ProfileDialog({
         if (!v) reset();
       }}
     >
-      <DialogContent className="sm:max-w-lg bg-white">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <User className="w-5 h-5 text-primary" />
-            Mi Perfil
+            <User className="size-5 text-primary" aria-hidden="true" />
+            Mi perfil
           </DialogTitle>
           <DialogDescription>
             Actualiza tu nombre, correo o contraseña
@@ -118,15 +118,15 @@ export function ProfileDialog({
                 disabled={!name.trim() || name === currentUser.name}
                 className="shrink-0"
               >
-                <Save className="w-4 h-4" />
+                <Save className="size-4" aria-hidden="true" />
               </Button>
             </div>
             {nameMsg && (
               <p
-                className={`text-xs px-2 py-1.5 rounded-md ${
+                className={`text-sm px-3.5 py-2.5 rounded-lg ${
                   nameMsg.type === "ok"
-                    ? "text-green-700 bg-green-50 border border-green-100"
-                    : "text-red-600 bg-red-50 border border-red-100"
+                    ? "text-primary-soft-foreground bg-primary-soft"
+                    : "text-destructive-soft-foreground bg-destructive-soft"
                 }`}
               >
                 {nameMsg.text}
@@ -135,10 +135,10 @@ export function ProfileDialog({
           </div>
 
           {/* Email */}
-          <div className="space-y-1.5 border-t border-gray-100 pt-4">
+          <div className="space-y-1.5 border-t border-border pt-4">
             <Label className="flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-gray-500" />
-              Cambiar Correo (actual: {currentUser.email})
+              <Mail className="size-3.5 text-muted-foreground" aria-hidden="true" />
+              Cambiar correo (actual: {currentUser.email})
             </Label>
             <div className="flex gap-2">
               <Input
@@ -155,15 +155,15 @@ export function ProfileDialog({
                 Enviar
               </Button>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Recibirás un enlace de confirmación en la nueva dirección.
             </p>
             {emailMsg && (
               <p
-                className={`text-xs px-2 py-1.5 rounded-md ${
+                className={`text-sm px-3.5 py-2.5 rounded-lg ${
                   emailMsg.type === "ok"
-                    ? "text-green-700 bg-green-50 border border-green-100"
-                    : "text-red-600 bg-red-50 border border-red-100"
+                    ? "text-primary-soft-foreground bg-primary-soft"
+                    : "text-destructive-soft-foreground bg-destructive-soft"
                 }`}
               >
                 {emailMsg.text}
@@ -172,10 +172,10 @@ export function ProfileDialog({
           </div>
 
           {/* Password */}
-          <div className="space-y-1.5 border-t border-gray-100 pt-4">
+          <div className="space-y-1.5 border-t border-border pt-4">
             <Label className="flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-gray-500" />
-              Cambiar Contraseña
+              <KeyRound className="size-3.5 text-muted-foreground" aria-hidden="true" />
+              Cambiar contraseña
             </Label>
 
             <div className="space-y-2">
@@ -199,12 +199,14 @@ export function ProfileDialog({
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
+                  aria-label={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  aria-pressed={showPass}
+                  className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPass ? (
-                    <EyeOff className="w-4 h-4" />
+                    <EyeOff className="size-4" aria-hidden="true" />
                   ) : (
-                    <Eye className="w-4 h-4" />
+                    <Eye className="size-4" aria-hidden="true" />
                   )}
                 </button>
               </div>
@@ -223,16 +225,16 @@ export function ProfileDialog({
                 }
                 className="w-full"
               >
-                Actualizar Contraseña
+                Actualizar contraseña
               </Button>
             </div>
 
             {passMsg && (
               <p
-                className={`text-xs px-2 py-1.5 rounded-md ${
+                className={`text-sm px-3.5 py-2.5 rounded-lg ${
                   passMsg.type === "ok"
-                    ? "text-green-700 bg-green-50 border border-green-100"
-                    : "text-red-600 bg-red-50 border border-red-100"
+                    ? "text-primary-soft-foreground bg-primary-soft"
+                    : "text-destructive-soft-foreground bg-destructive-soft"
                 }`}
               >
                 {passMsg.text}

@@ -27,6 +27,7 @@ import {
   ADJUSTMENT_REASONS,
   InventoryItem,
   UnitType,
+  formatMoneyValue,
   isReferenceLens,
   useApp,
 } from "../context/app-context";
@@ -152,13 +153,18 @@ export function InventoryForm({
     const inBS = usdToBs(inUSD);
 
     return (
-      <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+      <div
+        data-money
+        className="text-sm text-muted-foreground mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
+      >
         <span className={currency === "USD" ? "font-bold text-primary" : ""}>
-          $ {inUSD.toFixed(2)}
+          $ {formatMoneyValue(inUSD)}
         </span>
-        <span className="text-gray-300">|</span>
+        <span aria-hidden="true" className="text-border-strong">
+          ·
+        </span>
         <span className={currency === "BS" ? "font-bold text-primary" : ""}>
-          Bs {inBS.toFixed(2)}
+          Bs {formatMoneyValue(inBS)}
         </span>
       </div>
     );
@@ -277,12 +283,12 @@ export function InventoryForm({
   const decrementQuantity = () => setQuantity((prev) => Math.max(0, prev - 1));
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-7">
+    <form onSubmit={handleSubmit} className="space-y-8">
       <FormSection icon={Tag} title="Identificación">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
             <Label htmlFor="name">
-              Nombre del Producto
+              Nombre del producto
             </Label>
             <Input
               id="name"
@@ -298,8 +304,12 @@ export function InventoryForm({
               htmlFor="barcode"
             >
               <span className="flex items-center gap-2">
-                <Barcode className="w-4 h-4 text-primary" strokeWidth={1.5} />
-                Código de Barras
+                <Barcode
+                  className="size-4 text-primary"
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                />
+                Código de barras
               </span>
             </Label>
             <Input
@@ -313,9 +323,19 @@ export function InventoryForm({
         </div>
       </FormSection>
 
-      <FormSection icon={() => <span className="text-primary font-semibold text-sm w-4 h-4 flex items-center justify-center">$</span>} title="Precios">
+      <FormSection
+        icon={() => (
+          <span
+            aria-hidden="true"
+            className="text-primary font-bold size-4 flex items-center justify-center"
+          >
+            $
+          </span>
+        )}
+        title="Precios"
+      >
         {referenceLens && (
-          <p className="text-xs text-amber-700">
+          <p className="rounded-lg bg-pending-soft px-3.5 py-2.5 text-sm text-pending">
             Estás viendo una tasa de referencia. Cambia a USD o Bs para editar
             precios.
           </p>
@@ -325,7 +345,7 @@ export function InventoryForm({
             <Label
               htmlFor="buyingPrice"
             >
-              Precio de Compra
+              Precio de compra
             </Label>
             <div className="flex gap-2">
               <Select
@@ -333,7 +353,7 @@ export function InventoryForm({
                 onValueChange={(v: InputCurrency) => setBuyingCurrency(v)}
                 disabled={referenceLens}
               >
-                <SelectTrigger aria-label="Moneda del precio de compra" className="w-[90px]">
+                <SelectTrigger aria-label="Moneda del precio de compra" className="w-28">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -344,12 +364,14 @@ export function InventoryForm({
               <Input
                 id="buyingPrice"
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 value={buyingPrice}
                 onChange={(e) => setBuyingPrice(e.target.value)}
                 placeholder="0.00"
-                className="flex-1"
+                className="flex-1 font-semibold"
+                data-money
                 disabled={referenceLens}
                 required
               />
@@ -361,7 +383,7 @@ export function InventoryForm({
             <Label
               htmlFor="sellingPrice"
             >
-              Precio de Venta
+              Precio de venta
             </Label>
             <div className="flex gap-2">
               <Select
@@ -369,7 +391,7 @@ export function InventoryForm({
                 onValueChange={(v: InputCurrency) => setSellingCurrency(v)}
                 disabled={referenceLens}
               >
-                <SelectTrigger aria-label="Moneda del precio de venta" className="w-[90px]">
+                <SelectTrigger aria-label="Moneda del precio de venta" className="w-28">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -380,12 +402,14 @@ export function InventoryForm({
               <Input
                 id="sellingPrice"
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 value={sellingPrice}
                 onChange={(e) => setSellingPrice(e.target.value)}
                 placeholder="0.00"
-                className="flex-1"
+                className="flex-1 font-semibold"
+                data-money
                 disabled={referenceLens}
                 required
               />
@@ -409,14 +433,19 @@ export function InventoryForm({
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
                 placeholder="0"
+                className="pr-9"
+                data-money
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+              <span
+                aria-hidden="true"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold"
+              >
                 %
               </span>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 pt-7">
+          <div className="flex items-center gap-3 md:pt-8">
             <Checkbox
               id="includesTaxes"
               checked={includesTaxes}
@@ -427,17 +456,17 @@ export function InventoryForm({
             <Label
               htmlFor="includesTaxes"
             >
-              Incluye Impuestos
+              Incluye impuestos
             </Label>
           </div>
         </div>
       </FormSection>
 
-      <FormSection icon={Boxes} title="Inventario y Categorización">
+      <FormSection icon={Boxes} title="Inventario y categorización">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-2">
             <Label htmlFor="quantity">
-              Cantidad en Stock
+              Cantidad en stock
             </Label>
             <div className="flex items-center gap-3">
               <Button
@@ -446,19 +475,21 @@ export function InventoryForm({
                 size="icon"
                 onClick={decrementQuantity}
                 aria-label="Disminuir cantidad en stock"
-                className="h-11 w-11 hover:border-primary"
+                className="hover:border-primary"
               >
-                <Minus className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
+                <Minus className="size-5" strokeWidth={1.5} aria-hidden="true" />
               </Button>
               <Input
                 id="quantity"
                 type="number"
+                inputMode="numeric"
                 min="0"
                 value={quantity}
                 onChange={(e) =>
                   setQuantity(Math.max(0, parseInt(e.target.value) || 0))
                 }
-                className="flex-1 text-center"
+                className="flex-1 text-center font-semibold"
+                data-money
               />
               <Button
                 type="button"
@@ -466,13 +497,13 @@ export function InventoryForm({
                 size="icon"
                 onClick={incrementQuantity}
                 aria-label="Aumentar cantidad en stock"
-                className="h-11 w-11 hover:border-primary"
+                className="hover:border-primary"
               >
-                <Plus className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
+                <Plus className="size-5" strokeWidth={1.5} aria-hidden="true" />
               </Button>
             </div>
             {stockChanged && (
-              <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <div className="space-y-2 rounded-lg border border-pending-strong bg-pending-soft p-3.5">
                 <Label htmlFor="adjustment-reason">
                   Motivo del ajuste
                 </Label>
@@ -480,7 +511,7 @@ export function InventoryForm({
                   value={adjustmentReason}
                   onValueChange={setAdjustmentReason}
                 >
-                  <SelectTrigger id="adjustment-reason" className="bg-white">
+                  <SelectTrigger id="adjustment-reason">
                     <SelectValue placeholder="¿Por qué cambia el stock?" />
                   </SelectTrigger>
                   <SelectContent>
@@ -491,7 +522,7 @@ export function InventoryForm({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-amber-900 leading-snug">
+                <p className="text-sm text-pending leading-snug">
                   Esto es un ajuste: cambia el stock sin mover dinero. Si llegó
                   mercancía que compraste, regístrala como <strong>compra</strong>{" "}
                   en Finanzas para que quede el costo, el proveedor y el pago.
@@ -502,7 +533,7 @@ export function InventoryForm({
 
           <div className="space-y-2">
             <Label htmlFor="unit">
-              Unidad de Medida
+              Unidad de medida
             </Label>
             <Select
               value={unit}
@@ -512,8 +543,8 @@ export function InventoryForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="units">Unidades (Items)</SelectItem>
-                <SelectItem value="kg">Kilogramos (Kg)</SelectItem>
+                <SelectItem value="units">Unidades</SelectItem>
+                <SelectItem value="kg">Kilogramos (kg)</SelectItem>
                 <SelectItem value="liters">Litros (L)</SelectItem>
               </SelectContent>
             </Select>
@@ -535,7 +566,7 @@ export function InventoryForm({
 
           <div className="space-y-2">
             <Label htmlFor="type">
-              Tipo / Categoría
+              Tipo o categoría
             </Label>
             <Input
               id="type"
@@ -549,7 +580,7 @@ export function InventoryForm({
 
       <CollapsibleFormSection
         icon={ImagePlus}
-        title="Imágenes del Producto"
+        title="Imágenes del producto"
         summary={images.length > 0 ? `${images.length} foto(s)` : "Ninguna"}
         defaultOpen={images.length > 0}
       >
@@ -557,7 +588,7 @@ export function InventoryForm({
           {images.map((img, i) => (
             <div
               key={i}
-              className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200"
+              className="relative w-20 h-20 rounded-lg overflow-hidden border border-border"
             >
               <img
                 src={img}
@@ -570,13 +601,13 @@ export function InventoryForm({
                 type="button"
                 onClick={() => removeImage(i)}
                 aria-label={`Eliminar imagen ${i + 1}`}
-                className="tap-target absolute top-0.5 right-0.5 inline-flex items-center justify-center h-6 w-6 bg-black/60 text-white rounded-full"
+                className="tap-target absolute top-0.5 right-0.5 inline-flex items-center justify-center h-7 w-7 bg-black/60 text-white rounded-full"
               >
-                <X className="w-3.5 h-3.5" aria-hidden="true" />
+                <X className="size-4" aria-hidden="true" />
               </button>
             </div>
           ))}
-          <label className="w-20 h-20 rounded-lg border border-dashed border-gray-300 flex items-center justify-center cursor-pointer text-gray-500 hover:border-primary hover:text-primary">
+          <label className="w-20 h-20 rounded-lg border border-dashed border-border-strong flex items-center justify-center cursor-pointer text-muted-foreground hover:border-primary hover:text-primary">
             <input
               type="file"
               accept="image/*"
@@ -585,7 +616,11 @@ export function InventoryForm({
               onChange={handleImageSelect}
               className="hidden"
             />
-            {compressing ? "..." : <Plus className="w-5 h-5" aria-hidden="true" />}
+            {compressing ? (
+              <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Plus className="size-5" aria-hidden="true" />
+            )}
           </label>
         </div>
       </CollapsibleFormSection>
@@ -616,7 +651,7 @@ export function InventoryForm({
             <Label
               htmlFor="notes"
             >
-              Notas del cambio (Historial)
+              Notas del cambio (historial)
             </Label>
             <Textarea
               id="notes"
@@ -629,7 +664,7 @@ export function InventoryForm({
         </div>
       </CollapsibleFormSection>
 
-      <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 -mx-6 px-6 sticky bottom-0 bg-white pb-1">
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-3 border-t border-border -mx-5 px-5 sm:-mx-6 sm:px-6 sticky bottom-0 bg-white pb-1">
         {editItem && onCancelEdit && (
           <Button
             type="button"
@@ -646,13 +681,13 @@ export function InventoryForm({
         >
           {submitting ? (
             <span className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="size-5 animate-spin" aria-hidden="true" />
               Guardando…
             </span>
           ) : editItem ? (
-            "Actualizar Producto"
+            "Actualizar producto"
           ) : (
-            "Agregar Producto"
+            "Agregar producto"
           )}
         </Button>
       </div>
@@ -671,8 +706,8 @@ function FormSection({
 }) {
   return (
     <div className="space-y-4">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-        <Icon className="w-4 h-4 text-primary" aria-hidden="true" />
+      <h3 className="flex items-center gap-2 text-base font-bold text-foreground">
+        <Icon className="size-4 text-primary" aria-hidden="true" />
         {title}
       </h3>
       {children}
@@ -712,14 +747,14 @@ function CollapsibleFormSection({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={contentId}
-        className="flex w-full items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700"
+        className="flex w-full min-h-11 items-center gap-2 text-base font-bold text-foreground hover:text-primary"
       >
-        <Icon className="w-4 h-4 text-primary" aria-hidden="true" />
+        <Icon className="size-4 text-primary" aria-hidden="true" />
         {title}
-        <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal font-normal text-gray-500">
+        <span className="ml-auto flex items-center gap-1.5 text-sm font-normal text-muted-foreground">
           {!open && summary}
           <ChevronDown
-            className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`}
+            className={`size-5 transition-transform ${open ? "rotate-180" : ""}`}
             aria-hidden="true"
           />
         </span>

@@ -58,21 +58,39 @@ export function OfflineSync() {
 
   if (online && pending === 0) return null;
 
+  // A full-width strip docked above the mobile tab bar (floating pill on
+  // desktop). Never overlaps the navigation; never small enough to miss:
+  // "did my sale save?" must answer itself.
   return (
-    <div className="fixed bottom-3 left-3 z-50">
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed left-0 right-0 z-40 bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] md:bottom-4 md:left-4 md:right-auto"
+    >
       {!online ? (
-        <div className="flex items-center gap-2 bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg">
-          <CloudOff className="w-3.5 h-3.5" />
-          Sin conexión{pending > 0 ? ` · ${pending} cambio(s) pendiente(s)` : ""}
+        <div className="flex items-center justify-center gap-2.5 bg-foreground text-white text-sm font-semibold px-4 py-2.5 md:rounded-xl md:shadow-raised">
+          <CloudOff className="size-4.5 shrink-0" aria-hidden="true" />
+          Sin conexión
+          {pending > 0 && (
+            <span className="font-normal text-white/80" data-money>
+              · {pending} {pending === 1 ? "cambio guardado" : "cambios guardados"} aquí
+            </span>
+          )}
         </div>
       ) : (
         <button
           onClick={sync}
           disabled={syncing}
-          className="flex items-center gap-2 bg-amber-500 text-slate-900 text-xs font-medium px-3 py-2 rounded-lg shadow-lg hover:bg-amber-400 disabled:opacity-70"
+          className="flex w-full md:w-auto items-center justify-center gap-2.5 bg-pending-strong text-foreground text-sm font-semibold px-4 py-2.5 md:rounded-xl md:shadow-raised hover:brightness-105 disabled:opacity-70"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
-          {pending} cambio(s) pendiente(s) · toca para reintentar
+          <RefreshCw
+            className={`size-4.5 shrink-0 ${syncing ? "animate-spin" : ""}`}
+            aria-hidden="true"
+          />
+          <span data-money>
+            {pending} {pending === 1 ? "cambio" : "cambios"} por enviar
+          </span>
+          <span className="font-normal">· toca para reenviar</span>
         </button>
       )}
     </div>

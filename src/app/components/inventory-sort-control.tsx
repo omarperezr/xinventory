@@ -47,33 +47,33 @@ export function InventorySortControl({ value, onChange, className }: Props) {
     <Popover>
       <PopoverTrigger asChild>
         <Button
-          variant="ghost"
-          className={`justify-start font-medium bg-input-background hover:bg-input-background hover:brightness-100 border border-input text-foreground ${className || ""}`}
+          variant="outline"
+          className={`justify-start ${className || ""}`}
         >
-          <ArrowDownUp className="w-4 h-4 mr-2 shrink-0" />
+          <ArrowDownUp className="size-4 shrink-0" aria-hidden="true" />
           <span className="truncate">{summary}</span>
           {value.length > 0 && (
-            <span className="ml-2 shrink-0 rounded-full bg-primary text-white text-xs font-semibold min-w-[20px] h-5 px-1 flex items-center justify-center">
+            <span className="ml-1 shrink-0 rounded-full bg-primary text-white text-meta font-bold min-w-5 h-5 px-1.5 flex items-center justify-center">
               {value.length}
             </span>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 p-2 bg-white">
+      <PopoverContent align="end" className="w-80 p-2">
         <div className="flex items-center justify-between px-2 py-1.5">
-          <span className="text-sm font-semibold text-gray-700">Ordenar por</span>
+          <span className="text-base font-bold text-foreground">Ordenar por</span>
           {value.length > 0 && (
             <button
               type="button"
               onClick={() => onChange([])}
-              className="text-xs text-gray-500 hover:text-gray-700 inline-flex items-center gap-1"
+              className="tap-target text-sm font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
-              <X className="w-3 h-3" />
+              <X className="size-4" aria-hidden="true" />
               Limpiar
             </button>
           )}
         </div>
-        <p className="px-2 pb-1.5 text-xs text-gray-500">
+        <p className="px-2 pb-2 text-sm text-muted-foreground">
           El orden de selección define la prioridad.
         </p>
         <div className="space-y-1">
@@ -84,24 +84,29 @@ export function InventorySortControl({ value, onChange, className }: Props) {
             return (
               <div
                 key={f.field}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50"
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-secondary"
               >
                 <span
-                  className={`flex items-center justify-center w-5 h-5 rounded-full text-xs font-semibold shrink-0 ${
-                    active ? "bg-primary text-white" : "bg-gray-100 text-gray-500"
+                  data-money
+                  className={`flex items-center justify-center size-6 rounded-full text-sm font-bold shrink-0 ${
+                    active
+                      ? "bg-primary text-white"
+                      : "bg-secondary text-muted-foreground"
                   }`}
                 >
                   {active ? idx + 1 : "·"}
                 </span>
-                <span className="flex-1 text-sm text-gray-700">{f.label}</span>
+                <span className="flex-1 text-sm font-medium text-foreground">
+                  {f.label}
+                </span>
                 <div className="flex gap-1">
                   <button
                     type="button"
                     onClick={() => setDirection(f.field, "asc")}
-                    className={`text-xs px-2 py-1 rounded border ${
+                    className={`tap-target h-9 px-2.5 rounded-md border text-sm font-semibold ${
                       active && dir === "asc"
-                        ? "bg-primary border-primary text-white font-medium"
-                        : "border-gray-200 text-gray-500 hover:bg-gray-100"
+                        ? "bg-primary border-primary text-white"
+                        : "border-border-strong text-muted-foreground hover:bg-secondary"
                     }`}
                   >
                     {f.ascLabel}
@@ -109,10 +114,10 @@ export function InventorySortControl({ value, onChange, className }: Props) {
                   <button
                     type="button"
                     onClick={() => setDirection(f.field, "desc")}
-                    className={`text-xs px-2 py-1 rounded border ${
+                    className={`tap-target h-9 px-2.5 rounded-md border text-sm font-semibold ${
                       active && dir === "desc"
-                        ? "bg-primary border-primary text-white font-medium"
-                        : "border-gray-200 text-gray-500 hover:bg-gray-100"
+                        ? "bg-primary border-primary text-white"
+                        : "border-border-strong text-muted-foreground hover:bg-secondary"
                     }`}
                   >
                     {f.descLabel}

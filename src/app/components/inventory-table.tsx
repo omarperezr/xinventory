@@ -10,6 +10,7 @@ import {
 import { format } from "date-fns";
 import { useState } from "react";
 import { ImageCarousel } from "./product-card";
+import { PriceTag, StockChip } from "./price-tag";
 import { shareImageToWhatsApp } from "../services/whatsapp";
 import { useApp, InventoryItem } from "../context/app-context";
 
@@ -28,9 +29,13 @@ function ProductThumb({
   if (images.length === 0 || !onView) {
     return (
       <div
-        className={`${className} rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0`}
+        className={`${className} rounded-lg bg-secondary flex items-center justify-center flex-shrink-0`}
       >
-        <Package className="w-5 h-5 text-gray-400" strokeWidth={1.5} aria-hidden="true" />
+        <Package
+          className="size-5 text-muted-foreground"
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
       </div>
     );
   }
@@ -39,7 +44,7 @@ function ProductThumb({
       type="button"
       onClick={() => onView(item)}
       aria-label={`Ver fotos de ${item.name}`}
-      className={`${className} relative rounded-lg overflow-hidden flex-shrink-0 border border-gray-200 focus-visible:ring-2 focus-visible:ring-primary`}
+      className={`${className} relative rounded-lg overflow-hidden flex-shrink-0 border border-border focus-visible:ring-2 focus-visible:ring-primary`}
     >
       <img
         src={images[0]}
@@ -102,28 +107,19 @@ function InventoryTableRow({
     }
   };
 
-  const unitLabel = { units: "u", kg: "kg", liters: "L" }[item.unit || "units"];
-
-  const stockColor =
-    item.quantity === 0
-      ? "bg-red-50 text-red-700"
-      : item.quantity < 10
-        ? "bg-yellow-50 text-yellow-700"
-        : "bg-green-50 text-green-700";
-
   const margin =
     item.sellingPrice > 0
       ? ((item.sellingPrice - item.buyingPrice) / item.sellingPrice) * 100
       : 0;
   const marginColor =
     margin <= 0
-      ? "text-red-600"
+      ? "text-destructive"
       : margin < 15
-        ? "text-yellow-600"
-        : "text-green-600";
+        ? "text-pending"
+        : "text-primary";
 
   return (
-    <tr className="hover:bg-gray-50 transition-colors">
+    <tr className="hover:bg-canvas transition-colors">
       {selectMode && (
         <td className="px-2 md:px-4 py-2 md:py-4">
           <Checkbox
@@ -136,53 +132,47 @@ function InventoryTableRow({
         <div className="flex items-center gap-3">
           <ProductThumb item={item} onView={onViewPhotos} className="w-10 h-10" />
           <div className="min-w-0">
-            <div className="text-xs md:text-sm font-medium text-gray-900 leading-tight">
+            <div className="text-sm font-semibold text-foreground leading-tight">
               {item.name}
             </div>
-            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-              {item.includesTaxes && (
-                <span className="text-meta uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
-                  +IVA
-                </span>
-              )}
-              <span className="md:hidden text-meta uppercase bg-gray-100 text-gray-600 px-1 py-0.5 rounded truncate max-w-[80px]">
-                {item.brand}
+            {item.includesTaxes && (
+              <span className="mt-0.5 inline-block text-meta font-semibold uppercase bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded">
+                +IVA
               </span>
-            </div>
-            <div className="md:hidden text-meta text-gray-500 font-mono mt-0.5 truncate max-w-[90px]">
-              {item.barcode}
-            </div>
+            )}
           </div>
         </div>
       </td>
 
       <td className="hidden md:table-cell px-6 py-4">
-        <span className="text-gray-600 font-mono text-sm">{item.barcode}</span>
+        <span className="text-muted-foreground font-mono text-sm" data-money>
+          {item.barcode}
+        </span>
       </td>
 
       <td className="hidden md:table-cell px-6 py-4">
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs font-medium text-gray-700 truncate max-w-[110px]">
+          <span className="text-sm font-medium text-foreground truncate max-w-[110px]">
             {item.brand}
           </span>
-          <span className="text-meta text-gray-500 uppercase truncate max-w-[110px]">
+          <span className="text-meta text-muted-foreground uppercase truncate max-w-[110px]">
             {item.type}
           </span>
         </div>
       </td>
 
       <td className="px-3 md:px-6 py-2 md:py-4">
-        <div className="text-xs md:text-sm font-medium text-gray-900">
-          {formatPrice(item.sellingPrice)}
-        </div>
+        <PriceTag usd={item.sellingPrice} size="sm" />
         {item.discount > 0 && (
-          <div className="text-meta text-orange-600">-{item.discount}%</div>
+          <div className="text-meta font-semibold text-pending">
+            -{item.discount}%
+          </div>
         )}
       </td>
 
       {showBuyingPrice && (
         <td className="hidden md:table-cell px-6 py-4">
-          <span className="text-gray-500 text-sm">
+          <span className="text-muted-foreground text-sm" data-money>
             {formatPrice(item.buyingPrice)}
           </span>
         </td>
@@ -190,14 +180,14 @@ function InventoryTableRow({
 
       {showBuyingPrice && (
         <td className="hidden md:table-cell px-6 py-4">
-          <span className={`text-sm font-medium ${marginColor}`}>
+          <span className={`text-sm font-semibold ${marginColor}`} data-money>
             {margin.toFixed(0)}%
           </span>
         </td>
       )}
 
       <td className="hidden md:table-cell px-6 py-4">
-        <span className="text-gray-600 text-sm">
+        <span className="text-muted-foreground text-sm" data-money>
           {item.updatedAt
             ? format(new Date(item.updatedAt), "dd MMM yyyy")
             : "N/A"}
@@ -205,12 +195,7 @@ function InventoryTableRow({
       </td>
 
       <td className="px-3 md:px-6 py-2 md:py-4">
-        <span
-          className={`inline-flex items-center px-1.5 md:px-2.5 py-0.5 rounded-full text-xs font-medium ${stockColor}`}
-        >
-          {item.quantity}
-          <span className="ml-0.5 opacity-70">{unitLabel}</span>
-        </span>
+        <StockChip quantity={item.quantity} unit={item.unit || "units"} size="sm" />
       </td>
 
       <td className="px-2 md:px-6 py-2 md:py-4">
@@ -218,43 +203,43 @@ function InventoryTableRow({
           {!selectMode && onViewHistory && (
             <Button
               variant="ghost"
-              size="sm"
+              size="icon-sm"
               onClick={() => onViewHistory(item)}
-              className="tap-target hidden md:flex text-gray-500 hover:text-gray-700 hover:bg-gray-100 h-9 w-9 p-0"
-              title="Ver Historial"
+              className="tap-target text-muted-foreground hover:text-foreground"
+              title="Ver historial"
               aria-label={`Ver historial de ${item.name}`}
             >
-              <Clock className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+              <Clock className="size-4" strokeWidth={1.5} aria-hidden="true" />
             </Button>
           )}
 
           {!selectMode && onViewHistory && (
             <Button
               variant="ghost"
-              size="sm"
+              size="icon-sm"
               onClick={() => onEdit(item)}
-              className="tap-target text-primary hover:text-primary hover:bg-blue-50 h-9 w-9 p-0"
+              className="tap-target text-primary hover:text-primary hover:bg-primary-soft"
               title="Editar"
               aria-label={`Editar ${item.name}`}
             >
-              <Edit2 className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+              <Edit2 className="size-4" strokeWidth={1.5} aria-hidden="true" />
             </Button>
           )}
 
           {!selectMode && onViewHistory && (
             <Button
               variant="ghost"
-              size="sm"
+              size="icon-sm"
               onClick={handleDelete}
               disabled={deleting}
-              className="tap-target hidden md:flex text-red-500 hover:text-red-700 hover:bg-red-50 h-9 w-9 p-0 disabled:opacity-60"
+              className="tap-target text-muted-foreground hover:text-destructive hover:bg-destructive-soft disabled:opacity-60"
               title="Eliminar"
               aria-label={`Eliminar ${item.name}`}
             >
               {deleting ? (
-                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               ) : (
-                <Trash2 className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+                <Trash2 className="size-4" strokeWidth={1.5} aria-hidden="true" />
               )}
             </Button>
           )}
@@ -299,29 +284,20 @@ function MobileAdminCard({
     }
   };
 
-  const unitLabel = { units: "u", kg: "kg", liters: "L" }[item.unit || "units"];
-
-  const stockColor =
-    item.quantity === 0
-      ? "text-red-600"
-      : item.quantity < 10
-        ? "text-yellow-600"
-        : "text-green-600";
-
   const margin =
     item.sellingPrice > 0
       ? ((item.sellingPrice - item.buyingPrice) / item.sellingPrice) * 100
       : 0;
   const marginColor =
     margin <= 0
-      ? "text-red-600"
+      ? "text-destructive"
       : margin < 15
-        ? "text-yellow-600"
-        : "text-green-600";
+        ? "text-pending"
+        : "text-primary";
 
   return (
-    <div className="p-3 border-b border-gray-100 last:border-0">
-      <div className="flex items-start gap-2">
+    <div className="p-3.5 border-b border-border last:border-0">
+      <div className="flex items-start gap-2.5">
         {selectMode && (
           <Checkbox
             checked={!!selected}
@@ -331,50 +307,46 @@ function MobileAdminCard({
         )}
         <ProductThumb item={item} onView={onViewPhotos} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-gray-900 leading-tight">
+          <p className="text-[0.9375rem] font-semibold text-foreground leading-tight">
             {item.name}
           </p>
-          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+          <div className="flex items-center gap-1 mt-1 flex-wrap">
             {item.includesTaxes && (
-              <span className="text-meta uppercase bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+              <span className="text-meta font-semibold uppercase bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded">
                 +IVA
               </span>
             )}
-            <span className="text-meta uppercase bg-gray-100 text-gray-600 px-1 py-0.5 rounded truncate max-w-[100px]">
+            <span className="text-meta font-semibold uppercase bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded truncate max-w-[100px]">
               {item.brand}
             </span>
           </div>
-          <p className="text-meta text-gray-500 font-mono mt-0.5 truncate">
+          <p className="text-meta text-muted-foreground font-mono mt-1 truncate" data-money>
             {item.barcode}
           </p>
         </div>
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-semibold text-gray-900">
-            {formatPrice(item.sellingPrice)}
-          </p>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <PriceTag usd={item.sellingPrice} size="sm" className="justify-end" />
           {item.discount > 0 && (
-            <p className="text-meta text-orange-600">-{item.discount}%</p>
+            <p className="text-meta font-semibold text-pending">-{item.discount}%</p>
           )}
-          <p className={`text-xs font-medium ${stockColor}`}>
-            {item.quantity} {unitLabel}
-          </p>
+          <StockChip quantity={item.quantity} unit={item.unit || "units"} size="sm" />
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-50">
-        <div className="flex items-center gap-3 text-xs min-w-0">
+      <div className="flex items-center justify-between gap-2 mt-2.5 pt-2.5 border-t border-border">
+        <div className="flex items-center gap-3 text-sm min-w-0" data-money>
           {showBuyingPrice && (
-            <span className="text-gray-500 truncate">
-              P. Compra:{" "}
-              <span className="font-medium text-gray-700">
+            <span className="text-muted-foreground truncate">
+              P. compra:{" "}
+              <span className="font-semibold text-foreground">
                 {formatPrice(item.buyingPrice)}
               </span>
             </span>
           )}
           {showBuyingPrice && (
-            <span className="text-gray-500 flex-shrink-0">
+            <span className="text-muted-foreground flex-shrink-0">
               Margen:{" "}
-              <span className={`font-medium ${marginColor}`}>
+              <span className={`font-semibold ${marginColor}`}>
                 {margin.toFixed(0)}%
               </span>
             </span>
@@ -385,37 +357,37 @@ function MobileAdminCard({
           <div className="flex items-center gap-1 flex-shrink-0">
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => onViewHistory(item)}
-              className="tap-target text-gray-500 hover:text-gray-700 hover:bg-gray-100 h-10 w-10 p-0"
-              title="Ver Historial"
+              className="text-muted-foreground hover:text-foreground"
+              title="Ver historial"
               aria-label={`Ver historial de ${item.name}`}
             >
-              <Clock className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+              <Clock className="size-5" strokeWidth={1.5} aria-hidden="true" />
             </Button>
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => onEdit(item)}
-              className="tap-target text-primary hover:text-primary hover:bg-blue-50 h-10 w-10 p-0"
+              className="text-primary hover:text-primary hover:bg-primary-soft"
               title="Editar"
               aria-label={`Editar ${item.name}`}
             >
-              <Edit2 className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+              <Edit2 className="size-5" strokeWidth={1.5} aria-hidden="true" />
             </Button>
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={handleDelete}
               disabled={deleting}
-              className="tap-target text-red-500 hover:text-red-700 hover:bg-red-50 h-10 w-10 p-0 disabled:opacity-60"
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive-soft disabled:opacity-60"
               title="Eliminar"
               aria-label={`Eliminar ${item.name}`}
             >
               {deleting ? (
-                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                <Loader2 className="size-5 animate-spin" aria-hidden="true" />
               ) : (
-                <Trash2 className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+                <Trash2 className="size-5" strokeWidth={1.5} aria-hidden="true" />
               )}
             </Button>
           </div>
@@ -446,26 +418,24 @@ export function InventoryTable({
 
   if (items.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-10 md:p-14 text-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-            <Package className="w-6 h-6 text-gray-500" strokeWidth={1.5} />
-          </div>
-          <div>
-            <h3 className="text-gray-900 text-sm mb-1">
-              No hay productos encontrados
-            </h3>
-            <p className="text-xs text-gray-500">
-              Agrega productos o ajusta tu búsqueda
-            </p>
-          </div>
-        </div>
+      <div className="bg-white rounded-xl border border-border shadow-card p-10 md:p-14 text-center">
+        <Package
+          className="mx-auto mb-3 size-10 text-muted-foreground/50"
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
+        <h3 className="text-base font-bold text-foreground mb-1">
+          No hay productos
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Agrega un producto o cambia lo que buscaste.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+    <div className="bg-white rounded-xl border border-border overflow-hidden shadow-card">
       {/* Mobile card list - no horizontal scroll on phones */}
       <div className="md:hidden">
         {items.map((item) => (
@@ -488,44 +458,44 @@ export function InventoryTable({
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
+            <tr className="border-b border-border bg-canvas">
               {selectMode && (
-                <th className="px-2 md:px-4 py-2 md:py-4 w-10" />
+                <th className="px-2 md:px-4 py-3.5 w-10" />
               )}
-              <th className="text-left px-3 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
+              <th className="text-left px-3 md:px-6 py-3.5 text-sm text-muted-foreground font-semibold">
                 Producto
               </th>
-              <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
+              <th className="hidden md:table-cell text-left px-6 py-3.5 text-sm text-muted-foreground font-semibold">
                 Código
               </th>
-              <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                Marca/Tipo
+              <th className="hidden md:table-cell text-left px-6 py-3.5 text-sm text-muted-foreground font-semibold">
+                Marca / tipo
               </th>
-              <th className="text-left px-3 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
-                P. Venta
+              <th className="text-left px-3 md:px-6 py-3.5 text-sm text-muted-foreground font-semibold">
+                P. venta
               </th>
               {showBuyingPrice && (
-                <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
-                  P. Compra
+                <th className="hidden md:table-cell text-left px-6 py-3.5 text-sm text-muted-foreground font-semibold">
+                  P. compra
                 </th>
               )}
               {showBuyingPrice && (
-                <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
+                <th className="hidden md:table-cell text-left px-6 py-3.5 text-sm text-muted-foreground font-semibold">
                   Margen
                 </th>
               )}
-              <th className="hidden md:table-cell text-left px-6 py-4 text-sm text-gray-600 font-normal">
+              <th className="hidden md:table-cell text-left px-6 py-3.5 text-sm text-muted-foreground font-semibold">
                 Creación
               </th>
-              <th className="text-left px-3 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
+              <th className="text-left px-3 md:px-6 py-3.5 text-sm text-muted-foreground font-semibold">
                 Stock
               </th>
-              <th className="text-left px-2 md:px-6 py-2 md:py-4 text-xs md:text-sm text-gray-600 font-normal">
-                Acc.
+              <th className="text-left px-2 md:px-6 py-3.5 text-sm text-muted-foreground font-semibold">
+                Acciones
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-border">
             {items.map((item) => (
               <InventoryTableRow
                 key={item.id}
@@ -549,7 +519,7 @@ export function InventoryTable({
         open={!!photoItem}
         onOpenChange={(open) => !open && setPhotoItem(null)}
       >
-        <DialogContent className="sm:max-w-md bg-white">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="pr-6 text-base leading-snug">
               {photoItem?.name}
@@ -574,15 +544,15 @@ export function InventoryTable({
       </Dialog>
 
       {/* Summary footer */}
-      <div className="border-t border-gray-200 bg-gray-50 px-3 md:px-6 py-2 md:py-3">
-        <div className="flex items-center justify-between text-xs md:text-sm">
-          <span className="text-gray-600">
+      <div className="border-t border-border bg-canvas px-3 md:px-6 py-3">
+        <div className="flex items-center justify-between text-sm" data-money>
+          <span className="text-muted-foreground">
             Productos:{" "}
-            <span className="font-medium text-gray-900">{items.length}</span>
+            <span className="font-bold text-foreground">{items.length}</span>
           </span>
-          <span className="text-gray-600">
+          <span className="text-muted-foreground">
             Stock:{" "}
-            <span className="font-medium text-gray-900">
+            <span className="font-bold text-foreground">
               {items.reduce((s, i) => s + i.quantity, 0)}
             </span>
           </span>

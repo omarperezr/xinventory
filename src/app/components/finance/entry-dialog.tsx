@@ -192,7 +192,7 @@ export function EntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>
             {entry ? "Editar movimiento" : "Nuevo movimiento"}
@@ -203,9 +203,9 @@ export function EntryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* Kind */}
-          <div role="tablist" className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+          <div role="tablist" className="flex gap-1 bg-secondary p-1 rounded-xl">
             {(["expense", "income", "transfer"] as EntryKind[]).map((option) => (
               <button
                 key={option}
@@ -213,10 +213,10 @@ export function EntryDialog({
                 role="tab"
                 aria-selected={kind === option}
                 onClick={() => setKind(option)}
-                className={`flex-1 min-h-10 rounded-md text-sm font-medium transition-colors ${
+                className={`flex-1 h-11 rounded-lg px-4 text-sm font-semibold transition-colors ${
                   kind === option
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
+                    ? "bg-white text-primary shadow-card"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {KIND_LABEL[option]}
@@ -232,8 +232,8 @@ export function EntryDialog({
             autoFocus
           />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="finance-date">Fecha</Label>
               <Input
                 id="finance-date"
@@ -242,7 +242,7 @@ export function EntryDialog({
                 onChange={(e) => setOccurredOn(e.target.value)}
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="finance-paidin">Pagado en</Label>
               <Select
                 value={paidIn}
@@ -262,8 +262,8 @@ export function EntryDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="finance-account">
                 {kind === "transfer" ? "Desde" : "Cuenta"}
               </Label>
@@ -283,7 +283,7 @@ export function EntryDialog({
             </div>
 
             {kind === "transfer" ? (
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="finance-counter">Hacia</Label>
                 <Select
                   value={counterAccountId}
@@ -305,7 +305,7 @@ export function EntryDialog({
                 </Select>
               </div>
             ) : (
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="finance-category">Categoría</Label>
                 <Select value={categoryId} onValueChange={setCategoryId}>
                   <SelectTrigger id="finance-category">
@@ -324,8 +324,8 @@ export function EntryDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="finance-payee">
                 {kind === "income" ? "De quién" : "A quién"}
               </Label>
@@ -346,7 +346,7 @@ export function EntryDialog({
               </Select>
             </div>
             {kind === "transfer" && allocations.length > 0 && (
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="finance-allocation">Fondo</Label>
                 <Select value={allocationId} onValueChange={setAllocationId}>
                   <SelectTrigger id="finance-allocation">
@@ -367,7 +367,7 @@ export function EntryDialog({
             )}
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="finance-description">Descripción</Label>
             <Input
               id="finance-description"
@@ -380,24 +380,24 @@ export function EntryDialog({
           </div>
 
           {kind !== "transfer" && (
-            <div className="rounded-lg border border-gray-200 p-3 space-y-3">
-              <label className="flex items-center gap-2 text-sm text-gray-700">
+            <div className="rounded-xl border border-border p-4 space-y-3">
+              <label className="flex items-center gap-2.5 text-base font-semibold text-foreground">
                 <input
                   type="checkbox"
                   checked={pending}
                   onChange={(e) => setPending(e.target.checked)}
-                  className="w-4 h-4"
+                  className="size-5 accent-[var(--primary)]"
                 />
                 {kind === "income"
                   ? "Todavía no me han pagado"
                   : "Todavía no lo he pagado"}
               </label>
-              <p className="text-meta text-gray-500 leading-snug">
+              <p className="text-sm text-muted-foreground leading-snug">
                 Queda como {kind === "income" ? "cuenta por cobrar" : "cuenta por pagar"}.
                 No toca el saldo de ninguna cuenta hasta que se marque como pagado.
               </p>
               {pending && (
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="finance-due">Se vence</Label>
                   <Input
                     id="finance-due"
@@ -410,9 +410,12 @@ export function EntryDialog({
             </div>
           )}
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="finance-tags">
-              Etiquetas <span className="text-gray-400">(separadas por coma)</span>
+              Etiquetas{" "}
+              <span className="font-normal text-muted-foreground">
+                (separadas por coma)
+              </span>
             </Label>
             <Input
               id="finance-tags"
@@ -420,13 +423,13 @@ export function EntryDialog({
               onChange={(e) => setTags(e.target.value)}
               placeholder="AB123CD, reparto, navidad"
             />
-            <p className="text-meta text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1.5">
               Sirven para cortar los gastos por vehículo, por ruta o por temporada
               sin crear categorías nuevas.
             </p>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="finance-notes">Notas</Label>
             <Textarea
               id="finance-notes"
@@ -436,7 +439,7 @@ export function EntryDialog({
             />
           </div>
 
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-2 pt-2">
             <Button
               variant="outline"
               className="flex-1"

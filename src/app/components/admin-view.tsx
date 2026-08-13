@@ -22,10 +22,6 @@ import {
   ArrowRight,
   Search,
   Check,
-  Package,
-  AlertTriangle,
-  Wallet,
-  TrendingUp,
   RefreshCw,
   Trash2,
   X,
@@ -57,8 +53,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { Card, CardContent } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
+import { cn } from "./ui/utils";
 import { InventorySortControl } from "./inventory-sort-control";
 import { sortInventory, SortOption } from "../utils/sortInventory";
 import { parseItemsFromExcel } from "../utils/excelImport";
@@ -76,15 +72,44 @@ const HISTORY_LABEL: Record<ItemHistoryRecord["action"], string> = {
   purchase_return: "Devolución a proveedor",
 };
 
-const HISTORY_DOT: Record<ItemHistoryRecord["action"], string> = {
-  create: "bg-green-500",
-  update: "bg-blue-500",
-  delete: "bg-red-500",
-  sale: "bg-gray-400",
-  return: "bg-amber-500",
-  purchase: "bg-emerald-600",
-  adjust: "bg-amber-500",
-  purchase_return: "bg-orange-500",
+// Green when stock came in, red when it went out, neutral when only the record
+// changed. The chip carries the same reading as the dot, so the meaning
+// survives a colourblind or sunlit screen.
+const HISTORY_TONE: Record<
+  ItemHistoryRecord["action"],
+  { chip: string; dot: string }
+> = {
+  create: {
+    chip: "bg-primary-soft text-primary-soft-foreground",
+    dot: "bg-primary",
+  },
+  update: { chip: "bg-secondary text-secondary-foreground", dot: "bg-border-strong" },
+  delete: {
+    chip: "bg-destructive-soft text-destructive-soft-foreground",
+    dot: "bg-destructive",
+  },
+  sale: {
+    chip: "bg-destructive-soft text-destructive-soft-foreground",
+    dot: "bg-destructive",
+  },
+  return: {
+    chip: "bg-primary-soft text-primary-soft-foreground",
+    dot: "bg-primary",
+  },
+  purchase: {
+    chip: "bg-primary-soft text-primary-soft-foreground",
+    dot: "bg-primary",
+  },
+  adjust: { chip: "bg-secondary text-secondary-foreground", dot: "bg-border-strong" },
+  purchase_return: {
+    chip: "bg-destructive-soft text-destructive-soft-foreground",
+    dot: "bg-destructive",
+  },
+};
+
+const NEUTRAL_TONE = {
+  chip: "bg-secondary text-secondary-foreground",
+  dot: "bg-border-strong",
 };
 
 interface AdminViewProps {
@@ -403,200 +428,193 @@ export function AdminView({
 
   return (
     <div className="space-y-8">
-      {/* Inventory Overview Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-muted-foreground leading-tight">
-                Costo de Inventario
+      {/* One card, four figures: the numbers are the subject, not the boxes. */}
+      <div className="bg-white rounded-xl border border-border shadow-card overflow-hidden">
+        <div className="grid grid-cols-2 md:grid-cols-4">
+          {[
+            {
+              label: "Costo de inventario",
+              value: formatPrice(inventoryCost),
+            },
+            {
+              label: "Valor potencial de venta",
+              value: formatPrice(inventoryValue),
+              tone: "text-primary",
+            },
+            {
+              label: "Bajo / agotado",
+              value: (
+                <>
+                  {lowStockItems.length}
+                  <span className="text-muted-foreground"> / </span>
+                  <span className="text-destructive">
+                    {outOfStockItems.length}
+                  </span>
+                </>
+              ),
+            },
+            {
+              label: "Margen promedio",
+              value: `${avgMargin.toFixed(0)}%`,
+            },
+          ].map((stat, i) => (
+            <div
+              key={stat.label}
+              className={cn(
+                "p-4 md:p-6",
+                i % 2 === 1 && "border-l border-border",
+                i >= 2 && "border-t border-border md:border-t-0",
+                i > 0 && "md:border-l md:border-border",
+              )}
+            >
+              <p className="text-sm text-muted-foreground leading-snug">
+                {stat.label}
               </p>
-              <Wallet className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-            </div>
-            <p className="text-base md:text-xl font-bold text-gray-900 truncate">
-              {formatPrice(inventoryCost)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-muted-foreground leading-tight">
-                Valor Potencial de Venta
+              <p
+                data-money
+                className={cn(
+                  "mt-1 text-2xl font-bold truncate",
+                  stat.tone || "text-foreground",
+                )}
+              >
+                {stat.value}
               </p>
-              <TrendingUp className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
             </div>
-            <p className="text-base md:text-xl font-bold text-green-600 truncate">
-              {formatPrice(inventoryValue)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-muted-foreground leading-tight">
-                Bajo / Sin Stock
-              </p>
-              <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
-            </div>
-            <p className="text-base md:text-xl font-bold text-gray-900">
-              {lowStockItems.length}
-              <span className="text-red-500"> / {outOfStockItems.length}</span>
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardContent className="p-3 md:p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-muted-foreground leading-tight">
-                Margen Promedio
-              </p>
-              <Package className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-            </div>
-            <p className="text-base md:text-xl font-bold text-gray-900">
-              {avgMargin.toFixed(0)}%
-            </p>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
       </div>
 
-      {/* Exchange Rates Section */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          Tasas de Cambio (Hoy)
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="rate-usd">USD (BCV) — Bs/USD</Label>
-            <div className="relative">
-              <DollarSign
-                aria-hidden="true"
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
-              />
-              <Input
-                id="rate-usd"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={usdInput}
-                onChange={(e) => {
-                  editingRates.current = true;
-                  setUsdInput(e.target.value);
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleSaveRates()}
-                placeholder="0.00"
-                className="pl-9 h-11"
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="rate-eur">EUR (BCV) — Bs/EUR</Label>
-            <div className="relative">
-              <Euro
-                aria-hidden="true"
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
-              />
-              <Input
-                id="rate-eur"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={eurInput}
-                onChange={(e) => {
-                  editingRates.current = true;
-                  setEurInput(e.target.value);
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleSaveRates()}
-                placeholder="0.00"
-                className="pl-9 h-11"
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="rate-usdt">USDT (Binance) — Bs/USDT</Label>
-            <div className="relative">
-              <Coins
-                aria-hidden="true"
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
-              />
-              <Input
-                id="rate-usdt"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={usdtInput}
-                onChange={(e) => {
-                  editingRates.current = true;
-                  setUsdtInput(e.target.value);
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleSaveRates()}
-                placeholder="0.00"
-                className="pl-9 h-11"
-              />
-            </div>
-            <p className="text-[11px] text-gray-500 leading-tight">
-              Binance P2P (liquidación)
-            </p>
-          </div>
+      {/* Exchange rates. One row per rate; one of them is the honest one, and
+          every cost, sale and payment the app records converts at that one. */}
+      <div className="bg-white rounded-xl border border-border shadow-card p-4 md:p-6 space-y-5">
+        <div>
+          <h3 className="text-lg font-bold text-foreground">
+            Tasas de cambio de hoy
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Bolívares por cada unidad de moneda.
+          </p>
         </div>
 
-        {/* This is the rate that defines what a bolivar is really worth.
-            Every cost, sale, and payment the app records converts at this rate. */}
-        <fieldset className="mt-6 border-t border-gray-100 pt-4">
-          <legend className="text-sm font-medium text-gray-900">
+        <fieldset className="space-y-3">
+          <legend className="text-base font-bold text-foreground">
             Tasa honesta del bolívar
           </legend>
-          <p className="text-xs text-gray-500 mt-1 mb-3">
+          <p className="text-sm text-muted-foreground">
             Define el valor real de los bolívares. Se usa para registrar
             compras, ventas y pagos. Las demás tasas quedan solo como
             referencia visual.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                { key: "USDT", label: "USDT (Binance)" },
-                { key: "USD", label: "USD (BCV)" },
-                { key: "EUR", label: "EUR (BCV)" },
-              ] as { key: RateKey; label: string }[]
-            ).map(({ key, label }) => (
-              <button
+          {(
+            [
+              {
+                key: "USD",
+                id: "rate-usd",
+                label: "USD (BCV)",
+                hint: "Bs por dólar",
+                icon: DollarSign,
+                value: usdInput,
+                set: setUsdInput,
+              },
+              {
+                key: "EUR",
+                id: "rate-eur",
+                label: "EUR (BCV)",
+                hint: "Bs por euro",
+                icon: Euro,
+                value: eurInput,
+                set: setEurInput,
+              },
+              {
+                key: "USDT",
+                id: "rate-usdt",
+                label: "USDT (Binance)",
+                hint: "Bs por USDT — Binance P2P (liquidación)",
+                icon: Coins,
+                value: usdtInput,
+                set: setUsdtInput,
+              },
+            ] as {
+              key: RateKey;
+              id: string;
+              label: string;
+              hint: string;
+              icon: typeof DollarSign;
+              value: string;
+              set: (v: string) => void;
+            }[]
+          ).map(({ key, id, label, hint, icon: Icon, value, set }) => {
+            const isHonest = honestInput === key;
+            return (
+              <div
                 key={key}
-                type="button"
-                role="radio"
-                aria-checked={honestInput === key}
-                onClick={() => {
-                  editingRates.current = true;
-                  setHonestInput(key);
-                }}
-                className={`h-11 px-4 rounded-lg border text-sm font-medium transition-colors ${
-                  honestInput === key
-                    ? "border-primary bg-primary text-white"
-                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                }`}
+                className={cn(
+                  "flex flex-wrap items-center gap-3 rounded-xl border p-3 md:p-4 transition-colors",
+                  isHonest ? "border-primary bg-primary-soft/30" : "border-border",
+                )}
               >
-                {label}
-              </button>
-            ))}
-          </div>
+                <div className="min-w-[9rem] flex-1">
+                  <Label htmlFor={id}>
+                    <Icon className="size-4 text-primary" aria-hidden="true" />
+                    {label}
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">{hint}</p>
+                </div>
+                <Input
+                  id={id}
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={value}
+                  onChange={(e) => {
+                    editingRates.current = true;
+                    set(e.target.value);
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleSaveRates()}
+                  placeholder="0.00"
+                  className="w-36 font-bold"
+                  data-money
+                />
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={isHonest}
+                  aria-label={`Usar ${label} como tasa honesta`}
+                  onClick={() => {
+                    editingRates.current = true;
+                    setHonestInput(key);
+                  }}
+                  className={cn(
+                    "inline-flex h-12 items-center gap-2 rounded-lg border px-4 text-sm font-semibold transition-colors",
+                    isHonest
+                      ? "border-primary bg-primary-soft text-primary-soft-foreground"
+                      : "border-border-strong bg-white text-muted-foreground hover:bg-secondary",
+                  )}
+                >
+                  <Check
+                    className={cn("size-4", !isHonest && "opacity-0")}
+                    aria-hidden="true"
+                  />
+                  Tasa honesta
+                </button>
+              </div>
+            );
+          })}
         </fieldset>
-        <div className="flex justify-end gap-3 mt-4">
+
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
           <Button
             type="button"
-            variant="ghost"
-            className="bg-input-background hover:bg-input-background hover:brightness-100 border border-input text-foreground"
+            variant="outline"
             onClick={handleFetchRates}
             disabled={syncingRates}
           >
             <RefreshCw
-              className={`w-4 h-4 mr-2 ${syncingRates ? "animate-spin" : ""}`}
+              className={syncingRates ? "animate-spin" : undefined}
+              aria-hidden="true"
             />
-            Actualizar Tasas
+            Actualizar tasas
           </Button>
           <Button
             type="button"
@@ -604,14 +622,14 @@ export function AdminView({
             disabled={!ratesChanged}
             className="px-6"
           >
-            <Check className="w-4 h-4 mr-2" />
-            Guardar Tasas
+            <Check aria-hidden="true" />
+            Guardar tasas
           </Button>
         </div>
       </div>
 
-      <div className="flex justify-end gap-2">
-        <label>
+      <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+        <label className="contents">
           <input
             type="file"
             accept=".xlsx,.xls"
@@ -621,14 +639,13 @@ export function AdminView({
           />
           <Button
             type="button"
-            variant="ghost"
-            className="bg-input-background hover:bg-input-background hover:brightness-100 border border-input text-foreground"
+            variant="outline"
             disabled={importing}
             asChild
           >
             <span>
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              {importing ? "Importando..." : "Importar Excel"}
+              <FileSpreadsheet aria-hidden="true" />
+              {importing ? "Importando…" : "Importar Excel"}
             </span>
           </Button>
         </label>
@@ -637,16 +654,16 @@ export function AdminView({
           onClick={() => setFormOpen(true)}
           className="px-6"
         >
-          <Plus className="w-4 h-4 mr-2" />
-          Agregar Producto
+          <Plus aria-hidden="true" />
+          Agregar producto
         </Button>
       </div>
 
       <Dialog open={formOpen} onOpenChange={handleFormOpenChange}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editingItem ? "Editar Producto" : "Agregar Nuevo Producto"}
+              {editingItem ? "Editar producto" : "Agregar producto"}
             </DialogTitle>
             <DialogDescription>
               {editingItem
@@ -672,31 +689,34 @@ export function AdminView({
         </DialogContent>
       </Dialog>
 
-      {/* Admin Inventory Search Bar */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <h3 className="text-base font-medium text-gray-900 whitespace-nowrap">
+      {/* Admin inventory search bar */}
+      <div className="bg-white rounded-xl border border-border shadow-card p-4 md:p-6">
+        <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
+          <h3 className="text-base font-bold text-foreground whitespace-nowrap">
             Inventario
-            <span className="ml-2 text-sm font-normal text-gray-500">
+            <span
+              className="ml-2 text-sm font-normal text-muted-foreground"
+              data-money
+            >
               ({visibleItems.length} de {items.length} productos)
             </span>
           </h3>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:ml-auto sm:max-w-2xl">
+          <div className="flex flex-col sm:flex-row gap-2 w-full lg:ml-auto lg:max-w-3xl">
             <div className="relative flex-1">
               <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 size-5 text-muted-foreground"
                 aria-hidden="true"
               />
               <Input
                 aria-label="Buscar en inventario"
-                placeholder="Buscar en inventario..."
+                placeholder="Buscar en inventario…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 h-9 text-sm"
+                className="pl-11"
               />
             </div>
             <Select value={filterBy} onValueChange={setFilterBy}>
-              <SelectTrigger className="w-full sm:w-[150px] h-9 text-sm">
+              <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Filtrar por" />
               </SelectTrigger>
               <SelectContent>
@@ -708,22 +728,22 @@ export function AdminView({
             <InventorySortControl
               value={sortBy}
               onChange={setSortBy}
-              className="h-9 sm:w-[170px]"
+              className="sm:w-[180px]"
             />
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               onClick={toggleSelectMode}
-              className="h-9 text-sm whitespace-nowrap bg-input-background hover:bg-input-background hover:brightness-100 border border-input text-foreground"
+              className="whitespace-nowrap"
             >
               {selectMode ? (
                 <>
-                  <X className="w-3.5 h-3.5 mr-1.5" />
+                  <X aria-hidden="true" />
                   Cancelar
                 </>
               ) : (
                 <>
-                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  <Trash2 aria-hidden="true" />
                   Eliminar varios
                 </>
               )}
@@ -732,19 +752,19 @@ export function AdminView({
         </div>
 
         {selectMode && (
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-border">
+            <label className="flex items-center gap-2.5 text-base font-medium text-foreground cursor-pointer">
               <Checkbox checked={allVisibleSelected} onCheckedChange={toggleSelectAll} />
               Seleccionar todos
             </label>
             <Button
               type="button"
-              size="sm"
+              variant="destructive"
               disabled={selectedIds.size === 0}
               onClick={() => setConfirmBulkDelete(true)}
-              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+              className="disabled:opacity-50"
             >
-              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              <Trash2 aria-hidden="true" />
               Eliminar ({selectedIds.size})
             </Button>
           </div>
@@ -764,12 +784,14 @@ export function AdminView({
 
       {/* Bulk Delete Confirm */}
       <AlertDialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
-        <AlertDialogContent className="bg-white">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar {selectedIds.size} producto(s)?</AlertDialogTitle>
+            <AlertDialogTitle>
+              ¿Eliminar {selectedIds.size} producto(s)?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Los productos seleccionados se eliminarán
-              permanentemente del inventario.
+              Esta acción no se puede deshacer. Los productos seleccionados se
+              eliminarán permanentemente del inventario.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -777,9 +799,9 @@ export function AdminView({
             <AlertDialogAction
               onClick={handleBulkDelete}
               disabled={bulkDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-white hover:bg-destructive/90"
             >
-              {bulkDeleting ? "Eliminando..." : "Eliminar"}
+              {bulkDeleting ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -790,73 +812,88 @@ export function AdminView({
         open={!!historyItem}
         onOpenChange={(open) => !open && setHistoryItem(null)}
       >
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto bg-white">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <History className="w-5 h-5 text-primary" />
-              Historial de Movimientos
+              <History className="size-5 text-primary" aria-hidden="true" />
+              Historial de movimientos
             </DialogTitle>
             <DialogDescription>
-              Historial completo para:{" "}
-              <span className="font-bold text-gray-900">
+              Historial completo de{" "}
+              <span className="font-bold text-foreground">
                 {historyItem?.name}
               </span>
             </DialogDescription>
           </DialogHeader>
 
-          <div className="relative border-l border-gray-200 ml-3 space-y-8 mt-4">
+          <div className="relative border-l border-border ml-3 space-y-7 mt-2">
             {historyRecords
               .slice()
               .reverse()
-              .map((record, index) => (
-                <div key={index} className="relative pl-6">
-                  <span
-                    className={`absolute -left-1.5 top-1.5 h-3 w-3 rounded-full border-2 border-white ${
-                      HISTORY_DOT[record.action] ?? "bg-gray-400"
-                    }`}
-                  />
-
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-500 font-mono">
-                      {format(new Date(record.date), "PPP p")}
-                    </span>
-                    <span className="font-medium text-gray-900">
-                      {HISTORY_LABEL[record.action] ?? record.action}
-                      {record.reason && (
-                        <span className="text-gray-500 font-normal">
-                          {" "}
-                          · {record.reason}
-                        </span>
+              .map((record, index) => {
+                const tone = HISTORY_TONE[record.action] ?? NEUTRAL_TONE;
+                return (
+                  <div key={index} className="relative pl-6">
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "absolute -left-1.5 top-1.5 size-3 rounded-full border-2 border-white",
+                        tone.dot,
                       )}
-                    </span>
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md border border-gray-100">
-                      {record.details}
-                    </p>
-                    <div className="flex items-center gap-4 text-xs mt-1">
-                      <span className="text-gray-500 flex items-center gap-1">
-                        Usuario:{" "}
-                        <span className="font-medium text-gray-700">
-                          {record.user}
-                        </span>
+                    />
+
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-meta text-muted-foreground" data-money>
+                        {format(new Date(record.date), "PPP p")}
                       </span>
-                      {record.previousStock !== undefined &&
-                        record.newStock !== undefined && (
-                          <span className="flex items-center gap-1 text-gray-600 bg-blue-50 px-2 py-0.5 rounded">
-                            Stock: {record.previousStock}{" "}
-                            <ArrowRight className="w-3 h-3" /> {record.newStock}
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full px-2.5 py-1 text-sm font-semibold",
+                            tone.chip,
+                          )}
+                        >
+                          {HISTORY_LABEL[record.action] ?? record.action}
+                        </span>
+                        {record.reason && (
+                          <span className="text-sm text-muted-foreground">
+                            {record.reason}
                           </span>
                         )}
+                      </span>
+                      <p className="text-sm text-muted-foreground bg-canvas p-3 rounded-lg border border-border">
+                        {record.details}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-3 text-sm mt-0.5">
+                        <span className="text-muted-foreground">
+                          Usuario:{" "}
+                          <span className="font-semibold text-foreground">
+                            {record.user}
+                          </span>
+                        </span>
+                        {record.previousStock !== undefined &&
+                          record.newStock !== undefined && (
+                            <span
+                              data-money
+                              className="inline-flex items-center gap-1 font-semibold text-secondary-foreground bg-secondary px-2.5 py-1 rounded-full"
+                            >
+                              Stock: {record.previousStock}
+                              <ArrowRight className="size-4" aria-hidden="true" />
+                              {record.newStock}
+                            </span>
+                          )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             {historyLoading && (
-              <p className="text-sm text-gray-500 pl-6">
-                Cargando historial...
+              <p className="text-sm text-muted-foreground pl-6">
+                Cargando historial…
               </p>
             )}
             {!historyLoading && historyRecords.length === 0 && (
-              <p className="text-sm text-gray-500 pl-6">
+              <p className="text-sm text-muted-foreground pl-6">
                 No hay historial registrado.
               </p>
             )}

@@ -16,7 +16,7 @@
 
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useHistory } from "../context/history-context";
-import { useApp } from "../context/app-context";
+import { useApp, formatMoneyValue } from "../context/app-context";
 import { supabase } from "../services/supabase";
 import {
   BarChart2,
@@ -177,7 +177,7 @@ export function ReportsView() {
   // and USDT lenses are "what this looks like at that rate today" by definition.
   const convertPast = (usd: number) =>
     currency === "BS" ? usd * periodRate : convertPrice(usd);
-  const moneyPast = (usd: number) => `${currencySymbol} ${convertPast(usd).toFixed(2)}`;
+  const moneyPast = (usd: number) => `${currencySymbol} ${formatMoneyValue(convertPast(usd))}`;
   const moneyPastCompact = (usd: number) =>
     `${currencySymbol} ${compact(convertPast(usd))}`;
 
@@ -216,31 +216,32 @@ export function ReportsView() {
   return (
     <div className="space-y-4 md:space-y-5 pb-8">
       {/* Filter row - scopes every panel below it */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-5 space-y-3">
+      <div className="bg-white rounded-xl border border-border shadow-card p-4 md:p-5 space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <BarChart2 className="w-5 h-5 text-primary" />
+            <h2 className="text-base md:text-lg font-bold text-foreground flex items-center gap-2">
+              <BarChart2 className="w-5 h-5 text-primary" aria-hidden="true" />
               Panel de reportes
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {format(range.from, "dd/MM/yyyy")} — {format(range.to, "dd/MM/yyyy")} ·{" "}
               {range.days} día(s) · {loadedCount} venta(s)
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap gap-1 bg-gray-100 rounded-lg p-0.5">
+            <div className="flex flex-wrap gap-1 bg-secondary rounded-lg p-0.5">
               {PERIOD_OPTIONS.map((o) => (
                 <button
                   key={o.key}
                   type="button"
                   onClick={() => setPeriod(o.key)}
                   title={o.label}
-                  className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors ${
+                  aria-pressed={period === o.key}
+                  className={`tap-target text-sm px-3 py-1.5 rounded-md font-semibold transition-colors ${
                     period === o.key
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-800"
+                      ? "bg-white text-primary shadow-card"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {o.short}
@@ -250,13 +251,14 @@ export function ReportsView() {
                 type="button"
                 onClick={() => setPeriod("custom")}
                 title="Rango personalizado"
-                className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1 ${
+                aria-pressed={period === "custom"}
+                className={`tap-target text-sm px-3 py-1.5 rounded-md font-semibold transition-colors flex items-center gap-1 ${
                   period === "custom"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-800"
+                    ? "bg-white text-primary shadow-card"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <CalendarRange className="w-3.5 h-3.5" />
+                <CalendarRange className="w-3.5 h-3.5" aria-hidden="true" />
                 Rango
               </button>
             </div>
@@ -265,21 +267,19 @@ export function ReportsView() {
               <Button
                 variant="outline"
                 size="sm"
-                className="text-xs"
                 disabled={!hasData}
                 onClick={() => exportReportPdf(buildReportData())}
               >
-                <FileText className="w-4 h-4 mr-1.5 text-red-500" />
+                <FileText aria-hidden="true" />
                 PDF
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="text-xs"
                 disabled={!hasData}
                 onClick={() => exportReportExcel(buildReportData())}
               >
-                <FileSpreadsheet className="w-4 h-4 mr-1.5 text-green-600" />
+                <FileSpreadsheet aria-hidden="true" />
                 Excel
               </Button>
             </div>
@@ -288,26 +288,26 @@ export function ReportsView() {
 
         {period === "custom" && (
           <div className="flex flex-wrap items-end gap-2 pt-1">
-            <label className="text-[11px] text-gray-500">
+            <label className="text-sm text-muted-foreground">
               Desde
               <input
                 type="date"
                 value={custom.from}
                 onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))}
-                className="block mt-0.5 text-xs border border-gray-200 rounded-md px-2 py-1.5"
+                className="block mt-1 h-11 text-base border border-input rounded-lg px-3"
               />
             </label>
-            <label className="text-[11px] text-gray-500">
+            <label className="text-sm text-muted-foreground">
               Hasta
               <input
                 type="date"
                 value={custom.to}
                 onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
-                className="block mt-0.5 text-xs border border-gray-200 rounded-md px-2 py-1.5"
+                className="block mt-1 h-11 text-base border border-input rounded-lg px-3"
               />
             </label>
             {!custom.from && (
-              <p className="text-[11px] text-gray-500 pb-1.5">
+              <p className="text-sm text-muted-foreground pb-1.5">
                 Elige una fecha inicial para aplicar el rango.
               </p>
             )}
@@ -319,8 +319,8 @@ export function ReportsView() {
             which routinely stops short of the previous window even when the
             selected range is complete. */}
         {(isPartial || !report.previousCovered) && (
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+          <div className="flex flex-wrap items-center gap-2 text-sm text-pending bg-pending-soft border border-pending-strong/40 rounded-lg px-3 py-2">
+            <Info className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
             <span>
               {isPartial && (
                 <>
@@ -341,14 +341,14 @@ export function ReportsView() {
               <Button
                 variant="outline"
                 size="sm"
-                className="text-meta h-9 ml-auto"
+                className="ml-auto"
                 disabled={loadingMore}
                 onClick={loadMore}
               >
                 {loadingMore ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                  <Loader2 className="animate-spin" aria-hidden="true" />
                 ) : (
-                  <Download className="w-3.5 h-3.5 mr-1" />
+                  <Download aria-hidden="true" />
                 )}
                 Cargar más historial
               </Button>
@@ -357,9 +357,9 @@ export function ReportsView() {
         )}
       </div>
 
-      {/* Panel navigation */}
-      <nav className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-        <ul className="flex gap-2 min-w-max md:min-w-0">
+      {/* Panel navigation - segmented control, horizontally scrollable on phones */}
+      <nav aria-label="Secciones del reporte" className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+        <ul className="flex gap-1 bg-secondary rounded-xl p-1 min-w-max md:min-w-0">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;
@@ -369,29 +369,14 @@ export function ReportsView() {
                   type="button"
                   onClick={() => setTab(t.key)}
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${
+                  className={`flex items-center gap-2 h-11 px-4 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                     active
-                      ? "bg-white border-primary/40 shadow-sm"
-                      : "bg-white/60 border-gray-200 hover:border-gray-300"
+                      ? "bg-white text-primary shadow-card"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <Icon
-                    className={`w-4 h-4 flex-shrink-0 ${
-                      active ? "text-primary" : "text-gray-500"
-                    }`}
-                  />
-                  <span>
-                    <span
-                      className={`block text-xs md:text-sm font-medium ${
-                        active ? "text-gray-900" : "text-gray-600"
-                      }`}
-                    >
-                      {t.label}
-                    </span>
-                    <span className="hidden md:block text-meta text-gray-500 leading-tight">
-                      {t.hint}
-                    </span>
-                  </span>
+                  <Icon className="size-4.5 flex-shrink-0" aria-hidden="true" />
+                  {t.label}
                 </button>
               </li>
             );
@@ -400,20 +385,24 @@ export function ReportsView() {
       </nav>
 
       {!hasData ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <BarChart2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-600 text-sm font-medium">
+        <div className="bg-white rounded-xl border border-border p-10 md:p-14 text-center shadow-card">
+          <BarChart2
+            className="mx-auto mb-3 size-10 text-muted-foreground/50"
+            strokeWidth={1.5}
+            aria-hidden="true"
+          />
+          <h3 className="text-base font-semibold text-foreground mb-1">
             No hay ventas en el período seleccionado
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
+          </h3>
+          <p className="text-sm text-muted-foreground">
             Prueba con un rango más amplio, por ejemplo «Todo».
           </p>
         </div>
       ) : (
         <Suspense
           fallback={
-            <div className="flex items-center justify-center py-16 text-gray-500 text-sm gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
+            <div className="flex items-center justify-center py-16 text-muted-foreground text-sm gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               Calculando…
             </div>
           }
