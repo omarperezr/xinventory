@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Package,
   Store,
   ShoppingCart,
   History,
@@ -631,9 +630,7 @@ export function InventoryHeader() {
           {/* Brand */}
           <div className="flex items-center gap-3 xl:gap-5 min-w-0">
             <Link to="/search" className="flex items-center gap-2.5 shrink-0">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-primary">
-                <Package className="size-5 text-white" strokeWidth={2} aria-hidden="true" />
-              </span>
+              <img src="/logo.svg" alt="" className="size-10" aria-hidden="true" />
               <span className="text-lg font-bold tracking-tight text-foreground">
                 Inventario
               </span>

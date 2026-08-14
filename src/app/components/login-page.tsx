@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Package, Eye, EyeOff, LogIn } from "lucide-react";
+import { Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuth } from "../context/auth-context";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -35,9 +35,7 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Brand */}
         <div className="flex flex-col items-center mb-8">
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-primary shadow-raised mb-4">
-            <Package className="size-8 text-white" strokeWidth={2} aria-hidden="true" />
-          </div>
+          <img src="/logo.svg" alt="" className="size-16 shadow-raised rounded-[24%] mb-4" aria-hidden="true" />
           <h1 className="text-[1.75rem] font-bold text-foreground tracking-tight">
             Inventario
           </h1>
