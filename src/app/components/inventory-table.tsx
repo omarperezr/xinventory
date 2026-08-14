@@ -307,7 +307,7 @@ function MobileAdminCard({
         )}
         <ProductThumb item={item} onView={onViewPhotos} />
         <div className="min-w-0 flex-1">
-          <p className="text-[0.9375rem] font-semibold text-foreground leading-tight">
+          <p className="text-[0.9375rem] font-semibold text-foreground leading-tight break-words">
             {item.name}
           </p>
           <div className="flex items-center gap-1 mt-1 flex-wrap">

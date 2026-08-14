@@ -535,7 +535,7 @@ export function TotalView({ onCheckout }: TotalViewProps) {
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="min-w-0 flex-1">
                               <p
-                                className={`text-[0.9375rem] font-semibold ${
+                                className={`text-[0.9375rem] font-semibold break-words ${
                                   unavailable
                                     ? "text-destructive-soft-foreground line-through"
                                     : "text-foreground"
