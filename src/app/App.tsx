@@ -6,7 +6,6 @@ import {
   Navigate,
   useNavigate,
 } from "react-router-dom";
-import { Package } from "lucide-react";
 import { InventoryHeader } from "./components/inventory-header";
 import { LoginPage } from "./components/login-page";
 import { OfflineSync } from "./components/offline-sync";
@@ -83,9 +82,7 @@ function AppContent() {
   if (!loaded) {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center gap-4">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-primary shadow-raised">
-          <Package className="size-7 text-white" strokeWidth={2} aria-hidden="true" />
-        </div>
+        <img src="/logo.svg" alt="" className="size-14 shadow-raised rounded-[24%]" aria-hidden="true" />
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
           <Spinner />
           Cargando…
