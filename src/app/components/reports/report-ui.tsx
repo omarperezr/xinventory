@@ -161,14 +161,14 @@ export function DeltaBadge({
   );
 }
 
-/** One card, one row: the period's headline figures side by side with
- *  dividers, instead of N separate identical icon cards. Scrolls
- *  horizontally on a narrow phone rather than wrapping into a grid, so every
- *  figure keeps the same reading position across panels. */
+/** One card with the period's headline figures. On phones they wrap into a
+ *  two-column grid so everything is visible without horizontal scrolling; on
+ *  lg+ they sit side by side with dividers. relative keeps the absolute
+ *  sr-only spans inside from widening the page. */
 export function KpiRow({ children }: { children: ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-border shadow-card overflow-x-auto">
-      <div className="flex divide-x divide-border min-w-max sm:min-w-0">{children}</div>
+    <div className="relative bg-white rounded-xl border border-border shadow-card">
+      <div className="grid grid-cols-2 lg:flex lg:divide-x lg:divide-border">{children}</div>
     </div>
   );
 }
@@ -202,7 +202,7 @@ export function Kpi({
   return (
     <Wrapper
       onClick={onClick}
-      className={`flex-1 min-w-[8.5rem] sm:min-w-0 p-3.5 md:p-4 text-left ${
+      className={`min-w-0 lg:flex-1 p-3.5 md:p-4 text-left ${
         onClick ? "hover:bg-secondary transition-colors cursor-pointer" : ""
       }`}
     >
@@ -433,16 +433,19 @@ export function DataTable<T>({
 
   return (
     <div>
-      <div className="overflow-x-auto -mx-4 md:-mx-5 px-4 md:px-5">
-        <div style={{ maxHeight, overflowY: "auto" }}>
-          <table className="w-full text-sm border-collapse">
+      {/* table-fixed on phones so the table splits the screen width instead
+          of growing to its content and scrolling sideways; the first column
+          (names) gets the biggest share and truncates. */}
+      <div className="-mx-4 md:-mx-5 px-4 md:px-5 md:overflow-x-auto">
+        <div className="overflow-x-hidden" style={{ maxHeight, overflowY: "auto" }}>
+          <table className="w-full text-sm border-collapse table-fixed md:table-auto">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-border">
                 {columns.map((c) => (
                   <th
                     key={c.key}
                     style={c.width ? { width: c.width } : undefined}
-                    className={`py-2 px-2 font-medium text-muted-foreground whitespace-nowrap ${
+                    className={`py-2 px-2 font-medium text-muted-foreground align-bottom md:whitespace-nowrap first:w-[38%] md:first:w-auto ${
                       c.align === "right" ? "text-right" : "text-left"
                     } ${c.secondary ? "hidden md:table-cell" : ""} ${
                       c.sortValue ? "cursor-pointer select-none hover:text-foreground" : ""
@@ -479,9 +482,9 @@ export function DataTable<T>({
                   {columns.map((c) => (
                     <td
                       key={c.key}
-                      className={`py-2 px-2 ${
+                      className={`py-2 px-2 overflow-hidden ${
                         c.align === "right"
-                          ? "text-right tabular-nums"
+                          ? "text-right tabular-nums whitespace-nowrap"
                           : "text-left"
                       } ${c.secondary ? "hidden md:table-cell" : ""}`}
                     >

@@ -436,19 +436,19 @@ export function PurchaseDialog({
           {/* Lines */}
           {lines.length > 0 && (
             <div className="border border-border rounded-xl overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full table-fixed text-sm">
                 <thead className="bg-canvas">
                   <tr>
                     <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground">
                       Producto
                     </th>
-                    <th className="text-right px-2 py-2.5 font-semibold text-muted-foreground w-24">
+                    <th className="text-right px-2 py-2.5 font-semibold text-muted-foreground w-16 md:w-24">
                       Cant.
                     </th>
-                    <th className="text-right px-2 py-2.5 font-semibold text-muted-foreground w-32">
+                    <th className="text-right px-2 py-2.5 font-semibold text-muted-foreground w-20 md:w-32">
                       Costo unit. $
                     </th>
-                    <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground w-28">
+                    <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground w-20 md:w-28">
                       Subtotal
                     </th>
                     <th className="w-10" />

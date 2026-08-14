@@ -261,7 +261,7 @@ export function FinanceView() {
             </div>
           </div>
 
-          <div className="flex gap-1 bg-secondary rounded-xl p-1 overflow-x-auto max-w-full self-start">
+          <div className="flex flex-wrap gap-1 bg-secondary rounded-xl p-1 max-w-full self-start">
             {PERIOD_OPTIONS.map((option) => (
               <button
                 key={option.key}
@@ -362,27 +362,30 @@ export function FinanceView() {
         )}
       </div>
 
-      {/* Panel navigation */}
-      <nav className="-mx-4 px-4 md:mx-0 md:px-0">
-        <ul className="flex gap-1 overflow-x-auto rounded-xl bg-secondary p-1">
+      {/* Panel navigation. Never scrolls: on phones the tabs wrap into a
+          grid with the label under the icon, on md+ the usual pill row. */}
+      <nav>
+        <ul className="grid grid-cols-4 gap-1 rounded-xl bg-secondary p-1 md:flex">
           {visibleTabs.map((option) => {
             const Icon = option.icon;
             const active = tab === option.key;
             return (
-              <li key={option.key}>
+              <li key={option.key} className="min-w-0">
                 <button
                   type="button"
                   onClick={() => setTab(option.key)}
                   aria-current={active ? "page" : undefined}
                   title={option.hint}
-                  className={`flex h-11 items-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-colors ${
+                  className={`w-full flex flex-col items-center gap-0.5 px-1 py-1.5 md:w-auto md:flex-row md:gap-2 md:h-11 md:px-4 md:py-0 rounded-lg font-semibold whitespace-nowrap transition-colors ${
                     active
                       ? "bg-white text-primary shadow-card"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <Icon className="size-4 shrink-0" aria-hidden="true" />
-                  {option.label}
+                  <Icon className="size-5 md:size-4 shrink-0" aria-hidden="true" />
+                  <span className="text-meta md:text-sm max-w-full truncate">
+                    {option.label}
+                  </span>
                 </button>
               </li>
             );

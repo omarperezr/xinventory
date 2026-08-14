@@ -127,6 +127,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
       key: "profit",
       header: "Ganancia",
       align: "right",
+      secondary: true,
       render: (p) => (
         <span className={p.profit < 0 ? "text-destructive font-medium" : "text-foreground"}>
           {money(p.profit)}
@@ -193,6 +194,7 @@ export function ProductsPanel({ report, money, moneyCompact }: PanelProps) {
       key: "stock",
       header: "Stock",
       align: "right",
+      secondary: true,
       render: (p) => (
         <span className={p.inStock === 0 ? "text-destructive font-medium" : "text-foreground"}>
           {p.inStock}

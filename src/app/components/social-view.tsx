@@ -80,7 +80,7 @@ export function SocialView() {
         </Button>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto rounded-xl bg-secondary p-1">
+      <div className="flex flex-wrap gap-1 rounded-xl bg-secondary p-1">
         {TABS.map(({ key, label, icon: Icon, hint }) => (
           <button
             key={key}

@@ -137,7 +137,7 @@ export function PostDialog({ post, open, onOpenChange }: PostDialogProps) {
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex flex-wrap gap-2 pb-1">
             {slides.map((url, i) => (
               <div key={url} className="relative shrink-0">
                 <img

@@ -357,26 +357,29 @@ export function ReportsView() {
         )}
       </div>
 
-      {/* Panel navigation - segmented control, horizontally scrollable on phones */}
-      <nav aria-label="Secciones del reporte" className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-        <ul className="flex gap-1 bg-secondary rounded-xl p-1 min-w-max md:min-w-0">
+      {/* Panel navigation - segmented control. Never scrolls: on phones the
+          five tabs share the row as equal columns with the label under the
+          icon, on md+ they are the usual pill row. */}
+      <nav aria-label="Secciones del reporte">
+        <ul className="grid grid-cols-5 gap-1 bg-secondary rounded-xl p-1 md:flex">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;
             return (
-              <li key={t.key}>
+              <li key={t.key} className="min-w-0">
                 <button
                   type="button"
                   onClick={() => setTab(t.key)}
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center gap-2 h-11 px-4 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+                  title={t.hint}
+                  className={`w-full flex flex-col items-center gap-0.5 px-1 py-1.5 md:w-auto md:flex-row md:gap-2 md:h-11 md:px-4 md:py-0 rounded-lg font-semibold whitespace-nowrap transition-colors ${
                     active
                       ? "bg-white text-primary shadow-card"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <Icon className="size-4.5 flex-shrink-0" aria-hidden="true" />
-                  {t.label}
+                  <Icon className="size-5 md:size-4.5 flex-shrink-0" aria-hidden="true" />
+                  <span className="text-meta md:text-sm max-w-full truncate">{t.label}</span>
                 </button>
               </li>
             );

@@ -80,7 +80,7 @@ export function SetupDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div role="tablist" className="flex gap-1 bg-secondary p-1 rounded-xl overflow-x-auto">
+        <div role="tablist" className="flex flex-wrap gap-1 bg-secondary p-1 rounded-xl">
           {TABS.map((option) => (
             <button
               key={option.key}

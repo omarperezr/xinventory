@@ -75,7 +75,10 @@ label {
   /* Grows the hit area of a small control to 44px on touch devices without
      changing what is painted, so dense desktop layouts stay dense. */
   @media (pointer: coarse) {
-    .tap-target {
+    /* :not(.absolute): several controls (password eye, card overlays) are
+       already position:absolute; forcing relative here knocked them out of
+       their anchor position on touch devices. */
+    .tap-target:not(.absolute) {
       position: relative;
     }
 

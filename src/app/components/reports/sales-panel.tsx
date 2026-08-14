@@ -117,6 +117,7 @@ export function SalesPanel({ report, money, moneyCompact, convert }: PanelProps)
       key: "avgTicket",
       header: "Ticket prom.",
       align: "right",
+      secondary: true,
       render: (s) => money(s.avgTicket),
       sortValue: (s) => s.avgTicket,
     },

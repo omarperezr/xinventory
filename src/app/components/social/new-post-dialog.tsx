@@ -191,7 +191,7 @@ export function NewPostDialog({
           </div>
 
           {selected && (
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="flex flex-wrap gap-2">
               {selected.images.slice(0, 4).map((url) => (
                 <img
                   key={url}
